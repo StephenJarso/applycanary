@@ -1,0 +1,37 @@
+# Secrets. .env holds the Anthropic key, SMTP password and GitHub token.
+# Only .env.example is tracked.
+.env
+.env.*
+!.env.example
+
+# Runtime data directory (app/config.py:59). Holds the SQLite database, the
+# resumes you upload and the tailored CVs that get generated -- i.e. personal
+# data and work history. Never commit this.
+data/
+*.db
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+
+# Virtualenv / Python build artefacts
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+
+# Tooling caches
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Editor / OS noise
+.vscode/
+.idea/
+*.swp
+.DS_Store
