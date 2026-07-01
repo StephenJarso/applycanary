@@ -1,0 +1,29 @@
+[project]
+name = "job-matcher"
+version = "0.1.0"
+description = "Automated job discovery, ATS resume scoring, CV tailoring and application queue"
+requires-python = ">=3.12"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-q --strict-markers"
+asyncio_mode = "auto"
+filterwarnings = ["ignore::DeprecationWarning"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "C4", "SIM", "ANN"]
+ignore = [
+    # ANN101/ANN102 (self/cls annotations) are not listed: ruff removed those
+    # codes in 0.5 and rejects them as config values.
+    "ANN401",  # allow Any in a few dynamic seams
+    "B008",    # FastAPI Depends() in defaults is idiomatic
+    "E501",    # long lines are caught by the formatter
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["ANN", "S101"]
