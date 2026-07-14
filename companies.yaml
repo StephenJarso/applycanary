@@ -1,0 +1,43 @@
+# Curated companies polled directly on their own ATS board.
+#
+# This is the highest-signal, fastest source: a posting appears here before it
+# propagates to aggregators, which is where the fast-apply advantage comes from.
+#
+# Find a company's board token from its careers URL:
+#   boards.greenhouse.io/ACME          -> platform: greenhouse, token: ACME
+#   jobs.lever.co/ACME                 -> platform: lever,      token: ACME
+#   jobs.ashbyhq.com/ACME              -> platform: ashby,       token: ACME
+#   jobs.smartrecruiters.com/ACME      -> platform: smartrecruiters, token: ACME
+#
+# Verify a token before relying on it:
+#   python3 scripts/verify_sources.py --platform greenhouse --token ACME
+#
+# Only smartrecruiters supports automated submission; everything else routes to
+# the review queue.
+
+companies:
+  - platform: greenhouse
+    token: stripe
+    name: Stripe
+  - platform: greenhouse
+    token: airbnb
+    name: Airbnb
+  - platform: lever
+    token: netflix
+    name: Netflix
+  - platform: ashby
+    token: ramp
+    name: Ramp
+
+# Broad aggregator sources. Set enabled: false to skip one.
+aggregators:
+  - source: remoteok
+    enabled: true
+    # Client-side filter; the feed is not filterable server-side. Leave empty
+    # for everything, which is noisy.
+    search_terms:
+      - engineer
+      - developer
+      - backend
+      - python
+      - data
