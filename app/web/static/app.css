@@ -1,0 +1,264 @@
+/* Job Matcher dashboard.
+   Plain CSS with system fonts. Dark mode follows the OS setting. */
+
+:root {
+  --bg: #ffffff;
+  --surface: #f7f7f8;
+  --border: #e3e3e6;
+  --text: #17171a;
+  --muted: #6b6b73;
+  --accent: #2f5eff;
+  --ok: #15803d;
+  --ok-bg: #dcfce7;
+  --warn: #b45309;
+  --warn-bg: #fef3c7;
+  --bad: #b91c1c;
+  --bad-bg: #fee2e2;
+  --radius: 8px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #131316;
+    --surface: #1c1c20;
+    --border: #2e2e34;
+    --text: #ececf0;
+    --muted: #9a9aa4;
+    --accent: #7d9bff;
+    --ok: #4ade80;
+    --ok-bg: #14321f;
+    --warn: #fbbf24;
+    --warn-bg: #3a2c0a;
+    --bad: #f87171;
+    --bad-bg: #3b1517;
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
+  background: var(--bg);
+  color: var(--text);
+}
+
+a { color: var(--accent); }
+
+.skip-link {
+  position: absolute;
+  left: -9999px;
+}
+.skip-link:focus {
+  left: 8px;
+  top: 8px;
+  background: var(--bg);
+  padding: 8px 12px;
+  z-index: 10;
+  border: 2px solid var(--accent);
+  border-radius: var(--radius);
+}
+
+/* ---------------------------------------------------------- chrome */
+
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 12px 24px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  flex-wrap: wrap;
+}
+
+.brand { font-weight: 700; text-decoration: none; color: var(--text); }
+
+.topbar nav { display: flex; gap: 16px; flex: 1; flex-wrap: wrap; }
+
+.topbar nav a {
+  text-decoration: none;
+  color: var(--muted);
+  padding: 4px 2px;
+  border-bottom: 2px solid transparent;
+}
+.topbar nav a[aria-current="page"] { color: var(--text); border-bottom-color: var(--accent); }
+
+.pill {
+  display: inline-block;
+  background: var(--border);
+  color: var(--text);
+  border-radius: 999px;
+  padding: 0 7px;
+  font-size: 12px;
+}
+
+.mode {
+  font-size: 12px;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 3px 10px;
+}
+.mode-auto { color: var(--warn); border-color: var(--warn); font-weight: 600; }
+
+main { padding: 24px; max-width: 1100px; margin: 0 auto; }
+
+footer {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 16px 24px;
+  border-top: 1px solid var(--border);
+  margin-top: 40px;
+}
+
+/* ---------------------------------------------------------- banners */
+
+.banner {
+  padding: 10px 24px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  font-size: 14px;
+}
+.banner-ok { background: var(--ok-bg); color: var(--ok); }
+.banner-error { background: var(--bad-bg); color: var(--bad); }
+.banner-warn { background: var(--warn-bg); color: var(--warn); }
+
+/* ---------------------------------------------------------- tables */
+
+table { width: 100%; border-collapse: collapse; }
+
+th, td {
+  text-align: left;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+
+th { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+
+tbody tr:hover { background: var(--surface); }
+
+/* ---------------------------------------------------------- scores */
+
+.score {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: var(--radius);
+  font-size: 13px;
+}
+.score-strong { background: var(--ok-bg); color: var(--ok); }
+.score-mid    { background: var(--warn-bg); color: var(--warn); }
+.score-weak   { background: var(--bad-bg); color: var(--bad); }
+.score-none   { background: var(--surface); color: var(--muted); }
+
+.tag {
+  display: inline-block;
+  font-size: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 1px 8px;
+  margin: 2px 2px 0 0;
+  color: var(--muted);
+}
+.tag-miss { border-color: var(--bad); color: var(--bad); }
+.tag-hit  { border-color: var(--ok); color: var(--ok); }
+
+.muted { color: var(--muted); font-size: 13px; }
+
+/* ---------------------------------------------------------- forms */
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+  margin-bottom: 20px;
+}
+
+label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 4px; }
+
+input[type=text], input[type=email], input[type=number], select, textarea {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  margin-bottom: 14px;
+}
+
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 16px; }
+@media (max-width: 700px) { .grid2 { grid-template-columns: 1fr; } }
+
+button, .btn {
+  font: inherit;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  background: var(--accent);
+  color: #fff;
+  padding: 8px 16px;
+  border-radius: var(--radius);
+  text-decoration: none;
+  display: inline-block;
+}
+button:hover, .btn:hover { filter: brightness(1.08); }
+
+.btn-quiet {
+  background: transparent;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  padding: 6px 12px;
+  font-size: 13px;
+}
+
+.btn-danger { background: transparent; color: var(--bad); border-color: var(--bad); }
+
+.inline { display: inline; }
+
+.actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+
+/* ---------------------------------------------------------- misc */
+
+.filters {
+  display: flex;
+  gap: 10px;
+  align-items: end;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+.filters input, .filters select { margin-bottom: 0; width: auto; }
+
+pre.doc {
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  font-size: 13px;
+  max-height: 420px;
+  overflow: auto;
+}
+
+.empty { text-align: center; padding: 60px 20px; color: var(--muted); }
+
+.violation {
+  border-left: 3px solid var(--bad);
+  padding: 6px 12px;
+  margin: 6px 0;
+  background: var(--bad-bg);
+  color: var(--bad);
+  font-size: 13px;
+  border-radius: 0 var(--radius) var(--radius) 0;
+}
+.violation-flag { border-left-color: var(--warn); background: var(--warn-bg); color: var(--warn); }
+
+.status-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
+.dot-ok { background: var(--ok); }
+.dot-bad { background: var(--bad); }

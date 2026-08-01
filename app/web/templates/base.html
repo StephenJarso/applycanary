@@ -1,0 +1,63 @@
+{# Shared layout. Plain CSS, no build step — one file to read, no toolchain. #}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Job Matcher{% endblock %}</title>
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <header class="topbar">
+    <a class="brand" href="/">Job&nbsp;Matcher</a>
+    <nav aria-label="Main">
+      <a href="/" {% if active == 'jobs' %}aria-current="page"{% endif %}>Jobs
+        {%- if counts and counts.get('total') %} <span class="pill">{{ counts['total'] }}</span>{% endif %}</a>
+      <a href="/review" {% if active == 'review' %}aria-current="page"{% endif %}>Review
+        {%- if counts and counts.get('queued') %} <span class="pill">{{ counts['queued'] }}</span>{% endif %}</a>
+      <a href="/applications" {% if active == 'applications' %}aria-current="page"{% endif %}>Applied
+        {%- if counts and counts.get('applied') %} <span class="pill">{{ counts['applied'] }}</span>{% endif %}</a>
+      <a href="/sources" {% if active == 'sources' %}aria-current="page"{% endif %}>Sources</a>
+      <a href="/profile" {% if active == 'profile' %}aria-current="page"{% endif %}>Profile</a>
+    </nav>
+    <span class="mode {% if settings.enable_auto_submit %}mode-auto{% endif %}">
+      {{ 'auto-submit on' if settings.enable_auto_submit else 'review mode' }}
+    </span>
+  </header>
+
+  {% if not profile or not profile.base_resume_text %}
+    <div class="banner" role="status">
+      No resume on file yet.
+      <a href="/profile">Upload one</a> so jobs can be scored and tailored.
+    </div>
+  {% endif %}
+
+  {% if request.query_params.get('error') %}
+    <div class="banner banner-error" role="alert">{{ request.query_params['error'] }}</div>
+  {% endif %}
+  {% for flag, msg in [
+      ('saved','Profile saved.'), ('uploaded','Resume uploaded and parsed.'),
+      ('tailored','Application prepared.'), ('submitted','Application submitted.'),
+      ('prepped','Interview prep generated.'), ('github','GitHub evidence refreshed.')] %}
+    {% if request.query_params.get(flag) %}
+      <div class="banner banner-ok" role="status">{{ msg }}</div>
+    {% endif %}
+  {% endfor %}
+
+  <main id="main">
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer>
+    <form method="post" action="/actions/poll" class="inline">
+      <button type="submit" class="btn-quiet">Poll sources now</button>
+    </form>
+    <form method="post" action="/actions/score" class="inline">
+      <button type="submit" class="btn-quiet">Score pending</button>
+    </form>
+    <a class="btn-quiet" href="/health">Health</a>
+  </footer>
+</body>
+</html>
