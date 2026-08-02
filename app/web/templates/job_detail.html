@@ -1,0 +1,212 @@
+{% extends "base.html" %}
+{% set active = 'jobs' %}
+{% block title %}{{ job.title }} — Job Matcher{% endblock %}
+
+{% block content %}
+<p class="muted"><a href="/">&larr; All jobs</a></p>
+
+<h1>{{ job.title }}</h1>
+<p class="muted">
+  <strong>{{ job.company }}</strong>
+  {% if job.location %} · {{ job.location }}{% endif %}
+  {% if job.is_remote %} <span class="tag">remote</span>{% endif %}
+  · {{ job.source }} · status: {{ job.status }}
+  {% if job.seen_count > 1 %} · seen on {{ job.seen_count }} boards{% endif %}
+</p>
+
+{% if job.salary_min or job.salary_max %}
+  <p class="muted">
+    Salary: {{ '{:,}'.format(job.salary_min) if job.salary_min else '?' }}
+    – {{ '{:,}'.format(job.salary_max) if job.salary_max else '?' }}
+    {{ job.salary_currency }}
+    {% if job.salary_is_estimate %}<span class="tag">estimate</span>{% endif %}
+  </p>
+{% endif %}
+
+<div class="actions" style="margin:20px 0">
+  <a class="btn" href="{{ job.apply_url }}" target="_blank" rel="noopener noreferrer">
+    Open posting
+  </a>
+  <form method="post" action="/job/{{ job.id }}/tailor" class="inline">
+    <button type="submit" class="btn-quiet">
+      {{ 'Re-tailor resume' if version else 'Tailor resume & prepare' }}
+    </button>
+  </form>
+  <form method="post" action="/job/{{ job.id }}/prep" class="inline">
+    <button type="submit" class="btn-quiet">
+      {{ 'Regenerate prep' if prep else 'Interview prep' }}
+    </button>
+  </form>
+  <form method="post" action="/job/{{ job.id }}/skip" class="inline">
+    <button type="submit" class="btn-quiet">Skip</button>
+  </form>
+</div>
+
+{# ------------------------------------------------------------ score #}
+{% if score %}
+<section class="card">
+  <h2>Match score</h2>
+  {% set cls = 'score-strong' if score.total >= 75 else ('score-mid' if score.total >= 55 else 'score-weak') %}
+  <p>
+    <span class="score {{ cls }}" style="font-size:20px">{{ '%.0f'|format(score.total) }}</span>
+    <span class="muted">/ 100 · {{ score.verdict or 'unrated' }}</span>
+  </p>
+  <p class="muted">
+    Keyword {{ '%.0f'|format(score.keyword_score) }} ·
+    AI fit {{ '%.0f'|format(score.semantic_score) }} ·
+    decided by {{ score.decided_by or 'n/a' }}
+    {%- if score.model_used %} ({{ score.model_used }}){% endif %}
+  </p>
+
+  {% if score.disqualifier %}
+    <p class="violation">Filtered out: {{ score.disqualifier }}</p>
+  {% endif %}
+  {% if score.reasoning %}<p>{{ score.reasoning }}</p>{% endif %}
+
+  {% if score.matched_keywords %}
+    <p><strong>You have:</strong><br>
+      {% for kw in score.matched_keywords %}<span class="tag tag-hit">{{ kw }}</span>{% endfor %}
+    </p>
+  {% endif %}
+  {% if score.missing_keywords %}
+    <p><strong>Not evidenced in your resume:</strong><br>
+      {% for kw in score.missing_keywords %}<span class="tag tag-miss">{{ kw }}</span>{% endfor %}
+    </p>
+  {% endif %}
+</section>
+{% else %}
+<p class="muted">Not scored yet.</p>
+{% endif %}
+
+{# ------------------------------------------------------ tailored cv #}
+{% if version %}
+<section class="card">
+  <h2>Tailored resume</h2>
+  <p class="muted">
+    ATS score {{ '%.0f'|format(version.ats_score_before) }}
+    &rarr; {{ '%.0f'|format(version.ats_score_after) }}
+    {%- if version.model_used %} · {{ version.model_used }}{% endif %}
+  </p>
+
+  {% if version.truthcheck_passed %}
+    <p class="banner-ok" style="padding:8px 12px;border-radius:6px">
+      Verification passed — every claim traces to your resume or GitHub.
+    </p>
+  {% else %}
+    <p class="violation">
+      <strong>Blocked from automatic submission.</strong>
+      Content was generated that could not be verified against your source material.
+      Review it before using — do not submit claims you cannot back up.
+    </p>
+    {% for claim in version.unverifiable_claims %}
+      <div class="violation">{{ claim }}</div>
+    {% endfor %}
+  {% endif %}
+
+  {% for note in version.truthcheck_notes[:12] %}
+    <div class="violation violation-flag">{{ note }}</div>
+  {% endfor %}
+
+  {% if version.keywords_added %}
+    <p><strong>Surfaced:</strong>
+      {% for kw in version.keywords_added %}<span class="tag tag-hit">{{ kw }}</span>{% endfor %}
+    </p>
+  {% endif %}
+
+  {% if version.diff_summary %}<p class="muted">{{ version.diff_summary }}</p>{% endif %}
+
+  <details>
+    <summary>View tailored resume text</summary>
+    <pre class="doc">{{ version.text }}</pre>
+  </details>
+
+  {% if version.docx_path %}
+    <p class="muted">Saved: <code>{{ version.docx_path }}</code></p>
+  {% endif %}
+</section>
+{% endif %}
+
+{# ------------------------------------------------------ application #}
+{% if application %}
+<section class="card">
+  <h2>Application</h2>
+  {% if application.submitted_at %}
+    <p>Submitted {{ application.submitted_at.strftime('%b %d, %Y at %H:%M') }}
+       via {{ application.method }}.</p>
+    {% if application.confirmation %}<p class="muted">{{ application.confirmation }}</p>{% endif %}
+  {% else %}
+    <p class="muted">Prepared, not yet submitted.</p>
+    {% if application.error %}<p class="violation">{{ application.error }}</p>{% endif %}
+
+    <form method="post" action="/job/{{ job.id }}/submit" class="actions">
+      <label style="display:flex;align-items:center;gap:6px;margin:0">
+        <input type="checkbox" name="force" value="on" style="width:auto;margin:0">
+        Override score/auto-submit gates
+      </label>
+      <button type="submit">Submit application</button>
+    </form>
+    <p class="muted" style="margin-top:8px">
+      {% if not settings.enable_auto_submit %}
+        Auto-submit is off, so this runs as a dry run unless you override.
+      {% endif %}
+      Verification failures are never overridable.
+    </p>
+  {% endif %}
+
+  {% if application.cover_letter %}
+    <details><summary>Cover letter</summary>
+      <pre class="doc">{{ application.cover_letter }}</pre>
+    </details>
+  {% endif %}
+
+  {% if application.form_answers %}
+    <details><summary>Pre-filled form answers</summary>
+      <table>
+        {% for k, v in application.form_answers.items() %}
+          <tr><td class="muted">{{ k.replace('_',' ') }}</td>
+              <td>{{ v or '—' }}</td></tr>
+        {% endfor %}
+      </table>
+    </details>
+  {% endif %}
+</section>
+{% endif %}
+
+{# --------------------------------------------------------- prep #}
+{% if prep %}
+<section class="card">
+  <h2>Interview prep</h2>
+  {% if prep.company_notes %}<p>{{ prep.company_notes }}</p>{% endif %}
+
+  {% if prep.skill_gaps %}
+    <p><strong>Study before interviewing:</strong><br>
+      {% for gap in prep.skill_gaps %}<span class="tag tag-miss">{{ gap }}</span>{% endfor %}
+    </p>
+  {% endif %}
+
+  {% for label, items in [('Technical', prep.technical_questions),
+                          ('Behavioural', prep.behavioural_questions)] %}
+    {% if items %}
+      <h3>{{ label }}</h3>
+      {% for q in items %}
+        <details>
+          <summary>{{ q.question }}</summary>
+          {% if q.why %}<p class="muted">{{ q.why }}</p>{% endif %}
+          {% if q.answer %}<p>{{ q.answer }}</p>{% endif %}
+        </details>
+      {% endfor %}
+    {% endif %}
+  {% endfor %}
+
+  {% if prep.questions_to_ask %}
+    <h3>Ask them</h3>
+    <ul>{% for q in prep.questions_to_ask %}<li>{{ q }}</li>{% endfor %}</ul>
+  {% endif %}
+</section>
+{% endif %}
+
+<section class="card">
+  <h2>Job description</h2>
+  <pre class="doc">{{ job.description or 'No description captured.' }}</pre>
+</section>
+{% endblock %}
