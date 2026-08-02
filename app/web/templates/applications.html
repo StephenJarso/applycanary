@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% set active = 'applications' %}
+{% block title %}Applications — Job Matcher{% endblock %}
+
+{% block content %}
+<h1>Applications sent</h1>
+
+{% if not rows %}
+  <div class="empty">
+    <p>No applications submitted yet.</p>
+    <p class="muted">Prepared applications wait in the <a href="/review">review queue</a>.</p>
+  </div>
+{% else %}
+<table>
+  <caption class="muted" style="text-align:left;padding-bottom:8px">
+    {{ rows|length }} submitted
+  </caption>
+  <thead>
+    <tr>
+      <th scope="col">Submitted</th>
+      <th scope="col">Role</th>
+      <th scope="col">Company</th>
+      <th scope="col">Method</th>
+      <th scope="col">Outcome</th>
+      <th scope="col">Follow up</th>
+    </tr>
+  </thead>
+  <tbody>
+  {% for application, job in rows %}
+    <tr>
+      <td class="muted">{{ application.submitted_at.strftime('%b %d %H:%M') }}</td>
+      <td><a href="/job/{{ job.id }}">{{ job.title }}</a></td>
+      <td>{{ job.company }}</td>
+      <td class="muted">{{ application.method }}</td>
+      <td>
+        {% if application.outcome %}
+          <span class="tag {{ 'tag-hit' if application.outcome in ('interview','offer') else 'tag-miss' }}">
+            {{ application.outcome }}
+          </span>
+        {% else %}
+          <span class="muted">awaiting reply</span>
+        {% endif %}
+      </td>
+      <td class="muted">
+        {{ application.follow_up_due.strftime('%b %d') if application.follow_up_due else '—' }}
+      </td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+{% endblock %}
