@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% set active = 'sources' %}
+{% block title %}Sources — Job Matcher{% endblock %}
+
+{% block content %}
+<h1>Job sources</h1>
+<p class="muted">
+  Connector health over the last runs. A source returning zero for a long stretch
+  usually means its markup or API changed, not that hiring stopped.
+</p>
+
+{% if settings.startup_warnings() %}
+  {% for w in settings.startup_warnings() %}
+    <div class="violation violation-flag">{{ w }}</div>
+  {% endfor %}
+{% endif %}
+
+{% if not sources %}
+  <div class="empty">
+    <p>No polls recorded yet.</p>
+    <form method="post" action="/actions/poll" style="margin-top:12px">
+      <button type="submit">Poll sources now</button>
+    </form>
+  </div>
+{% else %}
+<table>
+  <thead>
+    <tr>
+      <th scope="col">Source</th>
+      <th scope="col">Last run</th>
+      <th scope="col">Runs</th>
+      <th scope="col">Failures</th>
+      <th scope="col">Jobs found</th>
+      <th scope="col">New</th>
+    </tr>
+  </thead>
+  <tbody>
+  {% for entry in sources %}
+    {% set last = entry['last'] %}
+    <tr>
+      <td>
+        <span class="status-dot {{ 'dot-ok' if last.ok else 'dot-bad' }}"></span>
+        {{ entry['source'] }}
+      </td>
+      <td class="muted">
+        {{ last.started_at.strftime('%b %d %H:%M') }}
+        <span class="muted">({{ last.duration_ms }}ms)</span>
+      </td>
+      <td class="muted">{{ entry['runs'] }}</td>
+      <td class="muted">
+        {% if entry['failures'] %}
+          <span class="tag tag-miss">{{ entry['failures'] }}</span>
+        {% else %}—{% endif %}
+      </td>
+      <td class="muted">{{ entry['found'] }}</td>
+      <td class="muted">{{ entry['new'] }}</td>
+    </tr>
+    {% if not last.ok and last.error %}
+      <tr><td colspan="6"><div class="violation">{{ last.error[:300] }}</div></td></tr>
+    {% endif %}
+  {% endfor %}
+  </tbody>
+</table>
+
+<h2>Recent runs</h2>
+<table>
+  <thead>
+    <tr>
+      <th scope="col">When</th><th scope="col">Source</th>
+      <th scope="col">Found</th><th scope="col">New</th>
+      <th scope="col">Dupes</th><th scope="col">Result</th>
+    </tr>
+  </thead>
+  <tbody>
+  {% for run in recent %}
+    <tr>
+      <td class="muted">{{ run.started_at.strftime('%b %d %H:%M:%S') }}</td>
+      <td class="muted">{{ run.source }}</td>
+      <td class="muted">{{ run.found }}</td>
+      <td class="muted">{{ run.new_jobs }}</td>
+      <td class="muted">{{ run.duplicates }}</td>
+      <td>
+        {% if run.ok %}
+          <span class="tag tag-hit">ok</span>
+        {% else %}
+          <span class="tag tag-miss">{{ (run.error or 'failed')[:80] }}</span>
+        {% endif %}
+      </td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+{% endblock %}
