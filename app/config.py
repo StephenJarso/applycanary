@@ -55,7 +55,7 @@ class Settings(BaseSettings):
     # --- server ---
     host: str = "127.0.0.1"
     port: int = 8000
-    database_url: str = "sqlite:///./data/job_matcher.db"
+    database_url: str = "sqlite:///./data/applycanary.db"
     data_dir: Path = Field(default=Path("./data"))
     log_level: str = "INFO"
 

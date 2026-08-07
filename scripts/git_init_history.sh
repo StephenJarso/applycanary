@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Build the initial git history for job_matcher as a sequence of small,
+# Build the initial git history for applycanary as a sequence of small,
 # dependency-ordered commits rather than one bulk import.
 #
 # Usage:
@@ -17,7 +17,7 @@
 
 set -euo pipefail
 
-REMOTE_URL="${1:-git@github.com:StephenJarso/job-matcher.git}"
+REMOTE_URL="${1:-git@github.com:StephenJarso/applycanary.git}"
 [ "$REMOTE_URL" = "none" ] && REMOTE_URL=""
 cd "$(dirname "$0")/.."
 

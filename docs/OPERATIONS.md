@@ -102,8 +102,8 @@ tables but never alters existing ones. Adding a column to a populated database
 means either writing the `ALTER TABLE` by hand or recreating the database:
 
 ```bash
-cp data/job_matcher.db data/job_matcher.db.backup
-rm data/job_matcher.db
+cp data/applycanary.db data/applycanary.db.backup
+rm data/applycanary.db
 python run.py
 ```
 

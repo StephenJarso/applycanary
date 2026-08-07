@@ -4,14 +4,14 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{% block title %}Job Matcher{% endblock %}</title>
+  <title>{% block title %}ApplyCanary{% endblock %}</title>
   <link rel="stylesheet" href="/static/app.css">
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to content</a>
 
   <header class="topbar">
-    <a class="brand" href="/">Job&nbsp;Matcher</a>
+    <a class="brand" href="/">ApplyCanary</a>
     <nav aria-label="Main">
       <a href="/" {% if active == 'jobs' %}aria-current="page"{% endif %}>Jobs
         {%- if counts and counts.get('total') %} <span class="pill">{{ counts['total'] }}</span>{% endif %}</a>

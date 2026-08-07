@@ -23,7 +23,7 @@ from dataclasses import asdict, dataclass, field
 from typing import Any
 
 TIMEOUT = 20
-UA = "job-matcher/0.1 (personal job search agent)"
+UA = "applycanary/0.1 (personal job search agent)"
 
 # (label, url, how to reach the job list, fields we rely on)
 PROBES: list[dict[str, Any]] = [

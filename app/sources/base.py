@@ -26,7 +26,7 @@ log = logging.getLogger(__name__)
 
 DEFAULT_TIMEOUT = 20.0
 # Identify the client honestly and give operators a way to reach the user.
-USER_AGENT = "job-matcher/0.1 (personal job search agent; +https://github.com)"
+USER_AGENT = "applycanary/0.1 (personal job search agent; +https://github.com)"
 
 
 @dataclass(slots=True)
