@@ -56,7 +56,7 @@ def main() -> int:
     for warning in settings.startup_warnings():
         print(f"  ! {warning}", file=sys.stderr)
 
-    print(f"\n  Job Matcher -> http://{settings.host}:{settings.port}\n")
+    print(f"\n  ApplyCanary -> http://{settings.host}:{settings.port}\n")
 
     uvicorn.run(
         "app.main:app",

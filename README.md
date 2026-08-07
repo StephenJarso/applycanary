@@ -1,4 +1,4 @@
-# Job Matcher
+# ApplyCanary
 
 Self-hosted job discovery, ATS resume tailoring, and application tracking. Runs on
 your own machine, polls job boards around the clock, scores openings against your
@@ -96,12 +96,12 @@ plenty — under systemd:
 
 ```ini
 [Unit]
-Description=Job Matcher
+Description=ApplyCanary
 After=network-online.target
 
 [Service]
-WorkingDirectory=/home/YOU/job_matcher
-ExecStart=/home/YOU/job_matcher/.venv/bin/python run.py
+WorkingDirectory=/home/YOU/applycanary
+ExecStart=/home/YOU/applycanary/.venv/bin/python run.py
 Restart=always
 User=YOU
 

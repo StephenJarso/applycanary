@@ -78,7 +78,7 @@ def create_app() -> FastAPI:
     settings = get_settings()
 
     app = FastAPI(
-        title="Job Matcher",
+        title="ApplyCanary",
         description="Self-hosted job discovery, ATS resume tailoring and application tracking.",
         version="0.1.0",
         lifespan=lifespan,

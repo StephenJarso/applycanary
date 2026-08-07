@@ -1,5 +1,5 @@
 [project]
-name = "job-matcher"
+name = "applycanary"
 version = "0.1.0"
 description = "Automated job discovery, ATS resume scoring, CV tailoring and application queue"
 requires-python = ">=3.12"
