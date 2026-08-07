@@ -1,0 +1,78 @@
+# ApplyCanary — one service running the dashboard and the scheduler together.
+#
+#   cp .env.example .env     # add ANTHROPIC_API_KEY, then edit as needed
+#   docker compose up -d
+#   docker compose logs -f
+#
+# Dashboard: http://127.0.0.1:8000
+
+services:
+  applycanary:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: applycanary:latest
+    container_name: applycanary
+
+    # SECURITY: bound to the host loopback, not 0.0.0.0.
+    #
+    # The app has no authentication and serves your resume, contact details and
+    # full application history. The container binds 0.0.0.0 internally because
+    # 127.0.0.1 inside a container is unreachable from the host — this published
+    # port is the actual boundary.
+    #
+    # Changing this to "8000:8000" exposes the dashboard to every machine that
+    # can route to this host, including the open internet on a public VPS. Put
+    # authentication in front of it first.
+    ports:
+      - "127.0.0.1:8000:8000"
+
+    # Secrets stay in .env and out of the image. Nothing here is baked in.
+    env_file:
+      - .env
+
+    environment:
+      # Must stay 0.0.0.0 — see the ports comment above.
+      HOST: 0.0.0.0
+      PORT: 8000
+      DATA_DIR: /data
+      DATABASE_URL: sqlite:////data/applycanary.db
+      # The digest, GitHub refresh and expiry jobs use cron triggers with bare
+      # hour values (app/scheduler.py:214-216), which follow system local time.
+      # Containers default to UTC, so an 08:03 digest would arrive at 11:03 in
+      # Nairobi. Set this to your zone.
+      TZ: ${TZ:-Africa/Nairobi}
+
+    volumes:
+      # Database, uploaded resumes, generated CVs and cache. Without this,
+      # every rebuild discards your application history.
+      - applycanary-data:/data
+      # Edit the curated board list without rebuilding the image.
+      - ./companies.yaml:/app/companies.yaml:ro
+
+    restart: unless-stopped
+
+    # The scheduler must survive reboots for the apply-early advantage to mean
+    # anything; restart:unless-stopped plus the healthcheck covers that.
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8000/health"]
+      interval: 60s
+      timeout: 10s
+      start_period: 25s
+      retries: 3
+
+    # Modest guards. Polling and scoring are I/O-bound; a runaway loop should
+    # not take the host down with it.
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  applycanary-data:
+    name: applycanary-data
