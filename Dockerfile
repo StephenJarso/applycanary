@@ -1,0 +1,79 @@
+# ApplyCanary — single image running the dashboard and the in-process scheduler.
+#
+# Two stages so compiler toolchains used to build wheels do not ship in the
+# final image. Runtime carries only the interpreter and installed packages.
+
+# ---------------------------------------------------------------- build
+FROM python:3.12-slim AS build
+
+# gcc is needed by any dependency without a prebuilt wheel for this platform
+# (rapidfuzz and pydantic-core publish wheels, but a pip resolver picking an
+# older release can still fall back to source).
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends gcc build-essential \
+ && rm -rf /var/lib/apt/lists/*
+
+# Install into a virtualenv so the whole tree copies to the runtime stage as one
+# self-contained directory.
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+# Copied alone so this layer caches on dependency changes, not code changes.
+COPY requirements.txt .
+RUN pip install --no-cache-dir --upgrade pip \
+ && pip install --no-cache-dir -r requirements.txt
+
+# ---------------------------------------------------------------- runtime
+FROM python:3.12-slim AS runtime
+
+LABEL org.opencontainers.image.title="ApplyCanary" \
+      org.opencontainers.image.description="Job discovery, ATS scoring and application agent" \
+      org.opencontainers.image.source="https://github.com/StephenJarso/applycanary"
+
+# curl serves the healthcheck below. tzdata lets TZ resolve to a real zone, which
+# the digest and GitHub-refresh cron triggers depend on for correct local hours.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends curl tzdata \
+ && rm -rf /var/lib/apt/lists/*
+
+COPY --from=build /opt/venv /opt/venv
+
+ENV PATH="/opt/venv/bin:$PATH" \
+    PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    # Bind all interfaces: 127.0.0.1 inside a container is unreachable from the
+    # host. The security boundary is the published port, which docker-compose
+    # pins to the host loopback. See the comment there before changing it.
+    HOST=0.0.0.0 \
+    PORT=8000 \
+    DATA_DIR=/data \
+    DATABASE_URL=sqlite:////data/applycanary.db
+
+# Run unprivileged. Created before the code copy so ownership is set in one pass.
+RUN useradd --create-home --uid 10001 canary \
+ && mkdir -p /data \
+ && chown -R canary:canary /data
+
+WORKDIR /app
+COPY --chown=canary:canary app/ ./app/
+COPY --chown=canary:canary run.py ./
+# Read at runtime from the working directory (app/pipeline/ingest.py:31), so it
+# must be present in the image. Override with a bind mount to edit the curated
+# board list without rebuilding.
+COPY --chown=canary:canary companies.yaml ./
+
+USER canary
+
+# Declared for documentation; compose does the actual publishing.
+EXPOSE 8000
+
+# Persist the SQLite database, resumes, generated CVs and cache. Without a mount
+# here every rebuild discards application history.
+VOLUME ["/data"]
+
+# /health reports scheduler state, so a hung scheduler surfaces as unhealthy
+# rather than staying invisible behind a listening socket.
+HEALTHCHECK --interval=60s --timeout=10s --start-period=25s --retries=3 \
+  CMD curl -fsS "http://127.0.0.1:${PORT}/health" >/dev/null || exit 1
+
+CMD ["python", "run.py"]

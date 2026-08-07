@@ -13,6 +13,14 @@ cp .env.example .env        # then edit: add ANTHROPIC_API_KEY
 .venv/bin/python run.py
 ```
 
+Or with Docker:
+
+```bash
+cp .env.example .env        # then edit: add ANTHROPIC_API_KEY
+docker compose up -d
+docker compose logs -f
+```
+
 Open http://127.0.0.1:8000, go to **Profile**, upload your resume, and set your
 target titles and locations. Polling starts on its own.
 
@@ -92,7 +100,49 @@ The ones that matter most:
 The scheduler runs in the same process as the web app, so the app must stay up.
 On a laptop that sleeps, it pauses with the machine. For genuine round-the-clock
 coverage, run it on a box that stays awake — a cheap VPS or a Raspberry Pi is
-plenty — under systemd:
+plenty.
+
+### With Docker
+
+```bash
+docker compose up -d          # start
+docker compose logs -f        # watch
+docker compose restart        # after editing .env
+docker compose down           # stop (data survives)
+```
+
+One container runs both the dashboard and the scheduler. `restart:
+unless-stopped` brings it back after a reboot.
+
+The database, uploaded resumes and generated CVs live in the named volume
+`applycanary-data`, so rebuilds do not lose your application history. Back it up
+with:
+
+```bash
+docker run --rm -v applycanary-data:/data -v "$PWD":/backup alpine \
+  tar czf /backup/applycanary-backup.tar.gz -C /data .
+```
+
+`docker compose down -v` deletes that volume and everything in it.
+
+Two details worth knowing:
+
+- **The published port is the security boundary.** The container binds `0.0.0.0`
+  internally because `127.0.0.1` inside a container is unreachable from the
+  host. Compose publishes it as `127.0.0.1:8000:8000`, so only this machine can
+  reach it. Changing that to `8000:8000` exposes an unauthenticated dashboard
+  holding your resume to anything that can route to the host.
+- **Set `TZ`.** Containers default to UTC, and the daily digest, GitHub refresh
+  and expiry jobs run on cron triggers in local time. Left unset, an 08:03
+  digest arrives at 11:03 in Nairobi. `.env.example` defaults to
+  `Africa/Nairobi`.
+
+`companies.yaml` is bind-mounted read-only, so you can edit the curated board
+list and `docker compose restart` without rebuilding.
+
+### With systemd
+
+Under systemd instead:
 
 ```ini
 [Unit]

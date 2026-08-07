@@ -9,6 +9,23 @@ from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
+@lru_cache
+def in_container() -> bool:
+    """Best-effort detection of Docker/Podman/Kubernetes.
+
+    Used only to phrase a warning accurately, never to change behaviour, so a
+    wrong answer is harmless. /.dockerenv covers Docker; the cgroup scan covers
+    Podman and Kubernetes, where that file is absent.
+    """
+    if Path("/.dockerenv").exists() or Path("/run/.containerenv").exists():
+        return True
+    try:
+        cgroup = Path("/proc/1/cgroup").read_text(encoding="utf-8", errors="ignore")
+    except OSError:
+        return False
+    return any(tag in cgroup for tag in ("docker", "containerd", "kubepods", "libpod"))
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -123,10 +140,20 @@ class Settings(BaseSettings):
                 f"{self.auto_submit_min_score}."
             )
         if self.host not in ("127.0.0.1", "localhost", "::1"):
-            warnings.append(
-                f"HOST is {self.host}, not loopback. The dashboard has no "
-                "authentication and exposes your resume and application history."
-            )
+            if in_container():
+                # A container must bind 0.0.0.0 to be reachable at all, so the
+                # bind address says nothing about exposure here. Point at the
+                # thing that does decide it rather than crying wolf every boot.
+                warnings.append(
+                    "Running in a container. The dashboard has no authentication, "
+                    "so publish it to the host loopback only "
+                    '("127.0.0.1:8000:8000", as docker-compose.yml does).'
+                )
+            else:
+                warnings.append(
+                    f"HOST is {self.host}, not loopback. The dashboard has no "
+                    "authentication and exposes your resume and application history."
+                )
         return warnings
 
 

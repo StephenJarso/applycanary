@@ -1,0 +1,43 @@
+# Keep the build context small and secrets out of the image.
+
+# Secrets. Supplied at runtime via compose `env_file`, never baked into a layer.
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Personal data: resumes, generated CVs, the SQLite database. Lives in a
+# mounted volume so it survives rebuilds and never enters the image.
+data/
+
+# Local virtualenvs — wrong platform for the image anyway.
+.venv/
+venv/
+env/
+
+# Python noise
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+htmlcov/
+.coverage
+
+# VCS and editor
+.git/
+.gitignore
+.github/
+.idea/
+.vscode/
+*.swp
+
+# Docs and build artifacts the running app does not read
+docs/
+*.md
+!README.md
+Dockerfile
+docker-compose.yml
+.dockerignore
