@@ -21,6 +21,13 @@ ignore = [
     # ANN101/ANN102 (self/cls annotations) are not listed: ruff removed those
     # codes in 0.5 and rejects them as config values.
     "ANN401",  # allow Any in a few dynamic seams
+    # The nested conditionals this flags each carry a comment explaining the
+    # inner guard; collapsing them into one condition would bury the reason.
+    "SIM102",
+    # try/except/pass around best-effort PDF and DOCX probes. contextlib.suppress
+    # reads as intentional silencing of a whole block; these are narrow "this
+    # optional signal may be unavailable" guards and are clearer inline.
+    "SIM105",
     "B008",    # FastAPI Depends() in defaults is idiomatic
     "E501",    # long lines are caught by the formatter
 ]

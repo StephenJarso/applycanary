@@ -106,15 +106,25 @@ def location_bucket(location: str, *, remote: bool = False) -> str:
 
 def canonical_url(url: str) -> str:
     """Strip tracking params and normalise, so the same posting relabelled by an
-    aggregator resolves to one key."""
+    aggregator resolves to one key.
+
+    Input without a host is returned unchanged. `urlsplit` does not raise on
+    junk — it just yields an empty netloc — and rebuilding that produces a
+    plausible-looking `https:///...` string. Since this value is dedup layer 2,
+    such a string could collide across unrelated postings and merge distinct
+    jobs, so anything that is not a real absolute URL is left alone.
+    """
     if not url:
         return ""
+    cleaned = url.strip()
     try:
-        parts = urlsplit(url.strip())
+        parts = urlsplit(cleaned)
     except ValueError:
-        return url.strip()
+        return cleaned
+    if not parts.netloc:
+        return cleaned
     scheme = "https" if parts.scheme in ("http", "https", "") else parts.scheme
-    host = (parts.netloc or "").lower().removeprefix("www.")
+    host = parts.netloc.lower().removeprefix("www.")
     kept = [(k, v) for k, v in parse_qsl(parts.query, keep_blank_values=False)
             if not _TRACKING_PARAMS.match(k)]
     kept.sort()

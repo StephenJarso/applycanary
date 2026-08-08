@@ -2,19 +2,24 @@
 
 Timestamps are naive UTC throughout (`utcnow()`); SQLite has no tz-aware type
 and mixing aware/naive datetimes is a common source of comparison bugs.
+
+Note: this module deliberately does NOT use `from __future__ import annotations`.
+That turns every annotation into a string, and SQLAlchemy cannot resolve a PEP
+604 union like `JobScore | None` as a relationship target — mappers fail to
+configure on the first query. Relationship targets use quoted forward
+references instead, which is the form SQLModel documents.
 """
 
-from __future__ import annotations
-
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from enum import StrEnum
+from typing import Optional
 
 from sqlalchemy import Column, Index, Text, UniqueConstraint
 from sqlmodel import JSON, Field, Relationship, SQLModel
 
 
 def utcnow() -> datetime:
-    return datetime.now(timezone.utc).replace(tzinfo=None)
+    return datetime.now(UTC).replace(tzinfo=None)
 
 
 class JobStatus(StrEnum):
@@ -123,15 +128,15 @@ class Job(SQLModel, table=True):
     status: JobStatus = Field(default=JobStatus.NEW, index=True)
     seen_count: int = 1
 
-    score: JobScore | None = Relationship(
+    score: Optional["JobScore"] = Relationship(
         back_populates="job",
         sa_relationship_kwargs={"uselist": False, "cascade": "all, delete-orphan"},
     )
-    aliases: list[JobAlias] = Relationship(
+    aliases: list["JobAlias"] = Relationship(
         back_populates="job",
         sa_relationship_kwargs={"cascade": "all, delete-orphan"},
     )
-    application: Application | None = Relationship(
+    application: Optional["Application"] = Relationship(
         back_populates="job",
         sa_relationship_kwargs={"uselist": False, "cascade": "all, delete-orphan"},
     )
@@ -162,7 +167,7 @@ class JobAlias(SQLModel, table=True):
     match_score: float | None = None
     seen_at: datetime = Field(default_factory=utcnow)
 
-    job: Job | None = Relationship(back_populates="aliases")
+    job: Optional["Job"] = Relationship(back_populates="aliases")
 
 
 class JobScore(SQLModel, table=True):
@@ -187,7 +192,7 @@ class JobScore(SQLModel, table=True):
     model_used: str = ""
     scored_at: datetime = Field(default_factory=utcnow)
 
-    job: Job | None = Relationship(back_populates="score")
+    job: Optional["Job"] = Relationship(back_populates="score")
 
 
 # ---------------------------------------------------------------- artifacts
@@ -240,7 +245,7 @@ class Application(SQLModel, table=True):
     response_received: bool = False
     outcome: str = ""               # interview | rejected | ghosted | offer
 
-    job: Job | None = Relationship(back_populates="application")
+    job: Optional["Job"] = Relationship(back_populates="application")
 
 
 class InterviewPrep(SQLModel, table=True):

@@ -37,7 +37,7 @@ PROBES: list[dict[str, Any]] = [
     {
         "label": "lever",
         "url": "https://api.lever.co/v0/postings/{token}?mode=json",
-        "default_token": "netflix",
+        "default_token": "spotify",
         "list_path": [],  # bare array
         "expect_fields": ["id", "text", "hostedUrl", "categories"],
     },
@@ -51,14 +51,14 @@ PROBES: list[dict[str, Any]] = [
     {
         "label": "smartrecruiters",
         "url": "https://api.smartrecruiters.com/v1/companies/{token}/postings?limit=10",
-        "default_token": "Ubisoft",
+        "default_token": "Visa",
         "list_path": ["content"],
         "expect_fields": ["id", "name", "ref", "location"],
     },
     {
         "label": "workable",
         "url": "https://apply.workable.com/api/v1/widget/accounts/{token}?details=true",
-        "default_token": "workable",
+        "default_token": "zapier",
         "list_path": ["jobs"],
         "expect_fields": ["id", "title", "url"],
     },
@@ -135,8 +135,17 @@ def probe(spec: dict[str, Any], token_override: str | None = None) -> Result:
                       error=f"expected a list at {spec['list_path'] or 'root'}, "
                             f"got {type(items).__name__}")
 
-    sample = next((i for i in items if isinstance(i, dict)), {})
-    missing = [f for f in spec["expect_fields"] if f not in sample]
+    # Sample the first element that actually looks like a posting. RemoteOK
+    # puts a legal notice at index 0, so naively sampling items[0] reports
+    # field drift on a connector that is working fine.
+    sample = next(
+        (i for i in items
+         if isinstance(i, dict) and not i.get("legal")
+         and any(f in i for f in spec["expect_fields"])),
+        next((i for i in items if isinstance(i, dict)), {}),
+    )
+    # An empty board is not drift: there is nothing to check the shape against.
+    missing = [f for f in spec["expect_fields"] if f not in sample] if sample else []
     return Result(
         spec["label"], url, True, status, elapsed,
         count=len(items),

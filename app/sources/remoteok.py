@@ -13,7 +13,7 @@ estimates and never used to reject a job outright.
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from app.sources.base import BaseSource, RawJob, clean_html, register
@@ -66,7 +66,7 @@ class RemoteOkSource(BaseSource):
 
         posted = parse_iso(item.get("date"))
         if posted is None and isinstance(epoch := item.get("epoch"), (int, float)):
-            posted = datetime.fromtimestamp(epoch, tz=timezone.utc).replace(tzinfo=None)
+            posted = datetime.fromtimestamp(epoch, tz=UTC).replace(tzinfo=None)
 
         lo = _int_or_none(item.get("salary_min"))
         hi = _int_or_none(item.get("salary_max"))
