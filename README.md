@@ -10,10 +10,14 @@ resume, and prepares tailored applications for you to approve.
 python3 -m venv .venv
 .venv/bin/pip install -r requirements.txt
 cp .env.example .env        # then edit: add ANTHROPIC_API_KEY
+
+# Build the React dashboard (optional — the app runs without it)
+cd frontend && npm ci && npm run build && cd ..
+
 .venv/bin/python run.py
 ```
 
-Or with Docker:
+Or with Docker, which builds the frontend for you:
 
 ```bash
 cp .env.example .env        # then edit: add ANTHROPIC_API_KEY
@@ -21,10 +25,35 @@ docker compose up -d
 docker compose logs -f
 ```
 
-Open http://127.0.0.1:8000, go to **Profile**, upload your resume, and set your
-target titles and locations. Polling starts on its own.
+Then open:
+
+- **http://127.0.0.1:8000/ui** — the React dashboard
+- **http://127.0.0.1:8000/** — the server-rendered fallback, no build needed
+- **http://127.0.0.1:8000/docs** — interactive API reference
+
+Go to **Profile**, upload your resume, and set your target titles and locations.
+Polling starts on its own.
 
 Nothing is submitted anywhere until you approve it. See [Auto-submit](#auto-submit).
+
+## Interfaces
+
+There are two UIs over one JSON API, and the API is the real contract — both
+render the same data from `/api/*`.
+
+**React dashboard at `/ui`.** Dense dark-first tables, live filtering, score
+breakdowns, keyboard-navigable rows. Needs `npm run build`; the bundle lands in
+`app/web/dist` and FastAPI serves it. About 89 kB gzipped.
+
+**Jinja dashboard at `/`.** Server-rendered, zero build step, works from a clean
+checkout with Node nowhere in sight. Kept deliberately: it means a broken
+frontend build never costs you access to your own application history.
+
+Frontend development, against the real backend rather than mocks:
+
+```bash
+cd frontend && npm run dev      # :5173, proxies /api to :8000
+```
 
 ## What it does
 
@@ -202,7 +231,15 @@ app/
   resume/           parse, render
   apply/            form fill, submitters, runner
   notify/           email digest and alerts
-  web/              routes and templates
+  web/
+    api.py          JSON API consumed by both UIs
+    routes.py       server-rendered Jinja dashboard
+    templates/      Jinja templates
+    dist/           built React bundle (generated, gitignored)
+frontend/
+  src/api.ts        typed client mirroring the Pydantic models
+  src/pages/        Jobs, JobDetail, Review, Applications, Sources, Profile
+  src/styles.css    design tokens, dark-first
 companies.yaml      boards to poll
 run.py              entrypoint
 ```

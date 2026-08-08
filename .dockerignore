@@ -16,6 +16,13 @@ data/
 venv/
 env/
 
+# Frontend. node_modules is platform-specific and large; the frontend stage
+# installs its own. The built bundle is produced inside the image, so a stale
+# local build must not be copied in over it.
+frontend/node_modules/
+frontend/.vite/
+app/web/dist/
+
 # Python noise
 __pycache__/
 *.py[cod]
