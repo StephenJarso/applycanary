@@ -8,12 +8,16 @@
 #   jobs.lever.co/ACME                 -> platform: lever,      token: ACME
 #   jobs.ashbyhq.com/ACME              -> platform: ashby,       token: ACME
 #   jobs.smartrecruiters.com/ACME      -> platform: smartrecruiters, token: ACME
+#   apply.workable.com/ACME            -> platform: workable,   token: ACME
 #
 # Verify a token before relying on it:
 #   python3 scripts/verify_sources.py --platform greenhouse --token ACME
 #
 # Only smartrecruiters supports automated submission; everything else routes to
 # the review queue.
+#
+# Every token below was verified live. Tokens go stale — `lever: netflix` was a
+# 404 by the time it was first run — so re-verify rather than trusting this list.
 
 companies:
   - platform: greenhouse
@@ -22,22 +26,61 @@ companies:
   - platform: greenhouse
     token: airbnb
     name: Airbnb
+  - platform: greenhouse
+    token: gitlab
+    name: GitLab
   - platform: lever
-    token: netflix
-    name: Netflix
+    token: spotify
+    name: Spotify
   - platform: ashby
     token: ramp
     name: Ramp
+  - platform: ashby
+    token: linear
+    name: Linear
+  - platform: workable
+    token: zego
+    name: Zego
 
 # Broad aggregator sources. Set enabled: false to skip one.
+#
+# These trade precision for reach: they carry far more postings than a single
+# board, but the same job often appears on several at once. Dedup handles the
+# overlap, so enabling more of them costs poll time rather than duplicate noise.
+#
+# All of these need no API key. Their salary figures are self-reported ranges,
+# so they are stored flagged as estimates and never used to reject a job.
 aggregators:
   - source: remoteok
     enabled: true
     # Client-side filter; the feed is not filterable server-side. Leave empty
     # for everything, which is noisy.
-    search_terms:
+    search_terms: &terms
       - engineer
       - developer
       - backend
       - python
       - data
+
+  - source: remotive
+    enabled: true
+    # Filterable server-side, so this is a query rather than a local filter.
+    search_terms: *terms
+    limit: 100
+
+  - source: jobicy
+    enabled: true
+    search_terms: *terms
+    count: 50
+
+  - source: himalayas
+    enabled: true
+    # Capped at 50 by the API.
+    limit: 50
+
+  # Largest feed of the set and mostly Germany/EU. Filtered client-side, so it
+  # is the slowest to poll; disable it if you are not targeting Europe.
+  - source: arbeitnow
+    enabled: true
+    search_terms: *terms
+    remote_only: false

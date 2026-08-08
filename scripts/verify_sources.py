@@ -22,7 +22,11 @@ import urllib.request
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
-TIMEOUT = 20
+# Generous, because a slow board is not a dead board. Greenhouse with
+# content=true returns every description inline and can exceed 20s on a large
+# board; failing it as DEAD would be exactly the false alarm this script exists
+# to avoid.
+TIMEOUT = 45
 UA = "applycanary/0.1 (personal job search agent)"
 
 # (label, url, how to reach the job list, fields we rely on)
@@ -58,9 +62,12 @@ PROBES: list[dict[str, Any]] = [
     {
         "label": "workable",
         "url": "https://apply.workable.com/api/v1/widget/accounts/{token}?details=true",
-        "default_token": "zapier",
+        # Most Workable boards sit at zero live openings, which is a valid
+        # response and would look like drift. This token is reliably populated.
+        "default_token": "zego",
         "list_path": ["jobs"],
-        "expect_fields": ["id", "title", "url"],
+        # There is no `id`; shortcode is the stable public identifier.
+        "expect_fields": ["shortcode", "title", "application_url"],
     },
     {
         "label": "remoteok",
@@ -68,6 +75,34 @@ PROBES: list[dict[str, Any]] = [
         "default_token": "",
         "list_path": [],
         "expect_fields": ["id", "position", "company"],
+    },
+    {
+        "label": "remotive",
+        "url": "https://remotive.com/api/remote-jobs?limit=5",
+        "default_token": "",
+        "list_path": ["jobs"],
+        "expect_fields": ["id", "title", "company_name", "url"],
+    },
+    {
+        "label": "arbeitnow",
+        "url": "https://www.arbeitnow.com/api/job-board-api",
+        "default_token": "",
+        "list_path": ["data"],
+        "expect_fields": ["slug", "title", "company_name", "url"],
+    },
+    {
+        "label": "jobicy",
+        "url": "https://jobicy.com/api/v2/remote-jobs?count=5",
+        "default_token": "",
+        "list_path": ["jobs"],
+        "expect_fields": ["id", "jobTitle", "companyName", "url"],
+    },
+    {
+        "label": "himalayas",
+        "url": "https://himalayas.app/jobs/api?limit=5",
+        "default_token": "",
+        "list_path": ["jobs"],
+        "expect_fields": ["title", "companyName", "applicationLink", "guid"],
     },
     {
         "label": "hn_hiring",

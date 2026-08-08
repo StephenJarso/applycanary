@@ -10,7 +10,7 @@ from __future__ import annotations
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import UTC, datetime
 
 import httpx
 
@@ -160,6 +160,27 @@ def get_source(name: str) -> type[BaseSource]:
 
 def all_sources() -> dict[str, type[BaseSource]]:
     return dict(_REGISTRY)
+
+
+def parse_epoch(value: object, *, unit: str = "s") -> datetime | None:
+    """Epoch timestamp to naive UTC, matching the convention in `app/models.py`.
+
+    Boards disagree on units: Lever sends milliseconds, Arbeitnow and Himalayas
+    send seconds. Pass `unit="ms"` for the former.
+
+    Values are sanity-bounded to 2000-2100 because a board occasionally emits 0
+    or a placeholder, and a job dated 1970 would sort to the bottom forever
+    while one dated 2255 would pin to the top.
+    """
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    seconds = float(value) / 1000.0 if unit == "ms" else float(value)
+    if not 946_684_800 <= seconds <= 4_102_444_800:
+        return None
+    try:
+        return datetime.fromtimestamp(seconds, tz=UTC).replace(tzinfo=None)
+    except (OverflowError, OSError, ValueError):
+        return None
 
 
 def clean_html(raw: str) -> str:

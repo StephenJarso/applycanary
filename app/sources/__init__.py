@@ -7,11 +7,16 @@ from __future__ import annotations
 
 # Imported for registration side effects.
 from app.sources import (  # noqa: F401,E402
+    arbeitnow,
     ashby,
     greenhouse,
+    himalayas,
+    jobicy,
     lever,
     remoteok,
+    remotive,
     smartrecruiters,
+    workable,
 )
 from app.sources.base import (  # noqa: F401
     BaseSource,
