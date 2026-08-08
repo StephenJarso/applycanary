@@ -42,3 +42,6 @@ npm-debug.log*
 .idea/
 *.swp
 .DS_Store
+
+# Volume backups written by scripts/backup.sh — data, not source.
+backups/
