@@ -251,6 +251,32 @@ def _parse_text(p: Path) -> ParsedResume:
 # ---------------------------------------------------------------- content
 
 
+def _title_like(line: str) -> bool:
+    """True when every word starts uppercase, ignoring short joining words.
+
+    `str.istitle()` is too strict for real headings: an apostrophe splits a word
+    internally, so "Where I've Made An Impact" reports False and a genuinely
+    creative heading slips past the check.
+    """
+    if line.isupper():
+        return True
+    joiners = {"a", "an", "the", "and", "or", "of", "in", "at", "to", "for", "my", "i"}
+    words = [w for w in re.split(r"[\s/&-]+", line) if w]
+    if not words:
+        return False
+    significant = 0
+    for word in words:
+        letters = [c for c in word if c.isalpha()]
+        if not letters:
+            continue
+        if word.lower().strip(".,'") in joiners:
+            continue
+        significant += 1
+        if not letters[0].isupper():
+            return False
+    return significant > 0
+
+
 def _extract_content_signals(out: ParsedResume) -> None:
     out.emails = list(dict.fromkeys(_EMAIL.findall(out.text)))
     out.urls = list(dict.fromkeys(_URL.findall(out.text)))
@@ -264,7 +290,7 @@ def _extract_content_signals(out: ParsedResume) -> None:
         alias: key for key, aliases in CANONICAL_SECTIONS.items() for alias in aliases
     }
 
-    for raw_line in out.text.splitlines():
+    for index, raw_line in enumerate(out.text.splitlines()):
         line = raw_line.strip()
         if not line or len(line) > 60:
             continue
@@ -280,7 +306,13 @@ def _extract_content_signals(out: ParsedResume) -> None:
         looks_heading = (
             1 <= len(words) <= 5
             and not line.endswith((".", ",", ";", ":"))
-            and (line.isupper() or line.istitle())
+            # A comma almost always means a role/employer or city line
+            # ("Backend Engineer, Bitwise"), not a section heading.
+            and "," not in line
+            # The first non-empty line is conventionally the candidate's name.
+            # Reporting it as a bad heading is confusing and wrong.
+            and index > 0
+            and _title_like(line)
             and not _EMAIL.search(line)
             and not any(ch.isdigit() for ch in line)
         )

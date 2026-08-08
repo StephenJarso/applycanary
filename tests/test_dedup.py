@@ -66,7 +66,8 @@ class TestResolve:
         assert len(session.exec(select(Job)).all()) == 1
 
     def test_layer1_fingerprint_dedups(self, session):
-        session.add(make_job()); session.commit()
+        session.add(make_job())
+        session.commit()
         result = resolve(session, make_job(company="Acme Inc.", title="Backend Engineer (m/f/d)",
                                           location="Anywhere", source="remoteok", source_id="9",
                                           url="https://remoteok.com/x"))
@@ -76,7 +77,8 @@ class TestResolve:
         assert len(session.exec(select(Job)).all()) == 1
 
     def test_layer2_canonical_url_dedups(self, session):
-        session.add(make_job(url="https://acme.com/j/1")); session.commit()
+        session.add(make_job(url="https://acme.com/j/1"))
+        session.commit()
         # Different title wording so fingerprint misses, but same posting URL.
         result = resolve(session, make_job(
             title="Backend Developer", source="linkedin", source_id="7",
@@ -86,7 +88,8 @@ class TestResolve:
         assert result.matched_by == "canonical_url"
 
     def test_layer3_fuzzy_title_dedups(self, session):
-        session.add(make_job(title="Senior Backend Engineer")); session.commit()
+        session.add(make_job(title="Senior Backend Engineer"))
+        session.commit()
         result = resolve(session, make_job(
             title="Backend Engineer, Senior", source="lever", source_id="4",
             url="https://jobs.lever.co/acme/999"))
@@ -95,7 +98,8 @@ class TestResolve:
         assert result.matched_by == "fuzzy_title"
 
     def test_distinct_jobs_both_stored(self, session):
-        session.add(make_job(title="Backend Engineer")); session.commit()
+        session.add(make_job(title="Backend Engineer"))
+        session.commit()
         result = resolve(session, make_job(
             title="Frontend Engineer", source="lever", source_id="2",
             url="https://jobs.lever.co/acme/2"))
@@ -104,7 +108,8 @@ class TestResolve:
         assert len(session.exec(select(Job)).all()) == 2
 
     def test_same_title_different_company_both_stored(self, session):
-        session.add(make_job(company="Acme")); session.commit()
+        session.add(make_job(company="Acme"))
+        session.commit()
         result = resolve(session, make_job(
             company="Globex", source="lever", source_id="3",
             url="https://jobs.lever.co/globex/3"))
@@ -112,7 +117,8 @@ class TestResolve:
         assert result.is_new is True
 
     def test_duplicate_recorded_as_alias(self, session):
-        session.add(make_job()); session.commit()
+        session.add(make_job())
+        session.commit()
         resolve(session, make_job(source="remoteok", source_id="55",
                                   url="https://remoteok.com/55"))
         session.commit()
@@ -121,7 +127,8 @@ class TestResolve:
         assert aliases[0].source == "remoteok"
 
     def test_alias_not_duplicated_on_repeat_poll(self, session):
-        session.add(make_job()); session.commit()
+        session.add(make_job())
+        session.commit()
         for _ in range(3):
             resolve(session, make_job(source="remoteok", source_id="55",
                                       url="https://remoteok.com/55"))
@@ -129,14 +136,16 @@ class TestResolve:
         assert len(session.exec(select(JobAlias)).all()) == 1
 
     def test_seen_count_increments(self, session):
-        session.add(make_job()); session.commit()
+        session.add(make_job())
+        session.commit()
         result = resolve(session, make_job(source="remoteok", source_id="55",
                                            url="https://remoteok.com/55"))
         session.commit()
         assert result.job.seen_count == 2
 
     def test_richer_description_wins(self, session):
-        session.add(make_job(description="short")); session.commit()
+        session.add(make_job(description="short"))
+        session.commit()
         long_desc = "a much fuller description " * 20
         result = resolve(session, make_job(source="remoteok", source_id="55",
                                            url="https://remoteok.com/55",
@@ -146,7 +155,8 @@ class TestResolve:
 
     def test_shorter_description_does_not_overwrite(self, session):
         long_desc = "a much fuller description " * 20
-        session.add(make_job(description=long_desc)); session.commit()
+        session.add(make_job(description=long_desc))
+        session.commit()
         result = resolve(session, make_job(source="remoteok", source_id="55",
                                            url="https://remoteok.com/55",
                                            description="short"))
@@ -154,7 +164,8 @@ class TestResolve:
         assert result.job.description == long_desc
 
     def test_salary_backfilled_from_duplicate(self, session):
-        session.add(make_job()); session.commit()
+        session.add(make_job())
+        session.commit()
         result = resolve(session, make_job(source="remoteok", source_id="55",
                                            url="https://remoteok.com/55",
                                            salary_min=90000, salary_max=120000,
@@ -164,7 +175,8 @@ class TestResolve:
 
     def test_ats_platform_preserved_from_duplicate(self, session):
         # The sanctioned-API platform enables auto-submit and must never be lost.
-        session.add(make_job()); session.commit()
+        session.add(make_job())
+        session.commit()
         result = resolve(session, make_job(
             source="smartrecruiters", source_id="55",
             url="https://jobs.smartrecruiters.com/acme/55",

@@ -141,13 +141,17 @@ def _run_checks(
                 ))
 
         for pattern in _CREDENTIAL_PATTERNS:
-            match = pattern.search(text)
-            if match and not pattern.search(source):
-                report.violations.append(Violation(
-                    kind="invented_credential", severity="block",
-                    detail=f"Mentions {match.group(0)!r}, which is not in your source material.",
-                    bullet=text,
-                ))
+            for term in dict.fromkeys(m.group(0) for m in pattern.finditer(text)):
+                # Compare the specific credential against the source, not the
+                # whole pattern. Matching the pattern would mean any degree
+                # already on the resume ("BSc") licenses every other one the
+                # model might invent ("MBA").
+                if not re.search(rf"\b{re.escape(term)}\b", source, re.I):
+                    report.violations.append(Violation(
+                        kind="invented_credential", severity="block",
+                        detail=f"Mentions {term!r}, which is not in your source material.",
+                        bullet=text,
+                    ))
 
         for skill in extract_skills(text) - source_skills:
             report.violations.append(Violation(
@@ -214,7 +218,9 @@ def _normalise_numbers(text: str) -> list[str]:
         token = raw.strip().lower().replace(",", "").replace(" ", "")
         if not token:
             continue
-        digits = token.rstrip("%kmx").rstrip("percent")
+        # removesuffix, not rstrip: rstrip("percent") strips any of those
+        # characters from the end, so "50t" would silently become "50".
+        digits = token.rstrip("%kmx").removesuffix("percent")
         if digits.isdigit() and 1900 <= int(digits) <= 2100:
             continue
         out.append(token)

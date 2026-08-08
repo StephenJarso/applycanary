@@ -39,7 +39,14 @@ Python, Django, FastAPI, PostgreSQL, Redis, Docker, AWS, Git
 
 
 def _parsed(text: str, **kwargs: object) -> ParsedResume:
-    out = ParsedResume(text=text, file_type="docx", has_text_layer=True, **kwargs)  # type: ignore[arg-type]
+    """Build a ParsedResume for rule tests.
+
+    Defaults describe a clean text-bearing DOCX; any field can be overridden to
+    exercise a specific rule (a scanned PDF, a multi-column layout, and so on).
+    """
+    fields = {"text": text, "file_type": "docx", "has_text_layer": True}
+    fields.update(kwargs)
+    out = ParsedResume(**fields)  # type: ignore[arg-type]
     _extract_content_signals(out)
     return out
 

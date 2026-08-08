@@ -13,7 +13,7 @@ third-party agent. These jobs route to the review queue.
 from __future__ import annotations
 
 import logging
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 from app.sources.base import BaseSource, RawJob, clean_html, register
@@ -33,9 +33,8 @@ def parse_iso(value: Any) -> datetime | None:
     except ValueError:
         return None
     if dt.tzinfo is not None:
-        from datetime import timezone
 
-        dt = dt.astimezone(timezone.utc).replace(tzinfo=None)
+        dt = dt.astimezone(UTC).replace(tzinfo=None)
     return dt
 
 
