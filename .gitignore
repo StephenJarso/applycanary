@@ -30,6 +30,13 @@ dist/
 .coverage
 htmlcov/
 
+# Frontend. The built bundle (app/web/dist) is covered by `dist/` above —
+# it is a build artifact, produced by `npm run build` or the Docker build.
+node_modules/
+frontend/.vite/
+*.tsbuildinfo
+npm-debug.log*
+
 # Editor / OS noise
 .vscode/
 .idea/

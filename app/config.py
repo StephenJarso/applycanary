@@ -115,6 +115,11 @@ class Settings(BaseSettings):
     def static_dir(self) -> Path:
         return self.package_dir / "web" / "static"
 
+    @property
+    def frontend_dist(self) -> Path:
+        """Built React bundle. Absent until `npm run build` has been run."""
+        return self.package_dir / "web" / "dist"
+
     def ensure_dirs(self) -> None:
         for d in (self.data_dir, self.resume_dir, self.artifact_dir, self.cache_dir):
             d.mkdir(parents=True, exist_ok=True)

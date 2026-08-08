@@ -84,15 +84,53 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
-    from app.web import routes
+    from app.web import api, routes
 
+    # JSON API first: /api/* is matched before the SPA catch-all below.
+    app.include_router(api.router)
+    # Server-rendered Jinja dashboard, kept working as a fallback.
     app.include_router(routes.router)
 
     static_dir = settings.static_dir
     if static_dir.exists():
         app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 
+    _mount_spa(app, settings)
+
     return app
+
+
+def _mount_spa(app: FastAPI, settings: object) -> None:
+    """Serve the built React app at /ui, when it has been built.
+
+    Absent a build the route simply does not exist, so the backend still runs
+    from a clean checkout without Node installed — `npm run build` is optional,
+    not a prerequisite.
+    """
+    dist = settings.frontend_dist  # type: ignore[attr-defined]
+    if not (dist / "index.html").exists():
+        log.info("no frontend build at %s — serving Jinja dashboard only", dist)
+        return
+
+    assets = dist / "assets"
+    if assets.exists():
+        app.mount("/ui/assets", StaticFiles(directory=str(assets)), name="spa-assets")
+
+    from fastapi.responses import FileResponse
+
+    index = dist / "index.html"
+
+    @app.get("/ui", include_in_schema=False)
+    @app.get("/ui/{path:path}", include_in_schema=False)
+    def spa(path: str = "") -> FileResponse:  # noqa: ARG001
+        """Return index.html for any /ui route.
+
+        Client-side routing means deep links like /ui/job/42 have no server
+        counterpart; the router resolves them once the bundle loads.
+        """
+        return FileResponse(index)
+
+    log.info("React dashboard mounted at /ui")
 
 
 app = create_app()

@@ -1,7 +1,24 @@
 # ApplyCanary — single image running the dashboard and the in-process scheduler.
 #
-# Two stages so compiler toolchains used to build wheels do not ship in the
-# final image. Runtime carries only the interpreter and installed packages.
+# Three stages so neither the C toolchain (for Python wheels) nor Node and
+# node_modules (for the React bundle) reach the final image. Runtime carries
+# only the interpreter, installed packages and the built static assets.
+
+# ---------------------------------------------------------------- frontend
+FROM node:22-slim AS frontend
+
+WORKDIR /fe
+# Manifests alone first, so this layer caches on dependency changes rather than
+# on every source edit.
+COPY frontend/package.json frontend/package-lock.json* ./
+# `npm ci` when a lockfile is present, `npm install` otherwise — the repo is
+# usable either way.
+RUN if [ -f package-lock.json ]; then npm ci --no-audit --no-fund; \
+    else npm install --no-audit --no-fund; fi
+
+COPY frontend/ ./
+# vite.config.ts writes to ../app/web/dist, so give it that path to write into.
+RUN mkdir -p /app/web && npm run build
 
 # ---------------------------------------------------------------- build
 FROM python:3.12-slim AS build
@@ -61,6 +78,10 @@ COPY --chown=canary:canary run.py ./
 # must be present in the image. Override with a bind mount to edit the curated
 # board list without rebuilding.
 COPY --chown=canary:canary companies.yaml ./
+
+# Built React bundle from the frontend stage. Copied after app/ so it is not
+# overwritten, and served at /ui by app/main.py.
+COPY --from=frontend --chown=canary:canary /app/web/dist ./app/web/dist
 
 USER canary
 
