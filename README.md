@@ -57,15 +57,33 @@ cd frontend && npm run dev      # :5173, proxies /api to :8000
 
 ## What it does
 
-**Finds jobs.** Curated company boards (Greenhouse, Lever, Ashby, SmartRecruiters,
-Workable) are polled every 5 minutes; that tight loop is what gets you in early on
-a new posting. Broader aggregators (RemoteOK, Adzuna, Hacker News hiring threads)
-are polled every 30 minutes. Add companies in `companies.yaml`.
+**Finds jobs.** Ten connectors, none needing an API key.
+
+*Company ATS boards* — Greenhouse, Lever, Ashby, SmartRecruiters, Workable —
+are polled every 5 minutes. This is the tight loop that gets you in early, since
+a posting appears on the company's own board before it propagates anywhere else.
+Add boards in `companies.yaml`.
+
+*Aggregators* — RemoteOK, Remotive, Jobicy, Himalayas, Arbeitnow — are polled
+every 30 minutes. Wider reach, lower signal, and heavy overlap with the ATS
+boards, which dedup collapses. Jobicy and Himalayas return structured salary;
+the rest report it as prose or not at all.
+
+Adding a board is one file in `app/sources/` plus a line in
+`app/sources/__init__.py`. Verify any endpoint before relying on it:
+
+```bash
+python3 scripts/verify_sources.py
+```
+
+Tokens go stale — `lever: netflix` was already a 404 the first time it ran — so
+that script exists to tell you whether a source broke or hiring just went quiet.
 
 **Deduplicates.** The same job cross-posted to four boards should appear once.
 Three layers run in order: exact URL match, a normalized `company|title|location`
 key, then fuzzy title similarity within a company. Details in
-`app/pipeline/dedup.py`.
+`app/pipeline/dedup.py`. On a live run across all ten sources, 1,352 fetched
+postings collapsed to 1,055 stored with 297 recorded as duplicate sightings.
 
 **Scores in two tiers.** Every job runs through free local filters first — hard
 knockouts (excluded companies, salary floor, remote-only) and keyword overlap
