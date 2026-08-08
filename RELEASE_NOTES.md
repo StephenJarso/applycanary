@@ -1,8 +1,12 @@
-# v0.1.0-rc.1
+# v0.1.0-rc.2
 
-First release candidate. A self-hosted job search agent: it polls ATS job
+Second release candidate. A self-hosted job search agent: it polls ATS job
 boards, scores postings against your resume, tailors a CV per posting behind a
 verification gate, and queues applications for your approval.
+
+Four bugs surfaced by the first real test run are fixed here. The suite, the
+dashboard and a live ingest have now all been exercised — see
+[What has been verified](#what-has-been-verified).
 
 **This is a release candidate, not a release.** See [Known
 limitations](#known-limitations) before deploying it.
@@ -78,28 +82,44 @@ titles and locations. Polling starts on its own.
 Set `TZ` in `.env`. The digest and refresh jobs run on cron triggers in local
 time, and containers default to UTC.
 
+## What has been verified
+
+Everything below was actually executed, not merely reviewed:
+
+- **113 tests pass**, `ruff check` clean.
+- **All dashboard routes serve 200** (`/`, `/review`, `/applications`,
+  `/profile`, `/sources`, `/health`) against a real database.
+- **All 7 job source endpoints are live** with no field drift — the parsers
+  match what the APIs currently return.
+- **A live ingest works end to end.** Polling Stripe (Greenhouse) and Ramp
+  (Ashby) fetched 674 postings and stored 491, correctly deduplicating 183.
+- **Dependencies resolve cleanly** from the `requirements.txt` floors.
+
+The first real test run found four genuine bugs, all fixed in this candidate.
+The most serious: SQLAlchemy mappers failed to configure, so the app booted and
+then raised on its first query. The most important: an invented credential
+("MBA") went undetected whenever the resume already contained a real one
+("BSc") — a hole in the anti-fabrication gate.
+
 ## Known limitations
 
-Being honest about what has and has not been exercised, since that is the whole
-reason this is an `rc`:
-
-- **The test suite has not been run.** 113 tests exist across 5 files. The
-  development environment had no working `pip`, so they remain unexecuted.
 - **The Docker image has not been built.** Compose and YAML parse, all Python
-  compiles, and every `COPY` source exists — but no build has run.
-- **Dependencies are floors, not pins.** `requirements.txt` uses `>=`
-  constraints that were never resolved against a real index. A version conflict
-  on first install is plausible. If you hit one, `pip freeze` from a working
-  build and pin against that.
+  compiles, and every `COPY` source exists — but no `docker build` has run.
+- **Dependencies are floors, not pins.** They resolved cleanly today; a future
+  install could pick different versions. `pip freeze > requirements.lock.txt`
+  from a working build if you need reproducibility.
 - **Sources depend on undocumented endpoints.** All five connectors use public
   JSON APIs rather than HTML scraping, which is sturdier, but none of these
   endpoints carry a stability guarantee. They can change shape or start rate
-  limiting without notice.
+  limiting without notice. Two default probe tokens had already gone stale
+  between writing and running.
 - **The scheduler is in-process.** If the app stops, polling stops. Run it
   somewhere that stays awake.
+- **Scoring and tailoring are unexercised against a live model.** Those paths
+  need an `ANTHROPIC_API_KEY` and have not been run end to end.
 
-Before relying on this, run `scripts/verify_sources.py` to confirm the job board
-endpoints still respond with the fields the parsers expect, then `pytest`.
+Run `scripts/verify_sources.py` before relying on the connectors — it takes
+seconds and tells you whether a board changed shape.
 
 ## Verifying sources
 
