@@ -50,7 +50,7 @@ def _counts(session: Session) -> dict[str, int]:
 
 @router.get("/login", response_class=HTMLResponse)
 def login_page(request: Request, error: str = "") -> HTMLResponse:
-    return templates.TemplateResponse("login.html", {"request": request, "error": error})
+    return templates.TemplateResponse(request, "login.html", {"error": error})
 
 
 @router.post("/login")
