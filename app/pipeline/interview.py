@@ -74,6 +74,8 @@ async def prep_for_job(
     prep.skill_gaps = [
         str(g) for g in (parsed.get("skill_gaps") or missing[:8]) if str(g).strip()
     ][:10]
+    prep.speech_interview = _interview_sims(parsed.get("speech_interview"))
+    prep.technical_interview = _interview_sims(parsed.get("technical_interview"))
     prep.model_used = result.model
     prep.created_at = utcnow()
 
@@ -103,7 +105,28 @@ def _questions(raw: object) -> list[dict]:
                 continue
             out.append({
                 "question": question,
-                "answer": str(item.get("answer") or item.get("suggested_answer") or ""),
+                "answer": str(item.get("answer") or item.get("suggested_answer") or item.get("answer_outline") or ""),
                 "why": str(item.get("why") or item.get("rationale") or ""),
             })
+    return out
+
+
+def _interview_sims(raw: object) -> list[dict]:
+    """Normalise speech/technical interview simulations."""
+    if not isinstance(raw, list):
+        return []
+    out: list[dict] = []
+    for item in raw[:6]:
+        if not isinstance(item, dict):
+            continue
+        question = str(item.get("question") or "").strip()
+        if not question:
+            continue
+        sim = {"question": question}
+        # Common fields
+        for field in ["expected_key_points", "expected_solution", "starter_code",
+                      "time_minutes", "evaluation_rubric"]:
+            if field in item:
+                sim[field] = item[field]
+        out.append(sim)
     return out
