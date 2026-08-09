@@ -90,21 +90,21 @@ aggregators:
   # JSON-LD JobPosting from detail pages. Fragile if markup changes.
   - source: brightermonday
     enabled: true
-    search_terms: *terms
+    search_terms: []
 
   # Fuzu covers Kenya, Uganda, and Nigeria. HTML scraper using JSON-LD.
   - source: fuzu
     enabled: true
     country: kenya
-    search_terms: *terms
+    search_terms: []
 
   # MyJobMag Kenya. Pure HTML scraper — most fragile of the set.
   - source: myjobmag
     enabled: true
-    search_terms: *terms
+    search_terms: []
 
   # CareerPoint Kenya. WordPress RSS feed — lightweight, stable.
   - source: careerpointkenya
     enabled: true
-    search_terms: *terms
+    search_terms: []
 
