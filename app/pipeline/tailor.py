@@ -15,7 +15,6 @@ import logging
 
 from sqlmodel import Session, select
 
-from app.config import get_settings
 from app.llm.client import cached_system, get_llm
 from app.llm.prompts import TAILORING_SYSTEM, build_tailoring_user
 from app.models import Job, JobScore, Profile, ResumeVersion, utcnow
@@ -41,7 +40,7 @@ async def tailor_for_job(
     """
     llm = get_llm()
     if not llm.available:
-        raise TailorError("ANTHROPIC_API_KEY is not configured; cannot tailor")
+        raise TailorError("no LLM API key configured (GEMINI_API_KEY or ANTHROPIC_API_KEY); cannot tailor")
 
     resume_text = (profile.base_resume_text or "").strip()
     if not resume_text:
@@ -63,7 +62,6 @@ async def tailor_for_job(
 
     before = evaluate(resume_text, job_description=job.description)
 
-    settings = get_settings()
     # Resume + evidence are stable across jobs in a cycle, so they belong in the
     # cached prefix; only the posting varies.
     system = cached_system(
@@ -90,7 +88,7 @@ async def tailor_for_job(
         if not llm.available:
             raise TailorError("LLM unavailable")
         parsed, result_meta = await llm.complete_json(
-            model=settings.model_tailor,
+            model=llm.tailor_model,
             system=system,
             messages=[{"role": "user", "content": user}],
             max_tokens=4096,

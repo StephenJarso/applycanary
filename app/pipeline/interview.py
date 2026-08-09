@@ -12,7 +12,6 @@ import logging
 
 from sqlmodel import Session, select
 
-from app.config import get_settings
 from app.llm.client import get_llm
 from app.llm.prompts import INTERVIEW_SYSTEM, build_interview_user
 from app.models import InterviewPrep, Job, Profile, utcnow
@@ -36,7 +35,7 @@ async def prep_for_job(
 
     llm = get_llm()
     if not llm.available:
-        raise InterviewPrepError("ANTHROPIC_API_KEY is not configured")
+        raise InterviewPrepError("no LLM API key configured (GEMINI_API_KEY or ANTHROPIC_API_KEY)")
 
     resume_text = (profile.base_resume_text or "").strip()
     if not resume_text:
@@ -44,10 +43,9 @@ async def prep_for_job(
 
     _, _, missing = keyword_overlap(resume_text, job.description or "")
 
-    settings = get_settings()
     try:
         parsed, result = await llm.complete_json(
-            model=settings.model_tailor,
+            model=llm.tailor_model,
             system=INTERVIEW_SYSTEM,
             messages=[{
                 "role": "user",

@@ -149,14 +149,13 @@ async def _cover_letter(
     if not llm.available:
         return ""
 
-    settings = get_settings()
     resume_text = (version.text if version else profile.base_resume_text) or ""
     if not resume_text.strip():
         return ""
 
     try:
         result = await llm.complete(
-            model=settings.model_tailor,
+            model=llm.tailor_model,
             system=COVER_LETTER_SYSTEM,
             messages=[{
                 "role": "user",
