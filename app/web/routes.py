@@ -45,7 +45,50 @@ def _counts(session: Session) -> dict[str, int]:
     return counts
 
 
-# ---------------------------------------------------------------- pages
+# ---------------------------------------------------------------- auth & pages
+
+
+@router.get("/login", response_class=HTMLResponse)
+def login_page(request: Request, error: str = "") -> HTMLResponse:
+    return templates.TemplateResponse("login.html", {"request": request, "error": error})
+
+
+@router.post("/login")
+def login_action(
+    request: Request,
+    username: str = Form(""),
+    password: str = Form(""),
+) -> RedirectResponse:
+    from app.auth import (
+        SESSION_COOKIE_NAME,
+        SESSION_MAX_AGE,
+        create_session_token,
+        verify_credentials,
+    )
+
+    if verify_credentials(username, password):
+        token = create_session_token(username)
+        response = RedirectResponse(url="/", status_code=303)
+        response.set_cookie(
+            key=SESSION_COOKIE_NAME,
+            value=token,
+            max_age=SESSION_MAX_AGE,
+            httponly=True,
+            samesite="lax",
+        )
+        return response
+
+    return RedirectResponse(url="/login?error=Invalid+credentials", status_code=303)
+
+
+@router.get("/logout")
+@router.post("/logout")
+def logout_action() -> RedirectResponse:
+    from app.auth import SESSION_COOKIE_NAME
+
+    response = RedirectResponse(url="/login", status_code=303)
+    response.delete_cookie(SESSION_COOKIE_NAME)
+    return response
 
 
 @router.get("/", response_class=HTMLResponse)
