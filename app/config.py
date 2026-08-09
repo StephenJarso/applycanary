@@ -40,8 +40,11 @@ class Settings(BaseSettings):
     model_triage: str = "claude-haiku-4-5-20251001"
     model_tailor: str = "claude-sonnet-5"
     gemini_api_key: str = ""
-    gemini_model: str = "gemini-2.5-flash"
-    gemini_tailor_model: str = "gemini-2.5-flash"
+    # gemini-2.5-flash is deprecated for new Google accounts; the current
+    # stable line is gemini-3.5-flash. Override per-backend if you need the
+    # lite variant for throughput.
+    gemini_model: str = "gemini-3.5-flash"
+    gemini_tailor_model: str = "gemini-3.5-flash"
 
     # --- safety gates ---
     enable_auto_submit: bool = False
