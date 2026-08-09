@@ -121,7 +121,11 @@ def dashboard(
         .limit(200)
     ).all()
 
-    sources = session.exec(select(Job.source).distinct()).all()
+    from app.sources import all_sources
+
+    distinct_db_sources = set(session.exec(select(Job.source).distinct()).all())
+    all_configured = set(all_sources().keys())
+    sources = sorted([s for s in (distinct_db_sources | all_configured) if s])
 
     return templates.TemplateResponse(
         request,
@@ -129,7 +133,7 @@ def dashboard(
         {
             "rows": rows,
             "counts": _counts(session),
-            "sources": sorted(s for s in sources if s),
+            "sources": sources,
             "filters": {
                 "min_score": min_score, "status": status, "source": source, "q": q,
             },
