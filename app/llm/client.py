@@ -1,24 +1,13 @@
-"""LLM client wrapper.
+"""Multi-provider LLM client with automatic fallback chain.
 
-The active backend is **Google Gemini**, called through its REST API with the
-already-installed `httpx` client. The Anthropic implementation using the
-`anthropic` SDK is retained below, commented out, so switching back is a small
-edit (`complete()` dispatch + restoring `_complete_anthropic`) rather than a
-rewrite.
+Provider order (tried sequentially until one succeeds):
+1. Gemini (primary) - needs GEMINI_API_KEY
+2. OpenRouter (free models) - needs OPENROUTER_API_KEY
+3. Groq (generous free tier) - needs GROQ_API_KEY
+4. Ollama (local, unlimited) - needs OLLAMA_HOST
 
-Two things this centralises:
-
-1. **Structured output.** Scoring and tailoring both need parseable JSON. Models
-   sometimes wrap JSON in prose or fences, so `complete_json` extracts and
-   validates rather than trusting `json.loads` on the raw text.
-
-2. **Shared context.** The resume and profile are identical across every job in a
-   scoring cycle, so they are placed in the system instruction. With Gemini this
-   context is reused at no extra cost per call; Claude needed explicit
-   `cache_control` blocks (see the commented-out code).
-
-If no API key is configured, `available` is False and callers fall back to
-local-only behaviour instead of crashing.
+If no API key is configured for any provider, `available` is False and callers
+fall back to local-only behaviour instead of crashing.
 """
 
 from __future__ import annotations
@@ -39,16 +28,24 @@ log = logging.getLogger(__name__)
 # which retrying cannot fix.
 _RETRYABLE = (429, 500, 502, 503, 504)
 MAX_RETRIES = 3
-GEMINI_API = "https://generativelanguage.googleapis.com/v1beta"
-# Long generations (a tailored resume is up to 4096 tokens) need headroom.
+# Timeouts per provider
 GEMINI_TIMEOUT = 120.0
+OPENROUTER_TIMEOUT = 120.0
+GROQ_TIMEOUT = 120.0
+OLLAMA_TIMEOUT = 300.0  # Local models can be slower
+
+# Provider API endpoints
+GEMINI_API = "https://generativelanguage.googleapis.com/v1beta"
+OPENROUTER_API = "https://openrouter.ai/api/v1"
+GROQ_API = "https://api.groq.com/openai/v1"
 
 
-class GeminiError(RuntimeError):
-    """Non-transient Gemini API failure (bad key, blocked prompt, invalid model)."""
+class ProviderError(RuntimeError):
+    """Non-transient provider API failure."""
 
-    def __init__(self, status: int, detail: str) -> None:
-        super().__init__(f"Gemini HTTP {status}: {detail}")
+    def __init__(self, provider: str, status: int, detail: str) -> None:
+        super().__init__(f"{provider} HTTP {status}: {detail}")
+        self.provider = provider
         self.status = status
 
 
@@ -64,43 +61,74 @@ class LlmResult:
 
     @property
     def truncated(self) -> bool:
-        """True when the model hit the token ceiling mid-answer.
-
-        Worth checking explicitly: a truncated response usually yields invalid
-        JSON, and the useful fix is a larger max_tokens, not a retry.
-        """
+        """True when the model hit the token ceiling mid-answer."""
         return self.stop_reason == "max_tokens"
 
 
 class LlmClient:
+    """Multi-provider LLM client with automatic fallback."""
+
     def __init__(self) -> None:
         self._settings = get_settings()
+        self._provider_order = self._build_provider_order()
+
+    def _build_provider_order(self) -> list[str]:
+        """Build ordered list of available providers."""
+        providers = []
+        s = self._settings
+        if s.gemini_api_key:
+            providers.append("gemini")
+        if s.openrouter_api_key:
+            providers.append("openrouter")
+        if s.groq_api_key:
+            providers.append("groq")
+        if s.ollama_host:
+            providers.append("ollama")
+        if s.anthropic_api_key:
+            providers.append("anthropic")
+        return providers
 
     @property
     def available(self) -> bool:
-        return bool(self._settings.gemini_api_key or self._settings.anthropic_api_key)
+        return bool(self._provider_order)
 
     @property
-    def backend(self) -> str:
-        if self._settings.gemini_api_key:
-            return "gemini"
-        if self._settings.anthropic_api_key:
-            return "anthropic"
-        return ""
+    def active_provider(self) -> str:
+        return self._provider_order[0] if self._provider_order else ""
 
     @property
     def triage_model(self) -> str:
         """Model used for tier-2 scoring. Backend-appropriate."""
-        if self.backend == "gemini":
-            return self._settings.gemini_model
-        return self._settings.model_triage
+        p = self.active_provider
+        s = self._settings
+        if p == "gemini":
+            return s.gemini_model
+        if p == "openrouter":
+            return s.openrouter_triage_model
+        if p == "groq":
+            return s.groq_triage_model
+        if p == "ollama":
+            return s.ollama_triage_model
+        if p == "anthropic":
+            return s.model_triage
+        return ""
 
     @property
     def tailor_model(self) -> str:
         """Model used for CV tailoring, cover letters and interview prep."""
-        if self.backend == "gemini":
-            return self._settings.gemini_tailor_model
-        return self._settings.model_tailor
+        p = self.active_provider
+        s = self._settings
+        if p == "gemini":
+            return s.gemini_tailor_model
+        if p == "openrouter":
+            return s.openrouter_tailor_model
+        if p == "groq":
+            return s.groq_tailor_model
+        if p == "ollama":
+            return s.ollama_tailor_model
+        if p == "anthropic":
+            return s.model_tailor
+        return ""
 
     async def complete(
         self,
@@ -112,25 +140,59 @@ class LlmClient:
         temperature: float = 0.0,
         json_mode: bool = False,
     ) -> LlmResult:
+        """Complete with automatic provider fallback."""
         if not self.available:
             raise RuntimeError(
-                "no LLM API key configured (GEMINI_API_KEY or ANTHROPIC_API_KEY)"
+                "no LLM provider configured. Set one of: "
+                "GEMINI_API_KEY, OPENROUTER_API_KEY, GROQ_API_KEY, "
+                "or run Ollama locally (OLLAMA_HOST)"
             )
-        if self.backend == "gemini":
-            return await self._complete_gemini(
-                model=model, system=system, messages=messages,
-                max_tokens=max_tokens, temperature=temperature, json_mode=json_mode,
-            )
-        # ================================================================
-        # Anthropic backend. Disabled while Gemini is active; to restore,
-        # uncomment `_complete_anthropic` / `_get_anthropic_client` below and
-        # call `self._complete_anthropic(...)` here.
-        # ================================================================
+
+        last_exc: Exception | None = None
+
+        for provider in self._provider_order:
+            try:
+                log.debug("Trying provider: %s with model: %s", provider, model)
+                if provider == "gemini":
+                    return await self._complete_gemini(
+                        model=model, system=system, messages=messages,
+                        max_tokens=max_tokens, temperature=temperature, json_mode=json_mode,
+                    )
+                if provider == "openrouter":
+                    return await self._complete_openrouter(
+                        model=model, system=system, messages=messages,
+                        max_tokens=max_tokens, temperature=temperature, json_mode=json_mode,
+                    )
+                if provider == "groq":
+                    return await self._complete_groq(
+                        model=model, system=system, messages=messages,
+                        max_tokens=max_tokens, temperature=temperature, json_mode=json_mode,
+                    )
+                if provider == "ollama":
+                    return await self._complete_ollama(
+                        model=model, system=system, messages=messages,
+                        max_tokens=max_tokens, temperature=temperature, json_mode=json_mode,
+                    )
+                if provider == "anthropic":
+                    return await self._complete_anthropic(
+                        model=model, system=system, messages=messages,
+                        max_tokens=max_tokens, temperature=temperature, json_mode=json_mode,
+                    )
+            except ProviderError as e:
+                # Non-retryable error from this provider - try next
+                log.warning("Provider %s failed: %s. Trying next...", provider, e)
+                last_exc = e
+                continue
+            except Exception as e:
+                # Unexpected error - try next provider
+                log.warning("Provider %s error: %s. Trying next...", provider, e)
+                last_exc = e
+                continue
+
+        # All providers exhausted
         raise RuntimeError(
-            "ANTHROPIC_API_KEY is set but the Anthropic backend is disabled; "
-            "add GEMINI_API_KEY to .env, or restore the commented-out "
-            "Anthropic code in app/llm/client.py"
-        )
+            f"All {len(self._provider_order)} providers failed. Last error: {last_exc}"
+        ) from last_exc
 
     # ---------------------------------------------------------------- gemini
 
@@ -154,43 +216,183 @@ class LlmClient:
         if system_text := _flatten_system(system):
             payload["systemInstruction"] = {"parts": [{"text": system_text}]}
         if json_mode:
-            # Ask the API to emit a JSON object directly, which is far more
-            # reliable than fishing it out of prose.
             payload["generationConfig"]["responseMimeType"] = "application/json"
 
         url = f"{GEMINI_API}/models/{model}:generateContent"
+        return await self._post_with_retry(
+            "gemini", url, model,
+            params={"key": self._settings.gemini_api_key},
+            headers={"Content-Type": "application/json"},
+            json=payload,
+            parse_fn=_parse_gemini_response,
+            timeout=GEMINI_TIMEOUT,
+        )
+
+    # ---------------------------------------------------------------- openrouter
+
+    async def _complete_openrouter(
+        self,
+        *,
+        model: str,
+        system: str | list[dict],
+        messages: list[dict],
+        max_tokens: int,
+        temperature: float,
+        json_mode: bool,
+    ) -> LlmResult:
+        payload = {
+            "model": model,
+            "messages": [{"role": "system", "content": _flatten_system(system)}] + messages
+            if _flatten_system(system) else messages,
+            "max_tokens": max_tokens,
+            "temperature": temperature,
+        }
+        if json_mode:
+            payload["response_format"] = {"type": "json_object"}
+
+        url = f"{OPENROUTER_API}/chat/completions"
+        return await self._post_with_retry(
+            "openrouter", url, model,
+            headers={
+                "Authorization": f"Bearer {self._settings.openrouter_api_key}",
+                "Content-Type": "application/json",
+                "HTTP-Referer": "https://github.com/applycanary",
+                "X-Title": "ApplyCanary",
+            },
+            json=payload,
+            parse_fn=_parse_openai_compatible_response,
+            timeout=OPENROUTER_TIMEOUT,
+        )
+
+    # ---------------------------------------------------------------- groq
+
+    async def _complete_groq(
+        self,
+        *,
+        model: str,
+        system: str | list[dict],
+        messages: list[dict],
+        max_tokens: int,
+        temperature: float,
+        json_mode: bool,
+    ) -> LlmResult:
+        payload = {
+            "model": model,
+            "messages": [{"role": "system", "content": _flatten_system(system)}] + messages
+            if _flatten_system(system) else messages,
+            "max_tokens": max_tokens,
+            "temperature": temperature,
+        }
+        if json_mode:
+            payload["response_format"] = {"type": "json_object"}
+
+        url = f"{GROQ_API}/chat/completions"
+        return await self._post_with_retry(
+            "groq", url, model,
+            headers={
+                "Authorization": f"Bearer {self._settings.groq_api_key}",
+                "Content-Type": "application/json",
+            },
+            json=payload,
+            parse_fn=_parse_openai_compatible_response,
+            timeout=GROQ_TIMEOUT,
+        )
+
+    # ---------------------------------------------------------------- ollama
+
+    async def _complete_ollama(
+        self,
+        *,
+        model: str,
+        system: str | list[dict],
+        messages: list[dict],
+        max_tokens: int,
+        temperature: float,
+        json_mode: bool,
+    ) -> LlmResult:
+        payload = {
+            "model": model,
+            "messages": [{"role": "system", "content": _flatten_system(system)}] + messages
+            if _flatten_system(system) else messages,
+            "options": {
+                "num_predict": max_tokens,
+                "temperature": temperature,
+            },
+            "stream": False,
+        }
+        if json_mode:
+            payload["format"] = "json"
+
+        url = f"{self._settings.ollama_host.rstrip('/')}/api/chat"
+        return await self._post_with_retry(
+            "ollama", url, model,
+            headers={"Content-Type": "application/json"},
+            json=payload,
+            parse_fn=_parse_ollama_response,
+            timeout=OLLAMA_TIMEOUT,
+        )
+
+    # ---------------------------------------------------------------- anthropic (kept for compatibility)
+
+    async def _complete_anthropic(
+        self,
+        *,
+        model: str,
+        system: str | list[dict],
+        messages: list[dict],
+        max_tokens: int,
+        temperature: float,
+        json_mode: bool,
+    ) -> LlmResult:
+        # Anthropic implementation kept for compatibility
+        # Uncomment and install `anthropic` package if needed
+        raise ProviderError("anthropic", 501, "Anthropic backend not implemented in multi-provider chain")
+
+    # ---------------------------------------------------------------- shared retry logic
+
+    async def _post_with_retry(
+        self,
+        provider: str,
+        url: str,
+        model: str,
+        *,
+        params: dict | None = None,
+        headers: dict | None = None,
+        json: dict | None = None,
+        parse_fn: Any,
+        timeout: float,
+    ) -> LlmResult:
         last_exc: Exception | None = None
 
         for attempt in range(1, MAX_RETRIES + 1):
             try:
                 async with httpx.AsyncClient(
-                    timeout=GEMINI_TIMEOUT, follow_redirects=True
+                    timeout=timeout, follow_redirects=True
                 ) as client:
                     resp = await client.post(
-                        url,
-                        params={"key": self._settings.gemini_api_key},
-                        headers={"Content-Type": "application/json"},
-                        json=payload,
+                        url, params=params, headers=headers, json=json
                     )
             except httpx.RequestError as exc:
                 if attempt == MAX_RETRIES:
                     raise
                 last_exc = exc
-                log.warning("gemini network error; retry %d/%d in %ds",
-                            attempt, MAX_RETRIES, 2 ** attempt)
+                log.warning("%s network error; retry %d/%d in %ds",
+                            provider, attempt, MAX_RETRIES, 2 ** attempt)
                 await _sleep(2 ** attempt)
                 continue
 
             if resp.status_code == 200:
-                return _parse_gemini_response(model, resp.json())
+                return parse_fn(model, resp.json())
+
             if resp.status_code in _RETRYABLE:
-                last_exc = GeminiError(resp.status_code, (resp.text or "")[:200])
+                last_exc = ProviderError(provider, resp.status_code, (resp.text or "")[:200])
                 delay = 2 ** attempt
-                log.warning("gemini %s; retry %d/%d in %ds",
-                            resp.status_code, attempt, MAX_RETRIES, delay)
+                log.warning("%s %s; retry %d/%d in %ds",
+                            provider, resp.status_code, attempt, MAX_RETRIES, delay)
                 await _sleep(delay)
                 continue
-            raise GeminiError(resp.status_code, (resp.text or "")[:300])
+
+            raise ProviderError(provider, resp.status_code, (resp.text or "")[:300])
 
         assert last_exc is not None
         raise last_exc
@@ -233,85 +435,86 @@ class LlmClient:
                 raise ValueError(f"{model} did not return valid JSON: {result.text[:200]!r}")
         return parsed, result
 
-    # ---------------------------------------------------------------- anthropic
-    # Retained for the switch back. Uncomment `_get_anthropic_client` and
-    # `_complete_anthropic`, and point `complete()` at `_complete_anthropic`.
-    #
-    # def _get_anthropic_client(self) -> Any:
-    #     if self._anthropic_client is None:
-    #         try:
-    #             from anthropic import AsyncAnthropic
-    #         except ImportError as exc:  # pragma: no cover
-    #             raise RuntimeError(
-    #                 "anthropic package not installed; run pip install -r requirements.txt"
-    #             ) from exc
-    #         self._anthropic_client = AsyncAnthropic(
-    #             api_key=self._settings.anthropic_api_key
-    #         )
-    #     return self._anthropic_client
-    #
-    # async def _complete_anthropic(
-    #     self,
-    #     *,
-    #     model: str,
-    #     system: str | list[dict],
-    #     messages: list[dict],
-    #     max_tokens: int,
-    #     temperature: float,
-    # ) -> LlmResult:
-    #     import anthropic
-    #
-    #     client = self._get_anthropic_client()
-    #     last_exc: Exception | None = None
-    #
-    #     for attempt in range(1, MAX_RETRIES + 1):
-    #         try:
-    #             resp = await client.messages.create(
-    #                 model=model,
-    #                 system=system,
-    #                 messages=messages,
-    #                 max_tokens=max_tokens,
-    #                 temperature=temperature,
-    #             )
-    #             break
-    #         except anthropic.APIStatusError as exc:
-    #             if exc.status_code not in _RETRYABLE or attempt == MAX_RETRIES:
-    #                 raise
-    #             last_exc = exc
-    #             delay = 2 ** attempt
-    #             log.warning("anthropic %s; retry %d/%d in %ds",
-    #                         exc.status_code, attempt, MAX_RETRIES, delay)
-    #             await _sleep(delay)
-    #         except anthropic.APIConnectionError as exc:
-    #             if attempt == MAX_RETRIES:
-    #                 raise
-    #             last_exc = exc
-    #             await _sleep(2 ** attempt)
-    #     else:  # pragma: no cover
-    #         raise last_exc or RuntimeError("anthropic call failed")
-    #
-    #     text = "".join(
-    #         block.text for block in resp.content if getattr(block, "type", "") == "text"
-    #     )
-    #     usage = resp.usage
-    #     return LlmResult(
-    #         text=text,
-    #         model=model,
-    #         input_tokens=getattr(usage, "input_tokens", 0) or 0,
-    #         output_tokens=getattr(usage, "output_tokens", 0) or 0,
-    #         cache_read_tokens=getattr(usage, "cache_read_input_tokens", 0) or 0,
-    #         cache_write_tokens=getattr(usage, "cache_creation_input_tokens", 0) or 0,
-    #         stop_reason=getattr(resp, "stop_reason", "") or "",
-    #     )
 
+# ---------------------------------------------------------------- response parsers
+
+def _parse_gemini_response(model: str, payload: dict) -> LlmResult:
+    if not isinstance(payload, dict):
+        raise ProviderError("gemini", 200, "unexpected response payload")
+
+    text = ""
+    stop = ""
+    candidates = payload.get("candidates") or []
+    if candidates and isinstance(candidates[0], dict):
+        content = candidates[0].get("content") or {}
+        parts = content.get("parts") or [] if isinstance(content, dict) else []
+        text = "".join(
+            str(p.get("text") or "") for p in parts if isinstance(p, dict)
+        )
+        stop = str(candidates[0].get("finishReason") or "")
+        if stop == "MAX_TOKENS":
+            stop = "max_tokens"
+        elif stop:
+            stop = stop.lower()
+
+    usage = payload.get("usageMetadata") or {} if isinstance(payload, dict) else {}
+    return LlmResult(
+        text=text,
+        model=model,
+        input_tokens=int(usage.get("promptTokenCount") or 0),
+        output_tokens=int(usage.get("candidatesTokenCount") or 0),
+        cache_read_tokens=int(usage.get("cachedContentTokenCount") or 0),
+        stop_reason=stop,
+    )
+
+
+def _parse_openai_compatible_response(model: str, payload: dict) -> LlmResult:
+    """Parse OpenAI-compatible responses (OpenRouter, Groq)."""
+    if not isinstance(payload, dict):
+        raise ProviderError("openai-compat", 200, "unexpected response payload")
+
+    text = ""
+    stop = ""
+    choices = payload.get("choices") or []
+    if choices and isinstance(choices[0], dict):
+        msg = choices[0].get("message") or {}
+        text = str(msg.get("content") or "")
+        stop = str(choices[0].get("finish_reason") or "")
+        if stop == "length":
+            stop = "max_tokens"
+
+    usage = payload.get("usage") or {} if isinstance(payload, dict) else {}
+    return LlmResult(
+        text=text,
+        model=model,
+        input_tokens=int(usage.get("prompt_tokens") or 0),
+        output_tokens=int(usage.get("completion_tokens") or 0),
+        stop_reason=stop,
+    )
+
+
+def _parse_ollama_response(model: str, payload: dict) -> LlmResult:
+    """Parse Ollama /api/chat response."""
+    if not isinstance(payload, dict):
+        raise ProviderError("ollama", 200, "unexpected response payload")
+
+    text = str(payload.get("message", {}).get("content") or "")
+    stop = str(payload.get("done_reason") or "")
+    if stop == "length":
+        stop = "max_tokens"
+
+    # Ollama doesn't return token counts in /api/chat
+    return LlmResult(
+        text=text,
+        model=model,
+        stop_reason=stop,
+    )
+
+
+# ---------------------------------------------------------------- utilities
 
 def cached_system(static_prefix: str, dynamic_suffix: str = "") -> list[dict]:
-    """Build a system prompt whose stable prefix is shared across calls.
-
-    Gemini has no per-call caching switch, so the blocks here carry the metadata
-    Claude's API used for explicit prompt caching; `_flatten_system` drops it
-    when talking to Gemini. Keep the static prefix byte-identical between calls.
-    """
+    """Build a system prompt whose stable prefix is shared across calls."""
     blocks: list[dict] = [{
         "type": "text",
         "text": static_prefix,
@@ -337,38 +540,6 @@ def _gemini_content(message: dict) -> dict:
     if role == "assistant":
         role = "model"
     return {"role": role, "parts": [{"text": str(message.get("content") or "")}]}
-
-
-def _parse_gemini_response(model: str, payload: object) -> LlmResult:
-    """Turn a :generateContent response body into an LlmResult."""
-    if not isinstance(payload, dict):
-        raise GeminiError(200, "unexpected response payload")
-
-    text = ""
-    stop = ""
-    candidates = payload.get("candidates") or []
-    if candidates and isinstance(candidates[0], dict):
-        content = candidates[0].get("content") or {}
-        parts = content.get("parts") or [] if isinstance(content, dict) else []
-        text = "".join(
-            str(p.get("text") or "") for p in parts if isinstance(p, dict)
-        )
-        stop = str(candidates[0].get("finishReason") or "")
-        # Normalise so LlmResult.truncated behaves the same across backends.
-        if stop == "MAX_TOKENS":
-            stop = "max_tokens"
-        elif stop:
-            stop = stop.lower()
-
-    usage = payload.get("usageMetadata") or {} if isinstance(payload, dict) else {}
-    return LlmResult(
-        text=text,
-        model=model,
-        input_tokens=int(usage.get("promptTokenCount") or 0),
-        output_tokens=int(usage.get("candidatesTokenCount") or 0),
-        cache_read_tokens=int(usage.get("cachedContentTokenCount") or 0),
-        stop_reason=stop,
-    )
 
 
 _FENCE = re.compile(r"```(?:json)?\s*(.*?)```", re.DOTALL | re.IGNORECASE)
@@ -401,7 +572,6 @@ def extract_json(text: str) -> dict | None:
 
 async def _sleep(seconds: float) -> None:
     import asyncio
-
     await asyncio.sleep(seconds)
 
 
