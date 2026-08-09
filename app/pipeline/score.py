@@ -21,6 +21,7 @@ from app.llm.prompts import SCORING_SYSTEM, build_scoring_user
 from app.models import Job, JobScore, JobStatus, Profile, utcnow
 from app.pipeline.ats_rules import evaluate as evaluate_ats
 from app.pipeline.keywords import keyword_overlap
+from app.pipeline.relevance import relevance_disqualifier
 from app.pipeline.tailor import TailorError, tailor_for_job
 
 log = logging.getLogger(__name__)
@@ -78,6 +79,10 @@ def hard_disqualifier(job: Job, profile: Profile) -> str:
 
     if not (job.description or "").strip():
         return "posting has no description to evaluate"
+
+    reason = relevance_disqualifier(job, profile)
+    if reason:
+        return reason
 
     return ""
 
