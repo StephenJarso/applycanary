@@ -19,7 +19,7 @@
     <label for="status">Status</label>
     <select id="status" name="status">
       <option value="">any</option>
-      {% for s in ['new','scored','queued','applied','skipped','failed'] %}
+        {% for s in ['new','scored','queued','applied','skipped','failed','rejected'] %}
         <option value="{{ s }}" {% if filters.status == s %}selected{% endif %}>{{ s }}</option>
       {% endfor %}
     </select>

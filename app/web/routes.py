@@ -106,8 +106,15 @@ def dashboard(
         .join(JobScore, JobScore.job_id == Job.id, isouter=True)
         .where(Job.status != JobStatus.EXPIRED)
     )
-    if status:
+    if status == "rejected":
+        stmt = stmt.where(Job.status == JobStatus.REJECTED)
+    elif status:
         stmt = stmt.where(Job.status == status)
+    else:
+        # Relevance filtering (target titles / seniority) runs at tier 1 and marks
+        # non-matching jobs REJECTED. Hide them by default so the dashboard shows
+        # only jobs worth acting on; pick "rejected" above to audit them.
+        stmt = stmt.where(Job.status != JobStatus.REJECTED)
     if source:
         stmt = stmt.where(Job.source == source)
     if q:
