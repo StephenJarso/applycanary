@@ -34,17 +34,29 @@ class Settings(BaseSettings):
     )
 
     # --- llm ---
-    # The active backend is Gemini. The Anthropic implementation is retained in
-    # app/llm/client.py (commented out) so a switch back is a small edit.
+    # Provider chain (tried in order). First available is used.
+    # 1. Gemini (primary) - needs GEMINI_API_KEY
+    # 2. OpenRouter (free models) - needs OPENROUTER_API_KEY
+    # 3. Groq (free tier) - needs GROQ_API_KEY
+    # 4. Ollama (local) - needs OLLAMA_HOST (default http://localhost:11434)
     anthropic_api_key: str = ""
     model_triage: str = "claude-haiku-4-5-20251001"
     model_tailor: str = "claude-sonnet-5"
     gemini_api_key: str = ""
-    # gemini-2.5-flash is deprecated for new Google accounts; the current
-    # stable line is gemini-3.5-flash. Override per-backend if you need the
-    # lite variant for throughput.
     gemini_model: str = "gemini-3.5-flash"
     gemini_tailor_model: str = "gemini-3.5-flash"
+
+    openrouter_api_key: str = ""
+    openrouter_triage_model: str = "meta-llama/llama-3.1-8b-instruct:free"
+    openrouter_tailor_model: str = "meta-llama/llama-3.1-8b-instruct:free"
+
+    groq_api_key: str = ""
+    groq_triage_model: str = "llama-3.1-8b-instant"
+    groq_tailor_model: str = "llama-3.1-8b-instant"
+
+    ollama_host: str = "http://localhost:11434"
+    ollama_triage_model: str = "llama3.1:8b"
+    ollama_tailor_model: str = "llama3.1:8b"
 
     # --- safety gates ---
     enable_auto_submit: bool = False
@@ -75,6 +87,7 @@ class Settings(BaseSettings):
 
     # --- aggregators ---
     adzuna_app_id: str = ""
+    adzuna_app_key: str = ""
     # --- auth ---
     auth_enabled: bool = False
     auth_username: str = "admin"

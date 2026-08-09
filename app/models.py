@@ -261,6 +261,12 @@ class InterviewPrep(SQLModel, table=True):
     # Requirements with no supporting evidence: what to study before interviewing.
     skill_gaps: list[str] = Field(default_factory=list, sa_column=Column(JSON))
 
+    # New: structured interview simulations
+    speech_interview: list[dict] = Field(default_factory=list, sa_column=Column(JSON))
+    # {question, expected_key_points, time_minutes, evaluation_rubric}
+    technical_interview: list[dict] = Field(default_factory=list, sa_column=Column(JSON))
+    # {question, starter_code, expected_solution, time_minutes, evaluation_rubric}
+
     model_used: str = ""
     created_at: datetime = Field(default_factory=utcnow)
 
