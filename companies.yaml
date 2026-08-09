@@ -108,3 +108,22 @@ aggregators:
     enabled: true
     search_terms: []
 
+  # --- Off-platform coverage via web search -----------------------------------
+  # DuckDuckGo lite searches the public web for postings a board connector
+  # cannot reach (e.g. jobs only on a company's own careers site). No API key
+  # required; `is_scraper = True` and per-result error isolation apply.
+  # `search_terms` filters the SERP; leave it empty to take the configured
+  # query verbatim via `query`.
+  - source: websearch
+    enabled: true
+    search_terms: *terms
+
+  # Adzuna API — structured JSON, global, no scraping. Requires ADZUNA_APP_ID
+  # and ADZUNA_APP_KEY in .env. Free tier: 500 req/month.
+  - source: adzuna
+    enabled: true
+    search_terms: *terms
+    country: us
+    location: "united states"
+    max_results: 50
+

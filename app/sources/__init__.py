@@ -7,6 +7,7 @@ from __future__ import annotations
 
 # Imported for registration side effects.
 from app.sources import (  # noqa: F401,E402
+    adzuna,
     arbeitnow,
     ashby,
     brightermonday,
@@ -20,7 +21,7 @@ from app.sources import (  # noqa: F401,E402
     remoteok,
     remotive,
     smartrecruiters,
-    workable,
+    websearch,
 )
 from app.sources.base import (  # noqa: F401
     BaseSource,
