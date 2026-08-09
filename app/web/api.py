@@ -392,26 +392,41 @@ def applications(session: Session = Depends(get_session)) -> list[JobOut]:
 
 @router.get("/sources", response_model=list[SourceHealthOut])
 def sources(session: Session = Depends(get_session)) -> list[SourceHealthOut]:
+    from app.sources import all_sources
+
+    by_source: dict[str, SourceHealthOut] = {
+        name: SourceHealthOut(
+            source=name, ok=True, runs=0, failures=0, found=0, new_jobs=0,
+            last_run_at=None, last_duration_ms=0, last_error="",
+        )
+        for name in all_sources()
+    }
+
     runs = session.exec(
         select(SourceRun).order_by(SourceRun.started_at.desc()).limit(200)
     ).all()
 
-    by_source: dict[str, SourceHealthOut] = {}
     for run in runs:
         entry = by_source.get(run.source)
         if entry is None:
-            # First seen is the most recent, since the query is ordered desc.
             entry = SourceHealthOut(
                 source=run.source, ok=run.ok, runs=0, failures=0, found=0, new_jobs=0,
                 last_run_at=run.started_at, last_duration_ms=run.duration_ms,
                 last_error=run.error,
             )
             by_source[run.source] = entry
+        elif entry.runs == 0:
+            entry.ok = run.ok
+            entry.last_run_at = run.started_at
+            entry.last_duration_ms = run.duration_ms
+            entry.last_error = run.error
+
         entry.runs += 1
         entry.found += run.found
         entry.new_jobs += run.new_jobs
         if not run.ok:
             entry.failures += 1
+
     return sorted(by_source.values(), key=lambda e: e.source)
 
 

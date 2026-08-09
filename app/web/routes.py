@@ -234,17 +234,31 @@ def sources_page(
 ) -> HTMLResponse:
     """Connector health. Surfaces a source that broke quietly."""
     from app.models import SourceRun
+    from app.sources import all_sources
+
+    by_source: dict[str, dict] = {
+        name: {
+            "source": name, "last": None, "runs": 0,
+            "failures": 0, "found": 0, "new": 0,
+        }
+        for name in all_sources()
+    }
 
     latest = session.exec(
         select(SourceRun).order_by(SourceRun.started_at.desc()).limit(120)
     ).all()
 
-    by_source: dict[str, dict] = {}
     for run in latest:
-        entry = by_source.setdefault(run.source, {
-            "source": run.source, "last": run, "runs": 0,
-            "failures": 0, "found": 0, "new": 0,
-        })
+        entry = by_source.get(run.source)
+        if entry is None:
+            entry = {
+                "source": run.source, "last": run, "runs": 0,
+                "failures": 0, "found": 0, "new": 0,
+            }
+            by_source[run.source] = entry
+        elif entry["last"] is None:
+            entry["last"] = run
+
         entry["runs"] += 1
         entry["found"] += run.found
         entry["new"] += run.new_jobs
