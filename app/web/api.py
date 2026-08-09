@@ -267,8 +267,14 @@ def list_jobs(
         .join(JobScore, JobScore.job_id == Job.id, isouter=True)
         .where(Job.status != JobStatus.EXPIRED)
     )
-    if status:
+    if status == "rejected":
+        stmt = stmt.where(Job.status == JobStatus.REJECTED)
+    elif status:
         stmt = stmt.where(Job.status == status)
+    else:
+        # Default to relevant jobs only; REJECTED jobs are tier-1 disqualifications
+        # (irrelevant titles/seniority etc.) and are hidden unless explicitly requested.
+        stmt = stmt.where(Job.status != JobStatus.REJECTED)
     if source:
         stmt = stmt.where(Job.source == source)
     if remote_only:
