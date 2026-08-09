@@ -117,15 +117,25 @@ docker compose ps          # should show (healthy) after ~30s
 
 ---
 
-## 4. Access
+## 4. Access & Authentication
 
-The dashboard **has no authentication**. It serves your resume, salary
-expectations, contact details and full application history to anyone who can
-reach the port.
+ApplyCanary includes a built-in session cookie and HTTP Basic authentication layer.
 
-`docker-compose.yml` publishes to `127.0.0.1:8000`, so the port is not reachable
-from the internet even with a permissive Security List. Reach it over an SSH
-tunnel from your laptop:
+Set the following in `.env` to enable authentication:
+
+```ini
+AUTH_ENABLED=true
+AUTH_USERNAME=admin
+AUTH_PASSWORD=your-secure-password
+SECRET_KEY=change-this-to-a-random-secret-key
+```
+
+When enabled:
+- Web dashboard access (`/ui` and `/`) presents a login screen or accepts HTTP Basic Auth.
+- API routes (`/api/*`) require valid Basic Auth or session cookies.
+- `/health` remains accessible unauthenticated for container health checks.
+
+Even with authentication enabled, keeping default port bindings restricted to `127.0.0.1:8000` or private networks (e.g. Tailscale) is recommended. Reach it over an SSH tunnel from your laptop:
 
 ```bash
 ssh -L 8000:127.0.0.1:8000 ubuntu@YOUR_IP
@@ -253,13 +263,16 @@ simpler.
 
 ---
 
-## Not verified
+## Building Production Release Packages (.deb, .exe, .zip)
 
-These instructions were written without an Oracle account and without Docker
-available, so **no step here has been executed**. The compose and Dockerfile
-they rely on are also unbuilt — `docker build` has never run against them.
+To build distribution release artifacts:
 
-The parts most likely to need adjustment: the first `docker compose up --build`
-(the three-stage build is untested), and Oracle console navigation, which
-changes often. The application itself is well tested — 141 passing tests, a
-live ingest across ten sources — but its containerisation is not.
+```bash
+./scripts/build_releases.sh
+```
+
+This generates:
+- **`dist/applycanary_<version>_amd64.deb`**: Native Debian/Ubuntu package with automated Systemd service installation.
+- **`dist/applycanary_portable.zip`**: Self-contained portable bundle with cross-platform launchers (`run.sh` / `run.bat`).
+- **`dist/applycanary_standalone_*.zip`**: Binary executable package produced via PyInstaller.
+
