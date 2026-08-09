@@ -40,6 +40,7 @@ class Decision:
     decided_by: str
     keyword_score: float = 0.0
     semantic_score: float = 0.0
+    ats_score: float = 0.0
     matched: list[str] = field(default_factory=list)
     missing: list[str] = field(default_factory=list)
     reasoning: str = ""
