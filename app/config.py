@@ -67,7 +67,11 @@ class Settings(BaseSettings):
 
     # --- aggregators ---
     adzuna_app_id: str = ""
-    adzuna_app_key: str = ""
+    # --- auth ---
+    auth_enabled: bool = False
+    auth_username: str = "admin"
+    auth_password: str = ""
+    secret_key: str = "applycanary-secret-key-change-in-production"
 
     # --- server ---
     host: str = "127.0.0.1"
@@ -77,6 +81,10 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
 
     # ------------------------------------------------------------------
+    @property
+    def is_auth_required(self) -> bool:
+        return self.auth_enabled or bool(self.auth_password)
+
     @property
     def llm_enabled(self) -> bool:
         return bool(self.anthropic_api_key)

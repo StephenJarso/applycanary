@@ -13,7 +13,7 @@ from __future__ import annotations
 import logging
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 
 from app.config import get_settings
@@ -83,6 +83,33 @@ def create_app() -> FastAPI:
         version="0.1.0",
         lifespan=lifespan,
     )
+
+    @app.middleware("http")
+    async def auth_middleware(request: Request, call_next):  # noqa: ANN001, ANN202
+        from fastapi.responses import JSONResponse, RedirectResponse
+
+        from app.auth import check_request_authenticated
+
+        path = request.url.path
+        if (
+            path == "/health"
+            or path == "/login"
+            or path.startswith("/static/")
+            or path.startswith("/ui/assets/")
+            or path == "/favicon.ico"
+        ):
+            return await call_next(request)
+
+        if not check_request_authenticated(request):
+            if path.startswith("/api/"):
+                return JSONResponse(
+                    status_code=401,
+                    content={"detail": "Authentication required"},
+                    headers={"WWW-Authenticate": 'Basic realm="ApplyCanary"'},
+                )
+            return RedirectResponse(url="/login", status_code=303)
+
+        return await call_next(request)
 
     from app.web import api, routes
 
