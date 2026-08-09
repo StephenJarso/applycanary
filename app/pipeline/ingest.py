@@ -173,8 +173,10 @@ def _persist(raw_jobs: list) -> tuple[int, int]:
     new_count = dup_count = 0
     with session_scope() as session:
         for raw in raw_jobs:
-            if not raw.title or not raw.company:
+            if not raw.title:
                 continue
+            if not raw.company:
+                raw.company = str(raw.source or "Unknown").title()
             result = resolve(session, raw.to_job())
             if result.is_new:
                 new_count += 1
