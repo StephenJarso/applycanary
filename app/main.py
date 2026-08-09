@@ -44,7 +44,8 @@ async def lifespan(app: FastAPI):  # noqa: ANN201, ARG001
 
     if not settings.llm_enabled:
         log.warning(
-            "ANTHROPIC_API_KEY is not set — scoring falls back to keyword-only "
+            "no LLM API key configured (GEMINI_API_KEY or ANTHROPIC_API_KEY) — "
+            "scoring falls back to keyword-only "
             "and tailoring/interview prep are disabled"
         )
     if not settings.email_enabled:

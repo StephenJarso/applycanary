@@ -34,9 +34,14 @@ class Settings(BaseSettings):
     )
 
     # --- llm ---
+    # The active backend is Gemini. The Anthropic implementation is retained in
+    # app/llm/client.py (commented out) so a switch back is a small edit.
     anthropic_api_key: str = ""
     model_triage: str = "claude-haiku-4-5-20251001"
     model_tailor: str = "claude-sonnet-5"
+    gemini_api_key: str = ""
+    gemini_model: str = "gemini-2.5-flash"
+    gemini_tailor_model: str = "gemini-2.5-flash"
 
     # --- safety gates ---
     enable_auto_submit: bool = False
@@ -87,7 +92,7 @@ class Settings(BaseSettings):
 
     @property
     def llm_enabled(self) -> bool:
-        return bool(self.anthropic_api_key)
+        return bool(self.gemini_api_key or self.anthropic_api_key)
 
     @property
     def email_enabled(self) -> bool:
@@ -137,8 +142,9 @@ class Settings(BaseSettings):
         warnings: list[str] = []
         if not self.llm_enabled:
             warnings.append(
-                "ANTHROPIC_API_KEY is unset: tier-2 scoring, CV tailoring and "
-                "interview prep are disabled. Local filtering still runs."
+                "No LLM API key configured (GEMINI_API_KEY or ANTHROPIC_API_KEY): "
+                "tier-2 scoring, CV tailoring and interview prep are disabled. "
+                "Local filtering still runs."
             )
         if not self.email_enabled:
             warnings.append("SMTP is not configured: digests will be logged, not sent.")

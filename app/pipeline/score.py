@@ -16,11 +16,12 @@ from dataclasses import dataclass, field
 
 from sqlmodel import Session, select
 
-from app.config import get_settings
 from app.llm.client import cached_system, get_llm
 from app.llm.prompts import SCORING_SYSTEM, build_scoring_user
 from app.models import Job, JobScore, JobStatus, Profile, utcnow
+from app.pipeline.ats_rules import evaluate as evaluate_ats
 from app.pipeline.keywords import keyword_overlap
+from app.pipeline.tailor import TailorError, tailor_for_job
 
 log = logging.getLogger(__name__)
 
@@ -113,7 +114,6 @@ def tier1(job: Job, profile: Profile) -> Decision:
 async def tier2(job: Job, profile: Profile, base: Decision) -> Decision:
     """LLM fit assessment. Falls back to the tier-1 decision on any failure."""
     llm = get_llm()
-    settings = get_settings()
     if not llm.available:
         return base
 
@@ -132,7 +132,7 @@ async def tier2(job: Job, profile: Profile, base: Decision) -> Decision:
 
     try:
         parsed, result = await llm.complete_json(
-            model=settings.model_triage,
+            model=llm.triage_model,
             system=system,
             messages=[{"role": "user", "content": user}],
             max_tokens=1024,
@@ -158,6 +158,7 @@ async def tier2(job: Job, profile: Profile, base: Decision) -> Decision:
     return Decision(
         total=total, verdict=verdict, decided_by="tier2_llm",
         keyword_score=base.keyword_score, semantic_score=semantic,
+        ats_score=base.ats_score,
         matched=matched, missing=missing,
         reasoning=str(parsed.get("reasoning") or "").strip()[:1000],
         model_used=result.model,
@@ -167,11 +168,50 @@ async def tier2(job: Job, profile: Profile, base: Decision) -> Decision:
 # ---------------------------------------------------------------- driver
 
 
-async def score_job(job: Job, profile: Profile) -> Decision:
+async def score_job(session: Session, job: Job, profile: Profile) -> Decision:
+    """Two-tier scoring plus the ATS structure pass.
+
+    ATS structure is the rule engine's verdict on the resume *as tailored for
+    this posting*: Claude first rewrites the resume against the job description,
+    then `ats_rules.evaluate` scores the tailored output. When the LLM is absent
+    or tailoring fails, the same rules run on the stored base resume so the
+    meter is never left at zero.
+    """
     decision = tier1(job, profile)
+    decision.ats_score = _base_ats_score(profile, job)
+
     if decision.decided_by == "tier1_filter" or decision.verdict == "weak":
         return decision
-    return await tier2(job, profile, decision)
+
+    decision = await tier2(job, profile, decision)
+    decision.ats_score = await _tailored_ats_score(session, job, profile)
+    return decision
+
+
+def _base_ats_score(profile: Profile, job: Job) -> float:
+    resume_text = profile.base_resume_text or " ".join(profile.skills or [])
+    return evaluate_ats(resume_text, job_description=job.description).score
+
+
+async def _tailored_ats_score(
+    session: Session, job: Job, profile: Profile
+) -> float:
+    """Rule-engine score of the Claude-tailored resume, or the base fallback."""
+    llm = get_llm()
+    if not llm.available:
+        return _base_ats_score(profile, job)
+
+    try:
+        version = await tailor_for_job(session, job, profile)
+    except TailorError as exc:
+        log.debug("job %s: tailoring unavailable for ATS pass (%s)", job.id, exc)
+        return _base_ats_score(profile, job)
+
+    if version is None or not version.text.strip():
+        return _base_ats_score(profile, job)
+    # The tailored version already carries the rule-engine verdict on its own
+    # rewritten text, so report that rather than re-running the rules.
+    return version.ats_score_after
 
 
 async def score_pending(session: Session, *, limit: int = 25) -> int:
@@ -198,7 +238,7 @@ async def score_pending(session: Session, *, limit: int = 25) -> int:
     scored = 0
     for job in jobs:
         try:
-            decision = await score_job(job, profile)
+            decision = await score_job(session, job, profile)
         except Exception:  # noqa: BLE001
             log.exception("scoring job %s failed", job.id)
             job.status = JobStatus.FAILED
@@ -218,6 +258,7 @@ def _persist_decision(session: Session, job: Job, decision: Decision) -> None:
 
     score.keyword_score = decision.keyword_score
     score.semantic_score = decision.semantic_score
+    score.ats_score = decision.ats_score
     score.total = decision.total
     score.matched_keywords = decision.matched
     score.missing_keywords = decision.missing
