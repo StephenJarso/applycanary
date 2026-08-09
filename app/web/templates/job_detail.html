@@ -15,12 +15,12 @@
 </p>
 
 {% if job.salary_min or job.salary_max %}
-  <p class="muted">
-    Salary: {{ '{:,}'.format(job.salary_min) if job.salary_min else '?' }}
-    – {{ '{:,}'.format(job.salary_max) if job.salary_max else '?' }}
-    {{ job.salary_currency }}
-    {% if job.salary_is_estimate %}<span class="tag">estimate</span>{% endif %}
-  </p>
+<p class="muted">
+  Salary: {{ '{:,}'.format(job.salary_min) if job.salary_min else '?' }}
+  – {{ '{:,}'.format(job.salary_max) if job.salary_max else '?' }}
+  {{ job.salary_currency }}
+  {% if job.salary_is_estimate %}<span class="tag">estimate</span>{% endif %}
+</p>
 {% endif %}
 
 <div class="actions" style="margin:20px 0">
@@ -54,6 +54,7 @@
   <p class="muted">
     Keyword {{ '%.0f'|format(score.keyword_score) }} ·
     AI fit {{ '%.0f'|format(score.semantic_score) }} ·
+    ATS {{ '%.0f'|format(score.ats_score) }} ·
     decided by {{ score.decided_by or 'n/a' }}
     {%- if score.model_used %} ({{ score.model_used }}){% endif %}
   </p>
@@ -78,10 +79,10 @@
 <p class="muted">Not scored yet.</p>
 {% endif %}
 
-{# ------------------------------------------------------ tailored cv #}
+{# ------------------------------------------------------ tailored cv vs JD side-by-side #}
 {% if version %}
 <section class="card">
-  <h2>Tailored resume</h2>
+  <h2>Tailored resume <span class="muted">vs Job description</span></h2>
   <p class="muted">
     ATS score {{ '%.0f'|format(version.ats_score_before) }}
     &rarr; {{ '%.0f'|format(version.ats_score_after) }}
@@ -113,16 +114,24 @@
     </p>
   {% endif %}
 
+  <div class="side-by-side" style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:16px">
+    <div class="panel">
+      <h3 style="margin:0 0 8px">Tailored Resume</h3>
+      <pre class="doc" style="max-height:500px;overflow:auto;white-space:pre-wrap">{{ version.text }}</pre>
+      {% if version.docx_path %}
+        <p class="muted" style="margin-top:8px">
+          <a href="/download/{{ version.id }}/docx">Download DOCX</a>
+          {% if version.pdf_path %} · <a href="/download/{{ version.id }}/pdf">Download PDF</a>{% endif %}
+        </p>
+      {% endif %}
+    </div>
+    <div class="panel">
+      <h3 style="margin:0 0 8px">Job Description</h3>
+      <pre class="doc" style="max-height:500px;overflow:auto;white-space:pre-wrap">{{ job.description or 'No description captured.' }}</pre>
+    </div>
+  </div>
+
   {% if version.diff_summary %}<p class="muted">{{ version.diff_summary }}</p>{% endif %}
-
-  <details>
-    <summary>View tailored resume text</summary>
-    <pre class="doc">{{ version.text }}</pre>
-  </details>
-
-  {% if version.docx_path %}
-    <p class="muted">Saved: <code>{{ version.docx_path }}</code></p>
-  {% endif %}
 </section>
 {% endif %}
 
@@ -151,28 +160,28 @@
       {% endif %}
       Verification failures are never overridable.
     </p>
-  {% endif %}
 
-  {% if application.cover_letter %}
-    <details><summary>Cover letter</summary>
-      <pre class="doc">{{ application.cover_letter }}</pre>
-    </details>
-  {% endif %}
+    {% if application.cover_letter %}
+      <details><summary>Cover letter</summary>
+        <pre class="doc">{{ application.cover_letter }}</pre>
+      </details>
+    {% endif %}
 
-  {% if application.form_answers %}
-    <details><summary>Pre-filled form answers</summary>
-      <table>
-        {% for k, v in application.form_answers.items() %}
-          <tr><td class="muted">{{ k.replace('_',' ') }}</td>
-              <td>{{ v or '—' }}</td></tr>
-        {% endfor %}
-      </table>
-    </details>
+    {% if application.form_answers %}
+      <details><summary>Pre-filled form answers</summary>
+        <table>
+          {% for k, v in application.form_answers.items() %}
+            <tr><td class="muted">{{ k.replace('_',' ') }}</td>
+                <td>{{ v or '—' }}</td></tr>
+          {% endfor %}
+        </table>
+      </details>
+    {% endif %}
   {% endif %}
 </section>
 {% endif %}
 
-{# --------------------------------------------------------- prep #}
+{# ------------------------------------------------------ prep #}
 {% if prep %}
 <section class="card">
   <h2>Interview prep</h2>
@@ -198,6 +207,57 @@
     {% endif %}
   {% endfor %}
 
+  {% if prep.speech_interview %}
+    <h3>Speech Interview (30 min simulation)</h3>
+    {% for sim in prep.speech_interview %}
+      <details>
+        <summary>{{ sim.question }}</summary>
+        {% if sim.expected_key_points %}
+          <p><strong>Key points to cover:</strong></p>
+          <ul>{% for pt in sim.expected_key_points %}<li>{{ pt }}</li>{% endfor %}</ul>
+        {% endif %}
+        {% if sim.time_minutes %}
+          <p class="muted">⏱ {{ sim.time_minutes }} min</p>
+        {% endif %}
+        {% if sim.evaluation_rubric %}
+          <details><summary>Evaluation rubric</summary>
+            {% for level, desc in sim.evaluation_rubric.items() %}
+              <p><strong>{{ level|capitalize }}:</strong> {{ desc }}</p>
+            {% endfor %}
+          </details>
+        {% endif %}
+      </details>
+    {% endfor %}
+  {% endif %}
+
+  {% if prep.technical_interview %}
+    <h3>Technical Interview (coding/design)</h3>
+    {% for sim in prep.technical_interview %}
+      <details>
+        <summary>{{ sim.question }}</summary>
+        {% if sim.starter_code %}
+          <p><strong>Starter code:</strong></p>
+          <pre class="doc">{{ sim.starter_code }}</pre>
+        {% endif %}
+        {% if sim.expected_solution %}
+          <details><summary>Expected solution outline</summary>
+            <pre class="doc">{{ sim.expected_solution }}</pre>
+          </details>
+        {% endif %}
+        {% if sim.time_minutes %}
+          <p class="muted">⏱ {{ sim.time_minutes }} min</p>
+        {% endif %}
+        {% if sim.evaluation_rubric %}
+          <details><summary>Evaluation rubric</summary>
+            {% for level, desc in sim.evaluation_rubric.items() %}
+              <p><strong>{{ level|capitalize }}:</strong> {{ desc }}</p>
+            {% endfor %}
+          </details>
+        {% endif %}
+      </details>
+    {% endfor %}
+  {% endif %}
+
   {% if prep.questions_to_ask %}
     <h3>Ask them</h3>
     <ul>{% for q in prep.questions_to_ask %}<li>{{ q }}</li>{% endfor %}</ul>
@@ -205,8 +265,9 @@
 </section>
 {% endif %}
 
+{# Full job description at bottom for reference #}
 <section class="card">
-  <h2>Job description</h2>
+  <h2>Full job description</h2>
   <pre class="doc">{{ job.description or 'No description captured.' }}</pre>
 </section>
 {% endblock %}
