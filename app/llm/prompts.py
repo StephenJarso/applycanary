@@ -191,10 +191,37 @@ Reply with a single JSON object and nothing else:
   ],
   "questions_to_ask": [<questions that show genuine engagement with the role>],
   "company_notes": "<what to know going in, from the posting itself>",
-  "skill_gaps": [<what to study before interviewing, most important first>]
+  "skill_gaps": [<what to study before interviewing, most important first>],
+
+  "speech_interview": [
+    {
+      "question": "<spoken interview question>",
+      "expected_key_points": ["<key point 1>", "<key point 2>", "..."],
+      "time_minutes": <5-10>,
+      "evaluation_rubric": {
+        "strong": "<what a strong answer covers>",
+        "adequate": "<what an adequate answer covers>",
+        "weak": "<what indicates a weak answer>"
+      }
+    }
+  ],
+  "technical_interview": [
+    {
+      "question": "<coding/design problem>",
+      "starter_code": "<optional starter template>",
+      "expected_solution": "<reference solution outline>",
+      "time_minutes": <15-30>,
+      "evaluation_rubric": {
+        "strong": "<what a strong solution demonstrates>",
+        "adequate": "<what an adequate solution demonstrates>",
+        "weak": "<what indicates a weak solution>"
+      }
+    }
+  ]
 }
 
-Six technical questions, four behavioural, five to ask back."""
+Six technical questions, four behavioural, 3-4 speech interview questions (30 min total),
+2-3 technical interview problems (45-60 min total), five questions to ask back."""
 
 
 def build_cover_letter_user(
