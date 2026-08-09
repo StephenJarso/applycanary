@@ -115,6 +115,15 @@ class CareerPointKenyaSource(BaseSource):
                 title = parts[0].strip()
                 break
 
+        if not company:
+            # Check for ' Job ' pattern: 'Technical Sales Executive (Solar) Job LY Power Nairobi, Kenya'
+            if " Job " in title:
+                parts = title.split(" Job ", 1)
+                title = parts[0].strip() + " Job"
+                company = parts[1].strip()
+            else:
+                company = "CareerPoint Kenya"
+
         return RawJob(
             source=self.name,
             source_id=link,
