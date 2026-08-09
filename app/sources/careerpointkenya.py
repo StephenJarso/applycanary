@@ -43,10 +43,22 @@ class CareerPointKenyaSource(BaseSource):
         self.search_terms = [t.lower() for t in (search_terms or []) if t]
 
     async def fetch(self) -> list[RawJob]:
-        resp = await self.client.get(
-            FEED_URL,
-            headers={"Accept": "application/rss+xml, application/xml, text/xml"},
-        )
+        try:
+            resp = await self.client.get(
+                FEED_URL,
+                headers={"Accept": "application/rss+xml, application/xml, text/xml"},
+            )
+        except Exception as err:
+            if "CERTIFICATE_VERIFY_FAILED" in str(err) or "SSLError" in type(err).__name__:
+                import httpx
+
+                async with httpx.AsyncClient(verify=False, timeout=20.0) as insecure_client:
+                    resp = await insecure_client.get(
+                        FEED_URL,
+                        headers={"Accept": "application/rss+xml, application/xml, text/xml"},
+                    )
+            else:
+                raise
         resp.raise_for_status()
 
         root = ET.fromstring(resp.text)
