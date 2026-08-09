@@ -287,13 +287,17 @@ def list_jobs(
         stmt = stmt.order_by(JobScore.total.desc().nullslast(), Job.first_seen_at.desc())
 
     rows = session.exec(stmt.offset(offset).limit(limit)).all()
-    sources = [s for s in session.exec(select(Job.source).distinct()).all() if s]
+    from app.sources import all_sources
+
+    distinct_db_sources = set(session.exec(select(Job.source).distinct()).all())
+    all_configured = set(all_sources().keys())
+    sources = sorted([s for s in (distinct_db_sources | all_configured) if s])
 
     return JobListOut(
         jobs=[_job_out(job, score) for job, score in rows],
         total=len(rows),
         counts=_counts(session),
-        sources=sorted(sources),
+        sources=sources,
     )
 
 
