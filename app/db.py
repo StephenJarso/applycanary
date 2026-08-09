@@ -22,6 +22,8 @@ _is_sqlite = _settings.database_url.startswith("sqlite")
 engine: Engine = create_engine(
     _settings.database_url,
     echo=False,
+    pool_pre_ping=True,
+    pool_recycle=3600,
     # check_same_thread=False is required because APScheduler executes jobs on
     # worker threads distinct from the request threads holding sessions.
     connect_args={"check_same_thread": False, "timeout": 30} if _is_sqlite else {},
