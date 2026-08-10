@@ -13,7 +13,12 @@ added_files = [
     ('app/web/dist', 'app/web/dist'),
 ]
 
-hidden_imports = [
+# Every app submodule. The entrypoint imports app.main directly (not as a module
+# string) so PyInstaller's graph finds most of these, but sources and notifiers
+# are imported lazily by registry lookup and would otherwise be omitted --
+# failing only at runtime on the user's machine. Sweep rather than hand-list, so
+# a newly added source is packaged without touching this file.
+hidden_imports = collect_submodules('app') + [
     'uvicorn',
     'uvicorn.logging',
     'uvicorn.loops',
