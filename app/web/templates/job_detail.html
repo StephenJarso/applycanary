@@ -120,12 +120,11 @@
       <div class="cv-rendered" style="max-height:500px;overflow:auto;white-space:pre-wrap;">
         {{ version.text | render_cv }}
       </div>
-      {% if version.docx_path %}
-        <p class="muted" style="margin-top:8px">
-          <a href="/download/{{ version.id }}/docx">Download DOCX</a>
-          {% if version.pdf_path %} · <a href="/download/{{ version.id }}/pdf">Download PDF</a>{% endif %}
-        </p>
-      {% endif %}
+      <div class="artifact-actions">
+        <a class="btn btn-primary" href="/api/resume-versions/{{ version.id }}/download/docx">Download DOCX</a>
+        <a class="btn" href="/api/resume-versions/{{ version.id }}/download/pdf">Download PDF</a>
+        <a class="btn" href="/api/resume-versions/{{ version.id }}/download/txt">Plain text</a>
+      </div>
     </div>
     <div class="panel">
       <h3 style="margin:0 0 8px">Job Description</h3>

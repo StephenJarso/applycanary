@@ -36,6 +36,10 @@ _SENIORITY_RANK: dict[str, int] = {
 }
 # Baseline rank for a title with no seniority token ("Software Engineer").
 _DEFAULT_RANK = 2
+# Deduction applied when a posting's title falls outside ``target_titles``.
+# Sized so a mismatched title alone cannot drop an otherwise-strong match below
+# the tier-1 cutoff — it reorders results rather than hiding them.
+TITLE_MISMATCH_PENALTY = 12.0
 # Words that mark scope/role, not pure seniority, so "junior engineer" does not
 # match "engineering manager" on the shared word "engineer".
 SCOPE_WORDS = {
@@ -117,13 +121,15 @@ def seniority_matches(title: str, years_experience: int | None) -> bool:
 
 
 def relevance_disqualifier(job: Job, profile: Profile) -> str:
-    """Return a reason string if the job is not relevant to the seeker, else ""."""
-    targets = profile.target_titles or []
-    if targets and not title_matches_target(job.title, targets):
-        return (
-            f"title {job.title!r} is not one of your target roles "
-            f"({', '.join(targets)})"
-        )
+    """Return a reason string if the job is categorically wrong for the seeker.
+
+    Only seniority is fatal here. A title that does not match ``target_titles``
+    is *not* disqualifying: those entries are frequently written as search
+    keywords ("golang", "backend") rather than real titles, and treating a
+    mismatch as fatal silently rejected every posting before the LLM ever saw
+    it. Title distance is reported by `title_mismatch_penalty` and applied as a
+    score deduction instead, which keeps the signal without the false negatives.
+    """
     if not seniority_matches(job.title, profile.years_experience):
         allowed = max_rank_for_experience(profile.years_experience)
         return (
@@ -132,3 +138,20 @@ def relevance_disqualifier(job: Job, profile: Profile) -> str:
             f"{profile.years_experience})"
         )
     return ""
+
+
+def title_mismatch_penalty(job: Job, profile: Profile) -> tuple[float, str]:
+    """Score deduction for a title outside ``target_titles``, plus its reason.
+
+    Returns ``(0.0, "")`` when the profile sets no targets or the title matches.
+    The deduction is deliberately moderate: a mismatch is evidence the posting
+    is off-target, not proof, and the LLM pass that follows sees the full
+    description and can override a bad title match either way.
+    """
+    targets = [t for t in (profile.target_titles or []) if t.strip()]
+    if not targets or title_matches_target(job.title, targets):
+        return 0.0, ""
+    return TITLE_MISMATCH_PENALTY, (
+        f"title {job.title!r} is outside your target roles "
+        f"({', '.join(targets)})"
+    )

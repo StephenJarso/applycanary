@@ -18,11 +18,17 @@ PKG_NAME="applycanary"
 echo "=== Building ApplyCanary .deb Release v${VERSION} ==="
 
 # 1. Build frontend bundle
-echo "Building React frontend..."
-cd "${ROOT_DIR}/frontend"
-npm ci --no-audit --no-fund
-npm run build
-cd "${ROOT_DIR}"
+# SKIP_FRONTEND=1 is set by the CI release workflow, which builds the bundle
+# once and shares it between the Linux and Windows jobs.
+if [ "${SKIP_FRONTEND:-0}" = "1" ]; then
+    echo "Skipping frontend build (SKIP_FRONTEND=1)"
+else
+    echo "Building React frontend..."
+    cd "${ROOT_DIR}/frontend"
+    npm ci --no-audit --no-fund
+    npm run build
+    cd "${ROOT_DIR}"
+fi
 
 # 2. Clean previous build directory
 rm -rf "${BUILD_DIR}"
