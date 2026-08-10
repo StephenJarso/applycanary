@@ -35,7 +35,14 @@ def build_pyinstaller_bundle() -> bool:
         return False
 
     try:
-        cmd = [sys.executable, "-m", "PyInstaller", "--clean", str(spec_file)]
+        # --noconfirm is required, not optional: without it PyInstaller prompts
+        # before replacing a non-empty dist/applycanary and aborts on the closed
+        # stdin of a script or CI runner. The failure was then swallowed below,
+        # so the release silently kept whatever binary was already on disk.
+        cmd = [
+            sys.executable, "-m", "PyInstaller",
+            "--clean", "--noconfirm", str(spec_file),
+        ]
         subprocess.run(cmd, cwd=ROOT_DIR, check=True)
 
         archive_name = "applycanary_standalone_win64" if os.name == "nt" else "applycanary_standalone_linux"
@@ -43,9 +50,13 @@ def build_pyinstaller_bundle() -> bool:
         shutil.make_archive(str(archive_path), "zip", DIST_DIR, "applycanary")
         print(f"\nSUCCESS: PyInstaller binary release created at {archive_path}.zip")
         return True
-    except Exception as err:
-        print(f"Warning: PyInstaller build failed ({err}). Falling back to portable bundle.")
-        return False
+    except subprocess.CalledProcessError as err:
+        # Never downgrade this to a warning: a release build that cannot produce
+        # its headline artifact must fail loudly rather than publish a stale one.
+        raise SystemExit(
+            f"PyInstaller build failed (exit {err.returncode}). "
+            "Fix the build or pass --portable-only to skip it deliberately."
+        ) from err
 
 
 def build_portable_bundle() -> None:

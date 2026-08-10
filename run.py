@@ -58,8 +58,18 @@ def main() -> int:
 
     print(f"\n  ApplyCanary -> http://{settings.host}:{settings.port}\n")
 
+    # A module *string* is required for --reload (uvicorn re-imports on change),
+    # but it fails inside a PyInstaller bundle: the import is invisible to the
+    # dependency graph, so "app.main" is never packaged and the binary exits
+    # with 'Could not import module "app.main"'. Frozen builds pass the app
+    # object directly, which also makes the dependency statically analysable.
+    if args.reload:
+        target = "app.main:app"
+    else:
+        from app.main import app as target
+
     uvicorn.run(
-        "app.main:app",
+        target,
         host=settings.host,
         port=settings.port,
         reload=args.reload,
