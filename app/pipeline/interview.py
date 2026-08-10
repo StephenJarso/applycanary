@@ -57,7 +57,7 @@ async def prep_for_job(
                     gaps=missing[:12],
                 ),
             }],
-            max_tokens=3000,
+            max_tokens=8000,
             temperature=0.3,
         )
     except Exception as exc:  # noqa: BLE001

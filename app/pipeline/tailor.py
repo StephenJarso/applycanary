@@ -115,6 +115,7 @@ async def tailor_for_job(
 
     version = existing or ResumeVersion(job_id=job.id)
     version.text = rebuilt
+    version.text_html = _render_cv_html(rebuilt)
     version.diff_summary = diff_sum
     version.ats_score_before = before.score
     version.ats_score_after = max(after.score, before.score + 15)
@@ -216,3 +217,71 @@ def _rule_based_tailor(
 
     rebuilt = "\n".join(header_lines) + "\n" + skills_block + "\n" + "\n".join(body_lines)
     return rebuilt.strip(), added_terms
+
+
+def _render_cv_html(text: str) -> str:
+    """Convert plain text resume to formatted HTML (mirrors _render_cv in routes.py)."""
+    if not text:
+        return ""
+    import re
+    lines = text.splitlines()
+    html_parts = []
+    first_line = True
+    in_list = False
+
+    section_words = {
+        "summary", "professional summary", "profile", "objective", "about",
+        "experience", "work experience", "professional experience", "employment",
+        "employment history", "work history", "education", "skills",
+        "technical skills", "core competencies", "projects", "certifications",
+        "publications", "awards", "languages", "interests", "volunteering",
+    }
+
+    for raw in lines:
+        line = raw.rstrip()
+        if not line.strip():
+            if in_list:
+                html_parts.append("</ul>")
+                in_list = False
+            html_parts.append("<br>")
+            continue
+
+        stripped = line.strip()
+        is_heading = (
+            stripped.upper() == stripped and len(stripped.split()) <= 4
+        ) or stripped.lower().rstrip(":") in section_words
+        is_bullet = bool(re.match(r"^\s*[-*•‣▪●·]\s+", line))
+
+        if is_heading:
+            if in_list:
+                html_parts.append("</ul>")
+                in_list = False
+            if first_line:
+                html_parts.append(f'<h1 class="cv-name">{stripped}</h1>')
+                first_line = False
+            else:
+                html_parts.append(f'<h2 class="cv-section">{stripped.rstrip(":").upper()}</h2>')
+            continue
+
+        if is_bullet:
+            if not in_list:
+                html_parts.append("<ul class=\"cv-bullets\">")
+                in_list = True
+            bullet_text = re.sub(r"^\s*[-*•‣▪●·]\s+", "", stripped)
+            html_parts.append(f"<li>{bullet_text}</li>")
+            continue
+
+        if in_list:
+            html_parts.append("</ul>")
+            in_list = False
+
+        if first_line:
+            html_parts.append(f'<h1 class="cv-name">{stripped}</h1>')
+            first_line = False
+        else:
+            html_parts.append(f'<p class="cv-text">{stripped}</p>')
+
+    if in_list:
+        html_parts.append("</ul>")
+
+    return "".join(html_parts)

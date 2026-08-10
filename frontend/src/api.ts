@@ -64,7 +64,9 @@ export interface JobDetail extends Job {
     outcome: string;
   } | null;
   resume_version: {
+    id: number;
     text: string;
+    text_html: string;
     diff_summary: string;
     ats_score_before: number;
     ats_score_after: number;
@@ -81,6 +83,19 @@ export interface JobDetail extends Job {
     questions_to_ask: string[];
     company_notes: string;
     skill_gaps: string[];
+    speech_interview: Array<{
+      question: string;
+      expected_key_points: string[];
+      time_minutes: number;
+      evaluation_rubric: Record<string, string>;
+    }>;
+    technical_interview: Array<{
+      question: string;
+      starter_code: string;
+      expected_solution: string;
+      time_minutes: number;
+      evaluation_rubric: Record<string, string>;
+    }>;
   } | null;
 }
 
