@@ -4,11 +4,27 @@ from __future__ import annotations
 
 import base64
 
+import pytest
 from fastapi.testclient import TestClient
 
 from app.auth import create_session_token, validate_session_token
 from app.config import get_settings
+from app.db import init_db
 from app.main import create_app
+
+
+@pytest.fixture
+def isolated_db():
+    """Ensure the schema exists before a test boots the app.
+
+    The database itself is already redirected to a temp dir by conftest. Tables
+    are created explicitly because these tests build `TestClient` without a
+    context manager, so the startup lifespan that would normally call `init_db`
+    never runs, and the endpoints below query tables like `job`.
+    """
+    init_db()
+    yield
+    get_settings.cache_clear()
 
 
 def test_session_token_lifecycle():
@@ -20,7 +36,7 @@ def test_session_token_lifecycle():
     assert validate_session_token("invalid_token") is None
 
 
-def test_auth_disabled_by_default(monkeypatch):
+def test_auth_disabled_by_default(isolated_db, monkeypatch):
     monkeypatch.setenv("AUTH_ENABLED", "false")
     monkeypatch.setenv("AUTH_PASSWORD", "")
     get_settings.cache_clear()
@@ -40,7 +56,7 @@ def test_auth_disabled_by_default(monkeypatch):
     get_settings.cache_clear()
 
 
-def test_auth_required_blocks_unauthenticated(monkeypatch):
+def test_auth_required_blocks_unauthenticated(isolated_db, monkeypatch):
     monkeypatch.setenv("AUTH_ENABLED", "true")
     monkeypatch.setenv("AUTH_USERNAME", "admin")
     monkeypatch.setenv("AUTH_PASSWORD", "secret123")
