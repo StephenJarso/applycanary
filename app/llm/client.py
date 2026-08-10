@@ -28,6 +28,9 @@ log = logging.getLogger(__name__)
 # which retrying cannot fix.
 _RETRYABLE = (429, 500, 502, 503, 504)
 MAX_RETRIES = 3
+# Ceiling on a provider-supplied Retry-After. Beyond this, failing over to the
+# next provider (or falling back to local scoring) beats blocking the pipeline.
+MAX_RETRY_AFTER = 60.0
 # Timeouts per provider
 GEMINI_TIMEOUT = 120.0
 OPENROUTER_TIMEOUT = 120.0
@@ -386,7 +389,7 @@ class LlmClient:
 
             if resp.status_code in _RETRYABLE:
                 last_exc = ProviderError(provider, resp.status_code, (resp.text or "")[:200])
-                delay = 2 ** attempt
+                delay = _retry_after(resp) or 2 ** attempt
                 log.warning("%s %s; retry %d/%d in %ds",
                             provider, resp.status_code, attempt, MAX_RETRIES, delay)
                 await _sleep(delay)
@@ -573,6 +576,22 @@ def extract_json(text: str) -> dict | None:
 async def _sleep(seconds: float) -> None:
     import asyncio
     await asyncio.sleep(seconds)
+
+
+def _retry_after(resp: httpx.Response) -> float:
+    """Honour the provider's own backoff hint, capped so a job cannot stall.
+
+    Gemini's free tier returns a Retry-After on 429 that is frequently much
+    longer than exponential backoff would guess. Ignoring it meant retrying
+    into the same quota wall three times and burning the whole retry budget.
+    """
+    raw = resp.headers.get("retry-after", "").strip()
+    if not raw:
+        return 0.0
+    try:
+        return min(float(raw), MAX_RETRY_AFTER)
+    except ValueError:
+        return 0.0  # HTTP-date form; fall back to exponential backoff.
 
 
 _client: LlmClient | None = None

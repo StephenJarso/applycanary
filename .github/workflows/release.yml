@@ -1,0 +1,149 @@
+name: release
+
+# Builds every distributable on a version tag and attaches them to the GitHub
+# Release. Releases were previously cut by hand, which is why v0.1.0-rc.1 and
+# rc.2 shipped with zero assets — the artifacts existed only on a laptop.
+#
+# Windows and Linux build on their native runners: PyInstaller produces a
+# host-platform binary and cannot cross-compile.
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to build and publish (e.g. v0.1.0)"
+        required: true
+
+permissions:
+  contents: write
+
+env:
+  PYTHON_VERSION: "3.12"
+  NODE_VERSION: "20"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+      - run: pip install -r requirements.txt
+      - run: python -m pytest -q
+
+  frontend:
+    # Built once and shared: both packages embed the same bundle, and building
+    # it on each platform risks them drifting apart.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci --no-audit --no-fund
+        working-directory: frontend
+      - run: npm run build
+        working-directory: frontend
+      - uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: app/web/dist
+          if-no-files-found: error
+
+  linux:
+    needs: [test, frontend]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+      - uses: actions/download-artifact@v4
+        with:
+          name: frontend-dist
+          path: app/web/dist
+      - run: pip install -r requirements.txt pyinstaller
+
+      - name: Build .deb
+        env:
+          SKIP_FRONTEND: "1"
+        run: |
+          chmod +x scripts/package_deb.sh
+          ./scripts/package_deb.sh
+
+      - name: Build Linux standalone binary
+        run: |
+          python -m PyInstaller --clean applycanary.spec
+          cd dist && zip -r applycanary_standalone_linux.zip applycanary
+
+      - name: Build portable bundle
+        run: python scripts/package_exe.py --skip-frontend --portable-only
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-artifacts
+          path: |
+            dist/*.deb
+            dist/applycanary_standalone_linux.zip
+            dist/applycanary_portable.zip
+          if-no-files-found: error
+
+  windows:
+    needs: [test, frontend]
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+      - uses: actions/download-artifact@v4
+        with:
+          name: frontend-dist
+          path: app/web/dist
+      - run: pip install -r requirements.txt pyinstaller
+
+      - name: Build Windows .exe
+        run: python -m PyInstaller --clean applycanary.spec
+
+      - name: Package .exe
+        shell: pwsh
+        run: |
+          Compress-Archive -Path dist/applycanary/* `
+                           -DestinationPath dist/applycanary_standalone_win64.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-artifacts
+          path: dist/applycanary_standalone_win64.zip
+          if-no-files-found: error
+
+  publish:
+    needs: [linux, windows]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: "*-artifacts"
+          merge-multiple: true
+          path: dist
+      - run: ls -lh dist
+
+      - name: Attach artifacts to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.inputs.tag || github.ref_name }}
+        run: |
+          # --clobber so re-running the workflow replaces assets rather than
+          # failing on a name that already exists.
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 \
+            || gh release create "$TAG" --repo "$GITHUB_REPOSITORY" \
+                 --title "$TAG" --generate-notes
+          gh release upload "$TAG" dist/* --repo "$GITHUB_REPOSITORY" --clobber

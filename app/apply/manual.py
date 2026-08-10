@@ -35,8 +35,9 @@ class ManualSubmitter(BaseSubmitter):
             ok=True,
             method=ApplyMethod.MANUAL,
             confirmation=(
-                f"Queued for review. Open {job.apply_url} to submit — the tailored "
-                "resume and cover letter are attached to this entry."
+                f"Queued for review. Copy the tailored resume and cover letter from "
+                f"the job page, then open {job.apply_url} to paste them in. "
+                "Nothing is sent until you do."
             ),
             dry_run=True,
         )

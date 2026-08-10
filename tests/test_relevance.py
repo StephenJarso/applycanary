@@ -3,6 +3,7 @@ from app.pipeline.relevance import (
     max_rank_for_experience,
     seniority_matches,
     title_matches_target,
+    title_mismatch_penalty,
     title_rank,
 )
 from app.pipeline.score import hard_disqualifier
@@ -76,10 +77,34 @@ def test_seniority_matches() -> None:
     assert seniority_matches("Director of Engineering", 9) is True
 
 
-def test_hard_disqualifier_rejects_unrelated_title() -> None:
+def test_unrelated_title_penalises_but_does_not_disqualify() -> None:
+    """A title outside the targets must stay scoreable.
+
+    Treating this as fatal meant tier 2 never ran for any posting whose title
+    did not fuzzy-match, which silently hid real openings — target_titles are
+    routinely written as search keywords rather than exact titles.
+    """
     profile = Profile(full_name="x", target_titles=["Frontend Engineer"])
-    reason = hard_disqualifier(_job("Backend Engineer"), profile)
-    assert reason and "target roles" in reason
+    job = _job("Backend Engineer")
+
+    assert hard_disqualifier(job, profile) == ""
+
+    penalty, reason = title_mismatch_penalty(job, profile)
+    assert penalty > 0
+    assert "target roles" in reason
+
+
+def test_matching_title_carries_no_penalty() -> None:
+    profile = Profile(full_name="x", target_titles=["Frontend Engineer"])
+    penalty, reason = title_mismatch_penalty(_job("Senior Frontend Engineer"), profile)
+    assert penalty == 0.0
+    assert reason == ""
+
+
+def test_no_targets_configured_carries_no_penalty() -> None:
+    profile = Profile(full_name="x", target_titles=[])
+    penalty, _ = title_mismatch_penalty(_job("Anything At All"), profile)
+    assert penalty == 0.0
 
 
 def test_hard_disqualifier_rejects_over_level() -> None:

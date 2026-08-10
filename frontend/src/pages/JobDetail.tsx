@@ -1,12 +1,42 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api } from "../api";
 import { Chips, ErrorBox, Loading, ScoreBadge, formatSalary, relTime } from "../components";
+
+/** Artifact downloads are same-origin: in dev Vite proxies /api to the backend. */
+function downloadUrl(versionId: number, fmt: "docx" | "pdf" | "txt") {
+  return `/api/resume-versions/${versionId}/download/${fmt}`;
+}
+
+async function copyToClipboard(
+  text: string,
+  setCopied: (v: string) => void,
+  key: string,
+) {
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch {
+    // Clipboard API needs a secure context; fall back to a temporary textarea
+    // so copy still works when the dashboard is served over plain http.
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.style.position = "fixed";
+    ta.style.opacity = "0";
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand("copy");
+    document.body.removeChild(ta);
+  }
+  setCopied(key);
+  setTimeout(() => setCopied(""), 1800);
+}
 
 export default function JobDetail() {
   const { id } = useParams();
   const jobId = Number(id);
   const qc = useQueryClient();
+  const [copied, setCopied] = useState("");
 
   const { data: job, isPending, error } = useQuery({
     queryKey: ["job", jobId],
@@ -179,13 +209,24 @@ export default function JobDetail() {
               <p className="prose">{version.diff_summary}</p>
             </details>
           )}
-          {version.docx_path && (
-            <p className="muted" style={{ marginTop: 8 }}>
-              <a href={`/download/${version.id}/docx`}>Download DOCX</a>
-              {version.pdf_path && <span> · </span>}
-              {version.pdf_path && <a href={`/download/${version.id}/pdf`}>Download PDF</a>}
-            </p>
-          )}
+          <div className="artifact-actions">
+            <a className="btn btn-primary" href={downloadUrl(version.id, "docx")}>
+              Download DOCX
+            </a>
+            <a className="btn" href={downloadUrl(version.id, "pdf")}>
+              Download PDF
+            </a>
+            <a className="btn" href={downloadUrl(version.id, "txt")}>
+              Plain text
+            </a>
+            <button
+              type="button"
+              className="btn"
+              onClick={() => copyToClipboard(version.text, setCopied, "resume")}
+            >
+              {copied === "resume" ? "Copied ✓" : "Copy resume"}
+            </button>
+          </div>
         </div>
       )}
 
@@ -206,11 +247,29 @@ export default function JobDetail() {
             <dt>Attempts</dt><dd className="num">{job.application.attempts}</dd>
           </dl>
 
-          {job.application.cover_letter && (
-            <details style={{ marginTop: 10 }}>
-              <summary>Cover letter</summary>
-              <pre className="doc">{job.application.cover_letter}</pre>
-            </details>
+          {job.application.cover_letter ? (
+            <div className="field" style={{ marginTop: 12 }}>
+              <label>Cover letter</label>
+              <pre className="doc" style={{ maxHeight: 320, overflow: "auto" }}>
+                {job.application.cover_letter}
+              </pre>
+              <div className="artifact-actions">
+                <button
+                  type="button"
+                  className="btn"
+                  onClick={() =>
+                    copyToClipboard(job.application!.cover_letter, setCopied, "cover")
+                  }
+                >
+                  {copied === "cover" ? "Copied ✓" : "Copy cover letter"}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <p className="muted" style={{ marginTop: 12 }}>
+              No cover letter was generated for this application. Re-run “Tailor”
+              to build one.
+            </p>
           )}
           {Object.keys(job.application.form_answers).length > 0 && (
             <details>
@@ -218,7 +277,24 @@ export default function JobDetail() {
               <dl className="kv" style={{ marginTop: 8 }}>
                 {Object.entries(job.application.form_answers).map(([k, v]) => (
                   <div key={k} style={{ display: "contents" }}>
-                    <dt>{k}</dt><dd>{v}</dd>
+                    <dt>{k}</dt>
+                    <dd>
+                      {v ? (
+                        <>
+                          {v}{" "}
+                          <button
+                            type="button"
+                            className="btn-copy"
+                            title={`Copy ${k}`}
+                            onClick={() => copyToClipboard(String(v), setCopied, k)}
+                          >
+                            {copied === k ? "✓" : "copy"}
+                          </button>
+                        </>
+                      ) : (
+                        <span className="muted">still needs an answer</span>
+                      )}
+                    </dd>
                   </div>
                 ))}
               </dl>

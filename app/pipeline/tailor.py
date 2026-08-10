@@ -118,7 +118,11 @@ async def tailor_for_job(
     version.text_html = _render_cv_html(rebuilt)
     version.diff_summary = diff_sum
     version.ats_score_before = before.score
-    version.ats_score_after = max(after.score, before.score + 15)
+    # Report what the rule engine actually measured. The previous
+    # `max(after, before + 15)` floor invented an improvement that may not have
+    # happened and could exceed 100 (a resume scoring 91 reported 106), which
+    # made the before/after meter untrustworthy precisely where it matters.
+    version.ats_score_after = after.score
     version.keywords_added = added
     version.truthcheck_passed = truthcheck_passed
     version.truthcheck_notes = notes

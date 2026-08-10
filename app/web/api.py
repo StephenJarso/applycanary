@@ -13,9 +13,11 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime
+from pathlib import Path
 from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, UploadFile
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 from sqlmodel import Session, func, select
 
@@ -349,8 +351,9 @@ def job_detail(job_id: int, session: Session = Depends(get_session)) -> JobDetai
         ),
         resume_version=(
             {
+                "id": version.id,
                 "text": version.text,
-                "text_html": version.text_html if hasattr(version, 'text_html') else version.text,
+                "text_html": version.text_html or version.text,
                 "diff_summary": version.diff_summary,
                 "ats_score_before": version.ats_score_before,
                 "ats_score_after": version.ats_score_after,
@@ -546,6 +549,85 @@ def profile_ats(session: Session = Depends(get_session)) -> dict:
     if not profile.base_resume_text:
         raise HTTPException(404, "no resume uploaded")
     return evaluate(profile.base_resume_text).as_dict()
+
+
+@router.get("/resume-versions/{version_id}/download/{fmt}")
+def download_resume_version(
+    version_id: int,
+    fmt: Literal["docx", "pdf", "txt"],
+    session: Session = Depends(get_session),
+) -> FileResponse:
+    """Serve a tailored resume artifact, rendering it on demand if absent.
+
+    Artifacts are regenerated rather than 404'd when the stored path is missing:
+    the row holds the resume *text*, so a file cleared by a deploy or a wiped
+    data dir is reproducible. Only paths inside the configured artifact dir are
+    served, so a tampered DB row cannot turn this into an arbitrary file read.
+    """
+    version = session.get(ResumeVersion, version_id)
+    if version is None:
+        raise HTTPException(404, "resume version not found")
+    if not (version.text or "").strip():
+        raise HTTPException(409, "this resume version has no text to render")
+
+    job = session.get(Job, version.job_id)
+    profile = session.exec(select(Profile)).first()
+    settings = get_settings()
+
+    if fmt == "txt":
+        path = settings.artifact_dir / f"resume_{version_id}.txt"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(version.text, encoding="utf-8")
+    else:
+        stored = Path(version.docx_path if fmt == "docx" else version.pdf_path or "")
+        path = stored if stored.name and stored.is_file() else Path()
+        if not path:
+            from app.resume.render import render_for_job
+
+            docx_path, pdf_path = render_for_job(
+                version.text,
+                company=job.company if job else "company",
+                title=job.title if job else "role",
+                full_name=(profile.full_name if profile else "") or "",
+            )
+            version.docx_path, version.pdf_path = str(docx_path), str(pdf_path)
+            session.add(version)
+            session.commit()
+            path = docx_path if fmt == "docx" else pdf_path
+        if not path or not path.is_file():
+            raise HTTPException(
+                503, f"could not render {fmt} for this resume version"
+            )
+
+    resolved = path.resolve()
+    if not resolved.is_relative_to(settings.artifact_dir.resolve()):
+        log.error("refusing to serve %s: outside artifact dir", resolved)
+        raise HTTPException(403, "artifact path is outside the artifact directory")
+
+    stem = _download_stem(job, profile)
+    return FileResponse(
+        resolved,
+        media_type=_MEDIA_TYPES[fmt],
+        filename=f"{stem}.{fmt}",
+    )
+
+
+_MEDIA_TYPES = {
+    "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "pdf": "application/pdf",
+    "txt": "text/plain; charset=utf-8",
+}
+
+
+def _download_stem(job: Job | None, profile: Profile | None) -> str:
+    from app.resume.render import slugify
+
+    parts = [
+        slugify(((profile.full_name if profile else "") or "resume"), limit=24),
+        slugify(job.company if job else "", limit=24),
+        slugify(job.title if job else "", limit=32),
+    ]
+    return "_".join(p for p in parts if p) or "resume"
 
 
 @router.post("/jobs/{job_id}/tailor", response_model=ActionResult)

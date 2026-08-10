@@ -219,6 +219,41 @@ button:hover, .btn:hover { filter: brightness(1.08); }
 
 .btn-danger { background: transparent; color: var(--bad); border-color: var(--bad); }
 
+/* Artifact download/copy row under a resume or cover letter. Secondary by
+   default so the one primary action stays visually distinct. */
+.artifact-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-top: 12px;
+}
+.artifact-actions .btn,
+.artifact-actions button {
+  background: transparent;
+  color: var(--text);
+  border: 1px solid var(--border);
+  padding: 7px 13px;
+  font-size: 13px;
+}
+.artifact-actions .btn-primary {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+
+/* Inline copy affordance beside a single prepared form answer. */
+.btn-copy {
+  background: transparent;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  padding: 1px 6px;
+  font-size: 11px;
+  border-radius: 4px;
+  vertical-align: middle;
+}
+.btn-copy:hover { color: var(--text); }
+
 .inline { display: inline; }
 
 .actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
