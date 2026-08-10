@@ -44,6 +44,19 @@ SEARCH_URL = "https://lite.duckduckgo.com/lite/"
 MAX_CONCURRENT_DETAIL = 5
 DETAIL_TIMEOUT = 20.0
 
+# Domains that block automated access or are not job posting pages
+_BLOCKED_DOMAINS = {
+    "indeed.com",
+    "ziprecruiter.com",
+    "glassdoor.com",
+    "upwork.com",
+    "linkedin.com",
+    "freelancer.com",
+    "fiverr.com",
+    "toptal.com",
+    "arc.dev",  # not a job board
+}
+
 # An anchor wrapped around a `uddg=`-encoded target URL on the DDG lite SERP:
 # <a ... href="https://duckduckgo.com/l/?uddg=<enc>...">title</a>
 _RESULT_RE = re.compile(
@@ -149,7 +162,7 @@ def _parse_results(html: str, limit: int) -> list[tuple[str, str, str]]:
 
 
 def _normalise_target(url: str) -> str:
-    """Only follow http(s) targets; drop DDG's own /l/ redirect wrappers."""
+    """Only follow http(s) targets; drop DDG's own /l/ redirect wrappers and blocked domains."""
     if not url:
         return ""
     try:
@@ -157,6 +170,10 @@ def _normalise_target(url: str) -> str:
     except (ValueError, TypeError):
         return ""
     if parsed.scheme not in ("http", "https") or not parsed.netloc:
+        return ""
+    # Block known anti-scraper domains
+    host = parsed.netloc.lower().removeprefix("www.")
+    if any(blocked in host for blocked in _BLOCKED_DOMAINS):
         return ""
     return url
 

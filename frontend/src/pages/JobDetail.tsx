@@ -146,6 +146,17 @@ export default function JobDetail() {
             ATS {version.ats_score_before} → <strong>{version.ats_score_after}</strong>
           </div>
 
+          <div className="side-by-side" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, marginTop: 16 }}>
+            <div className="panel">
+              <h4 style={{ margin: "0 0 8px" }}>Tailored Resume</h4>
+              <div className="cv-rendered" style={{ maxHeight: 500, overflow: "auto" }} dangerouslySetInnerHTML={{ __html: version.text_html || version.text }} />
+            </div>
+            <div className="panel">
+              <h4 style={{ margin: "0 0 8px" }}>Job Description</h4>
+              <pre className="doc" style={{ maxHeight: 500, overflow: "auto", whiteSpace: "pre-wrap" }}>{job.description || "No description captured."}</pre>
+            </div>
+          </div>
+
           {version.truthcheck_notes.map((note) => (
             <div key={note} className="violation">{note}</div>
           ))}
@@ -168,11 +179,12 @@ export default function JobDetail() {
               <p className="prose">{version.diff_summary}</p>
             </details>
           )}
-          {version.text && (
-            <details>
-              <summary>Full tailored resume</summary>
-              <pre className="doc">{version.text}</pre>
-            </details>
+          {version.docx_path && (
+            <p className="muted" style={{ marginTop: 8 }}>
+              <a href={`/download/${version.id}/docx`}>Download DOCX</a>
+              {version.pdf_path && <span> · </span>}
+              {version.pdf_path && <a href={`/download/${version.id}/pdf`}>Download PDF</a>}
+            </p>
           )}
         </div>
       )}
@@ -227,6 +239,73 @@ export default function JobDetail() {
               <Chips items={job.interview_prep.skill_gaps} variant="miss" max={20} />
             </div>
           )}
+
+          {job.interview_prep.speech_interview && job.interview_prep.speech_interview.length > 0 && (
+            <div className="interview-section speech-interview">
+              <h3>Speech Interview (30 min simulation)</h3>
+              {job.interview_prep.speech_interview.map((sim, idx) => (
+                <details key={idx} open>
+                  <summary>{sim.question}</summary>
+                  <div className="interview-content">
+                    {sim.expected_key_points && sim.expected_key_points.length > 0 && (
+                      <>
+                        <p><strong>Key points to cover:</strong></p>
+                        <ul>{sim.expected_key_points.map((pt, i) => <li key={i}>{pt}</li>)}</ul>
+                      </>
+                    )}
+                    {sim.time_minutes && <p className="muted">⏱ {sim.time_minutes} min</p>}
+                    {sim.evaluation_rubric && (
+                      <details>
+                        <summary>Evaluation rubric</summary>
+                        <div className="rubric">
+                          {Object.entries(sim.evaluation_rubric).map(([level, desc]) => (
+                            <p key={level}><strong>{level.charAt(0).toUpperCase() + level.slice(1)}:</strong> {desc}</p>
+                          ))}
+                        </div>
+                      </details>
+                    )}
+                  </div>
+                </details>
+              ))}
+            </div>
+          )}
+
+          {job.interview_prep.technical_interview && job.interview_prep.technical_interview.length > 0 && (
+            <div className="interview-section technical-interview">
+              <h3>Technical Interview (coding/design)</h3>
+              {job.interview_prep.technical_interview.map((sim, idx) => (
+                <details key={idx} open>
+                  <summary>{sim.question}</summary>
+                  <div className="interview-content">
+                    {sim.starter_code && (
+                      <>
+                        <p><strong>Starter code:</strong></p>
+                        <pre className="doc">{sim.starter_code}</pre>
+                      </>
+                    )}
+                    {sim.expected_solution && (
+                      <details>
+                        <summary>Expected solution outline</summary>
+                        <pre className="doc">{sim.expected_solution}</pre>
+                      </details>
+                    )}
+                    {sim.time_minutes && <p className="muted">⏱ {sim.time_minutes} min</p>}
+                    {sim.evaluation_rubric && (
+                      <details>
+                        <summary>Evaluation rubric</summary>
+                        <div className="rubric">
+                          {Object.entries(sim.evaluation_rubric).map(([level, desc]) => (
+                            <p key={level}><strong>{level.charAt(0).toUpperCase() + level.slice(1)}:</strong> {desc}</p>
+                          ))}
+                        </div>
+                      </details>
+                    )}
+                  </div>
+                </details>
+              ))}
+            </div>
+          )}
+
           {[
             ["Technical", job.interview_prep.technical_questions],
             ["Behavioural", job.interview_prep.behavioural_questions],

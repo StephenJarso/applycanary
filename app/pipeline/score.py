@@ -141,7 +141,7 @@ async def tier2(job: Job, profile: Profile, base: Decision) -> Decision:
             model=llm.triage_model,
             system=system,
             messages=[{"role": "user", "content": user}],
-            max_tokens=1024,
+            max_tokens=4096,
         )
     except Exception as exc:  # noqa: BLE001 - scoring must never break ingestion
         log.warning("tier2 scoring failed for job %s: %s", job.id, exc)

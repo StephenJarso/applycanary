@@ -350,6 +350,7 @@ def job_detail(job_id: int, session: Session = Depends(get_session)) -> JobDetai
         resume_version=(
             {
                 "text": version.text,
+                "text_html": version.text_html if hasattr(version, 'text_html') else version.text,
                 "diff_summary": version.diff_summary,
                 "ats_score_before": version.ats_score_before,
                 "ats_score_after": version.ats_score_after,
@@ -369,6 +370,8 @@ def job_detail(job_id: int, session: Session = Depends(get_session)) -> JobDetai
                 "questions_to_ask": list(prep.questions_to_ask or []),
                 "company_notes": prep.company_notes,
                 "skill_gaps": list(prep.skill_gaps or []),
+                "speech_interview": prep.speech_interview or [],
+                "technical_interview": prep.technical_interview or [],
             }
             if prep else None
         ),

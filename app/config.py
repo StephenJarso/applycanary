@@ -43,8 +43,8 @@ class Settings(BaseSettings):
     model_triage: str = "claude-haiku-4-5-20251001"
     model_tailor: str = "claude-sonnet-5"
     gemini_api_key: str = ""
-    gemini_model: str = "gemini-3.5-flash"
-    gemini_tailor_model: str = "gemini-3.5-flash"
+    gemini_model: str = "gemini-3.5-flash-lite"
+    gemini_tailor_model: str = "gemini-3.5-flash-lite"
 
     openrouter_api_key: str = ""
     openrouter_triage_model: str = "meta-llama/llama-3.1-8b-instruct:free"
@@ -100,6 +100,10 @@ class Settings(BaseSettings):
     database_url: str = "sqlite:///./data/applycanary.db"
     data_dir: Path = Field(default=Path("./data"))
     log_level: str = "INFO"
+    # Frontend base URL for redirects.
+    # In production: "/" (same origin, frontend served at /ui by FastAPI).
+    # In development: "http://localhost:5173/ui/" (Vite dev server).
+    frontend_base_url: str = "/"
 
     # ------------------------------------------------------------------
     @property
