@@ -8,10 +8,12 @@ application.
 from __future__ import annotations
 
 import logging
+import re
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
+from markupsafe import Markup
 from sqlmodel import Session, func, select
 
 from app.config import get_settings
@@ -28,8 +30,91 @@ from app.models import (
 
 log = logging.getLogger(__name__)
 
+
+def _redirect(path: str) -> RedirectResponse:
+    """Build a redirect to the frontend base URL + path."""
+    settings = get_settings()
+    base = settings.frontend_base_url.rstrip("/")
+    return RedirectResponse(url=f"{base}{path}", status_code=303)
+
+
+def _render_cv(text: str) -> Markup:
+    """Convert plain text resume to formatted HTML."""
+    if not text:
+        return Markup("")
+
+    lines = text.splitlines()
+    html_parts = []
+    first_line = True
+    in_list = False
+
+    for raw in lines:
+        line = raw.rstrip()
+        if not line.strip():
+            if in_list:
+                html_parts.append("</ul>")
+                in_list = False
+            html_parts.append("<br>")
+            continue
+
+        stripped = line.strip()
+
+        # Detect section headings (ALL CAPS or known section words)
+        section_words = {
+            "summary", "professional summary", "profile", "objective", "about",
+            "experience", "work experience", "professional experience", "employment",
+            "employment history", "work history", "education", "skills",
+            "technical skills", "core competencies", "projects", "certifications",
+            "publications", "awards", "languages", "interests", "volunteering",
+        }
+        is_heading = (
+            stripped.upper() == stripped and len(stripped.split()) <= 4
+        ) or stripped.lower().rstrip(":") in section_words
+
+        # Detect bullet points
+        is_bullet = bool(re.match(r"^\s*[-*•‣▪●·]\s+", line))
+
+        if is_heading:
+            if in_list:
+                html_parts.append("</ul>")
+                in_list = False
+            if first_line:
+                html_parts.append(f'<h1 class="cv-name">{stripped}</h1>')
+                first_line = False
+            else:
+                html_parts.append(f'<h2 class="cv-section">{stripped.rstrip(":").upper()}</h2>')
+            continue
+
+        if is_bullet:
+            if not in_list:
+                html_parts.append("<ul class=\"cv-bullets\">")
+                in_list = True
+            bullet_text = re.sub(r"^\s*[-*•‣▪●·]\s+", "", stripped)
+            html_parts.append(f"<li>{bullet_text}</li>")
+            continue
+
+        # Regular paragraph
+        if in_list:
+            html_parts.append("</ul>")
+            in_list = False
+
+        if first_line:
+            html_parts.append(f'<h1 class="cv-name">{stripped}</h1>')
+            first_line = False
+        else:
+            html_parts.append(f'<p class="cv-text">{stripped}</p>')
+
+    if in_list:
+        html_parts.append("</ul>")
+
+    return Markup("".join(html_parts))
+
+
 router = APIRouter()
 templates = Jinja2Templates(directory=str(get_settings().templates_dir))
+
+# Register custom filter
+templates.env.filters["render_cv"] = _render_cv
 
 
 def _profile(session: Session) -> Profile | None:
@@ -78,7 +163,7 @@ def login_action(
         )
         return response
 
-    return RedirectResponse(url="/login?error=Invalid+credentials", status_code=303)
+    return _redirect("/login?error=Invalid+credentials")
 
 
 @router.get("/logout")
@@ -86,7 +171,7 @@ def login_action(
 def logout_action() -> RedirectResponse:
     from app.auth import SESSION_COOKIE_NAME
 
-    response = RedirectResponse(url="/login", status_code=303)
+    response = _redirect("/login")
     response.delete_cookie(SESSION_COOKIE_NAME)
     return response
 
@@ -351,7 +436,7 @@ async def save_profile(
     profile.updated_at = utcnow()
     session.add(profile)
     session.commit()
-    return RedirectResponse("/profile?saved=1", status_code=303)
+    return _redirect("/profile?saved=1")
 
 
 @router.post("/profile/resume")
@@ -365,7 +450,7 @@ async def upload_resume(
     form = await request.form()
     upload = form.get("resume")
     if upload is None or not getattr(upload, "filename", ""):
-        return RedirectResponse("/profile?error=no+file", status_code=303)
+        return _redirect("/profile?error=no+file")
 
     settings = get_settings()
     settings.ensure_dirs()
@@ -374,9 +459,7 @@ async def upload_resume(
 
     suffix = Path(upload.filename).suffix.lower()
     if suffix not in SUPPORTED:
-        return RedirectResponse(
-            f"/profile?error=unsupported+type+{suffix}", status_code=303
-        )
+        return _redirect(f"/profile?error=unsupported+type+{suffix}")
 
     dest = settings.resume_dir / f"base{suffix}"
     dest.write_bytes(await upload.read())
@@ -385,7 +468,7 @@ async def upload_resume(
         parsed = parse_resume(dest)
     except Exception as exc:  # noqa: BLE001
         log.exception("resume parse failed")
-        return RedirectResponse(f"/profile?error={type(exc).__name__}", status_code=303)
+        return _redirect(f"/profile?error={type(exc).__name__}")
 
     profile = _profile(session) or Profile()
     profile.base_resume_path = str(dest)
@@ -399,7 +482,7 @@ async def upload_resume(
     session.add(profile)
     session.commit()
     log.info("resume uploaded: %d words, %d skills", parsed.word_count, len(profile.skills))
-    return RedirectResponse("/profile?uploaded=1", status_code=303)
+    return _redirect("/profile?uploaded=1")
 
 
 @router.post("/job/{job_id}/tailor")
@@ -417,8 +500,8 @@ async def tailor_job(
         await prepare(session, job, profile)
     except Exception as exc:  # noqa: BLE001
         log.exception("tailoring job %s failed", job_id)
-        return RedirectResponse(f"/job/{job_id}?error={type(exc).__name__}", status_code=303)
-    return RedirectResponse(f"/job/{job_id}?tailored=1", status_code=303)
+        return _redirect(f"/job/{job_id}?error={type(exc).__name__}")
+    return _redirect(f"/job/{job_id}?tailored=1")
 
 
 @router.post("/job/{job_id}/submit")
@@ -443,7 +526,7 @@ async def submit_job(
         session, job, profile, force=force.lower() in ("on", "true", "yes", "1")
     )
     flag = "submitted=1" if result.ok else f"error={result.error[:120]}"
-    return RedirectResponse(f"/job/{job_id}?{flag}", status_code=303)
+    return _redirect(f"/job/{job_id}?{flag}")
 
 
 @router.post("/job/{job_id}/skip")
@@ -454,7 +537,7 @@ def skip_job(job_id: int, session: Session = Depends(get_session)) -> RedirectRe
     job.status = JobStatus.SKIPPED
     session.add(job)
     session.commit()
-    return RedirectResponse("/", status_code=303)
+    return _redirect("/")
 
 
 @router.post("/job/{job_id}/prep")
@@ -472,8 +555,8 @@ async def make_prep(
         await prep_for_job(session, job, profile)
     except Exception as exc:  # noqa: BLE001
         log.exception("interview prep for job %s failed", job_id)
-        return RedirectResponse(f"/job/{job_id}?error={type(exc).__name__}", status_code=303)
-    return RedirectResponse(f"/job/{job_id}?prepped=1", status_code=303)
+        return _redirect(f"/job/{job_id}?error={type(exc).__name__}")
+    return _redirect(f"/job/{job_id}?prepped=1")
 
 
 @router.post("/actions/poll")
@@ -483,7 +566,7 @@ async def trigger_poll() -> RedirectResponse:
 
     await poll_curated()
     await poll_broad()
-    return RedirectResponse("/sources", status_code=303)
+    return _redirect("/sources")
 
 
 @router.post("/actions/score")
@@ -491,7 +574,7 @@ async def trigger_score(session: Session = Depends(get_session)) -> RedirectResp
     from app.pipeline.score import score_pending
 
     await score_pending(session, limit=50)
-    return RedirectResponse("/", status_code=303)
+    return _redirect("/")
 
 
 @router.post("/actions/github")
@@ -501,17 +584,17 @@ async def trigger_github(session: Session = Depends(get_session)) -> RedirectRes
 
     profile = _profile(session)
     if profile is None or not profile.github_username:
-        return RedirectResponse("/profile?error=no+github+username", status_code=303)
+        return _redirect("/profile?error=no+github+username")
 
     evidence = await scan(profile.github_username)
     if not evidence.ok:
-        return RedirectResponse(f"/profile?error={evidence.error[:100]}", status_code=303)
+        return _redirect(f"/profile?error={evidence.error[:100]}")
 
     profile.github_evidence = evidence.to_dict()
     profile.github_synced_at = utcnow()
     session.add(profile)
     session.commit()
-    return RedirectResponse("/profile?github=1", status_code=303)
+    return _redirect("/profile?github=1")
 
 
 # ---------------------------------------------------------------- helpers

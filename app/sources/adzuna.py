@@ -11,7 +11,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from app.config import Settings
+from app.config import Settings, get_settings
 from app.sources.base import BaseSource, RawJob, clean_html, register
 from app.sources.greenhouse import parse_iso
 
@@ -52,8 +52,8 @@ class AdzunaSource(BaseSource):
             self.country = _DEFAULT_COUNTRY
 
     async def fetch(self) -> list[RawJob]:
-        settings = self._settings
-        if not settings or not settings.adzuna_app_id or not settings.adzuna_app_key:
+        settings = get_settings()
+        if not settings.adzuna_app_id or not settings.adzuna_app_key:
             log.info("adzuna: ADZUNA_APP_ID/APP_KEY not configured, skipping")
             return []
 

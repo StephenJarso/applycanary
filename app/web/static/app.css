@@ -246,6 +246,79 @@ pre.doc {
   overflow: auto;
 }
 
+/* ---------------------------------------------------------- CV rendering */
+
+.cv-rendered {
+  font-family: inherit;
+  line-height: 1.6;
+}
+
+.cv-name {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0 0 0.25rem 0;
+}
+
+.cv-section {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--accent);
+  margin: 1.25rem 0 0.5rem 0;
+  padding-bottom: 0.25rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.cv-text {
+  margin: 0.35rem 0;
+  color: var(--text);
+}
+
+.cv-bullets {
+  margin: 0.5rem 0 0.5rem 1.5rem;
+  padding: 0;
+  list-style: disc;
+}
+
+.cv-bullets li {
+  margin: 0.25rem 0;
+  color: var(--text);
+}
+
+/* Side-by-side panels */
+.side-by-side .panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  max-height: 500px;
+  overflow: auto;
+}
+
+.side-by-side .panel h3 {
+  margin: 0 0 8px 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+/* Fix for cv-rendered inside panel */
+.cv-rendered .cv-name {
+  margin-bottom: 0.25rem;
+}
+.cv-rendered .cv-text {
+  margin: 0.35rem 0;
+}
+.cv-rendered .cv-section {
+  margin-top: 1rem;
+}
+.cv-rendered ul.cv-bullets {
+  margin: 0.5rem 0 0.5rem 1.5rem;
+}
+.cv-rendered ul.cv-bullets li {
+  margin: 0.25rem 0;
+}
+
 .empty { text-align: center; padding: 60px 20px; color: var(--muted); }
 
 .violation {
@@ -262,3 +335,83 @@ pre.doc {
 .status-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
 .dot-ok { background: var(--ok); }
 .dot-bad { background: var(--bad); }
+
+/* ---------------------------------------------------------- interview sections */
+
+.interview-section {
+  margin-top: 1rem;
+  padding: 1rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.interview-section details {
+  margin: 0.75rem 0;
+  padding: 1rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.interview-section summary {
+  font-weight: 600;
+  cursor: pointer;
+  color: var(--text);
+  padding: 0.5rem 0;
+}
+
+.interview-section summary:hover {
+  color: var(--accent);
+}
+
+.interview-section summary::-webkit-details-marker {
+  color: var(--accent);
+}
+
+.interview-content {
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border);
+}
+
+.interview-content p {
+  margin: 0.5rem 0;
+}
+
+.interview-content ul {
+  margin: 0.5rem 0 0.5rem 1.5rem;
+  padding: 0;
+  list-style: disc;
+}
+
+.interview-content li {
+  margin: 0.25rem 0;
+}
+
+.interview-section .rubric {
+  margin-top: 0.5rem;
+  padding: 0.75rem;
+  background: var(--surface);
+  border-radius: var(--radius);
+}
+
+.interview-section .rubric p {
+  margin: 0.35rem 0;
+}
+
+.interview-section h3 {
+  color: var(--accent);
+  margin-top: 1.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.interview-section .speech-interview {
+  border-left: 3px solid var(--ok);
+  padding-left: 1rem;
+}
+
+.interview-section .technical-interview {
+  border-left: 3px solid var(--accent);
+  padding-left: 1rem;
+}

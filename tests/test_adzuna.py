@@ -5,10 +5,9 @@ No network. Feeds a trimmed real-API payload straight to the parser.
 
 from __future__ import annotations
 
-from app.sources.adzuna import AdzunaSource, _adzuna_settings
 from app.config import Settings
+from app.sources.adzuna import AdzunaSource, _adzuna_settings
 from app.sources.base import RawJob
-
 
 ADZUNA_PAYLOAD = {
     "results": [

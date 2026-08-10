@@ -207,6 +207,7 @@ class ResumeVersion(SQLModel, table=True):
     docx_path: str = ""
     pdf_path: str = ""
     text: str = Field(default="", sa_column=Column(Text))
+    text_html: str = Field(default="", sa_column=Column(Text))
     diff_summary: str = Field(default="", sa_column=Column(Text))
 
     ats_score_before: float = 0.0
