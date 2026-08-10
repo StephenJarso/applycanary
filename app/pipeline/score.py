@@ -21,7 +21,7 @@ from app.llm.prompts import SCORING_SYSTEM, build_scoring_user
 from app.models import Job, JobScore, JobStatus, Profile, utcnow
 from app.pipeline.ats_rules import evaluate as evaluate_ats
 from app.pipeline.keywords import keyword_overlap
-from app.pipeline.relevance import relevance_disqualifier
+from app.pipeline.relevance import relevance_disqualifier, title_mismatch_penalty
 from app.pipeline.tailor import TailorError, tailor_for_job
 
 log = logging.getLogger(__name__)
@@ -191,6 +191,31 @@ async def score_job(session: Session, job: Job, profile: Profile) -> Decision:
 
     decision = await tier2(job, profile, decision)
     decision.ats_score = await _tailored_ats_score(session, job, profile)
+    return _apply_title_penalty(decision, job, profile)
+
+
+def _apply_title_penalty(
+    decision: Decision, job: Job, profile: Profile
+) -> Decision:
+    """Deduct for a title outside ``target_titles`` after the LLM has weighed in.
+
+    Applied here rather than in tier 1 on purpose: deducting before the coverage
+    gate would push mismatched titles under the threshold and skip tier 2, which
+    is exactly the silent-rejection behaviour this replaced. By the time this
+    runs the LLM has already read the full description, so the penalty only
+    reorders results that were genuinely considered.
+    """
+    penalty, reason = title_mismatch_penalty(job, profile)
+    if not penalty:
+        return decision
+
+    decision.total = round(max(0.0, decision.total - penalty), 1)
+    note = reason[0].upper() + reason[1:]
+    decision.reasoning = f"{decision.reasoning} {note}.".strip()
+    if decision.verdict == "strong_match":
+        # A title this far off should not present as a top match, even when the
+        # description reads well.
+        decision.verdict = "possible"
     return decision
 
 

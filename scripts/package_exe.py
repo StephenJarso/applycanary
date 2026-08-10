@@ -92,9 +92,16 @@ def build_portable_bundle() -> None:
 
 
 def main() -> None:
+    # --skip-frontend: the CI release workflow builds the bundle once and shares
+    # it across platform jobs, so rebuilding here would need Node on every runner.
+    skip_frontend = "--skip-frontend" in sys.argv
+    portable_only = "--portable-only" in sys.argv
+
     DIST_DIR.mkdir(parents=True, exist_ok=True)
-    build_frontend()
-    pyinstaller_success = build_pyinstaller_bundle()
+    if not skip_frontend:
+        build_frontend()
+    if not portable_only:
+        build_pyinstaller_bundle()
     build_portable_bundle()
 
     print("\n=== Release Artifacts Summary ===")
