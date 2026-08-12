@@ -1,7 +1,8 @@
 # ApplyCanary — Multi-User Retrofit & Deployment Plan
 
-**Status as of this document:** Phase 1 (auth foundation + request plumbing) is
-**complete and verified**. Phases 2–6 below are **not started**.
+**Status as of this document:** Phases 1 (auth foundation + request plumbing)
+and 2 (data migration) are **complete and verified**. Phases 3–6 below are
+**not started**.
 
 Branch: `worktree-deploy-app-standalone-release`
 
@@ -136,7 +137,7 @@ QUEUED can't pin a posting for everyone.
 
 ---
 
-## Phase 2 — Data migration (NOT STARTED) — **do this before any deploy**
+## Phase 2 — Data migration (COMPLETE) — done before any deploy
 
 `sync_schema()` (`app/db.py:93-136`) is additive-only and **explicitly skips
 NOT NULL columns without a default** (`db.py:120-126`). It also cannot alter a
@@ -164,6 +165,17 @@ Write `scripts/migrate_multiuser.py`:
 
 Rehearse against a **copy** first. Confirm 1810 jobs and 286 applications
 survive and all belong to the owner.
+
+**Done (2026-08-12):** `scripts/migrate_multiuser.py` written, rehearsed on a
+copy, then run against the live database. All row counts survived the rebuild
+(job 1896, job_score 1810, application 286, interview_prep 24, resume_version
+71, job_alias 2147, source_run 1943); the three fixture profiles were removed;
+`PRAGMA foreign_key_check` clean; composite uniques verified on all four
+per-user tables. Pre-migration backup saved at
+`data/applycanary.multiuser-<timestamp>.db`. Owner account is `admin`
+(password set at migration time, hashed with scrypt — **not** the old
+`AUTH_PASSWORD`); `sync_schema` adds the per-profile preference columns on
+first boot.
 
 ---
 
