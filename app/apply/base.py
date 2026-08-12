@@ -22,7 +22,6 @@ from datetime import timedelta
 
 from sqlmodel import Session, func, select
 
-from app.config import get_settings
 from app.models import (
     Application,
     ApplyMethod,
@@ -62,11 +61,19 @@ class SubmitGate:
         resume_version: ResumeVersion | None,
         *,
         force: bool = False,
+        user_id: int,
+        profile: Profile | None = None,
     ) -> GateResult:
-        settings = get_settings()
+        # Thresholds come from the user's profile, not process-wide settings:
+        # one user's auto-submit preferences must not govern another's.
+        auto_submit = profile.enable_auto_submit if profile else False
+        daily_cap = profile.daily_apply_cap if profile else 0
+        min_score = profile.auto_submit_min_score if profile else 100.0
 
         existing = session.exec(
-            select(Application).where(Application.job_id == job.id)
+            select(Application).where(
+                Application.job_id == job.id, Application.user_id == user_id
+            )
         ).first()
         if existing is not None and existing.submitted_at is not None:
             return GateResult(False, f"already applied on {existing.submitted_at:%Y-%m-%d}")
@@ -82,34 +89,39 @@ class SubmitGate:
                 "review and edit it before submitting",
             )
 
-        if not settings.enable_auto_submit and not force:
-            return GateResult(True, "ENABLE_AUTO_SUBMIT is false", dry_run=True)
+        if not auto_submit and not force:
+            return GateResult(True, "auto-submit is off for this profile", dry_run=True)
 
         since = utcnow() - timedelta(hours=24)
+        # Scoped to this user: a global count let one busy account starve
+        # everyone else's daily allowance.
         sent_today = session.exec(
             select(func.count(Application.id)).where(
+                Application.user_id == user_id,
                 Application.submitted_at.is_not(None),
                 Application.submitted_at >= since,
                 Application.method != ApplyMethod.DRY_RUN,
             )
         ).one()
-        if sent_today >= settings.daily_apply_cap:
+        if sent_today >= daily_cap:
             return GateResult(
                 False,
-                f"daily cap reached ({sent_today}/{settings.daily_apply_cap} in 24h)",
+                f"daily cap reached ({sent_today}/{daily_cap} in 24h)",
             )
 
         if not force:
             score = session.exec(
-                select(JobScore).where(JobScore.job_id == job.id)
+                select(JobScore).where(
+                    JobScore.job_id == job.id, JobScore.user_id == user_id
+                )
             ).first()
             if score is None:
                 return GateResult(False, "job has not been scored yet")
-            if score.total < settings.auto_submit_min_score:
+            if score.total < min_score:
                 return GateResult(
                     False,
                     f"score {score.total:.0f} is below the auto-submit minimum "
-                    f"({settings.auto_submit_min_score})",
+                    f"({min_score})",
                 )
 
         return GateResult(True)

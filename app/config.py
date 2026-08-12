@@ -8,6 +8,11 @@ from pathlib import Path
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+# Hard default for the session-signing key. Every deploy must override it with a
+# random value, and startup refuses a non-loopback bind that still carries it —
+# anyone who can read the public repo could forge a session token otherwise.
+DEFAULT_SECRET_KEY = "applycanary-secret-key-change-in-production"
+
 
 @lru_cache
 def in_container() -> bool:
@@ -89,10 +94,15 @@ class Settings(BaseSettings):
     adzuna_app_id: str = ""
     adzuna_app_key: str = ""
     # --- auth ---
+    # Legacy single-user credentials. Retained only so the migration can seed the
+    # first account; authentication itself now goes through the User table.
     auth_enabled: bool = False
     auth_username: str = "admin"
     auth_password: str = ""
-    secret_key: str = "applycanary-secret-key-change-in-production"
+    secret_key: str = DEFAULT_SECRET_KEY
+    # Registration requires an invite code, because the operator's API keys pay
+    # for every user's scoring and tailoring.
+    allow_registration: bool = True
 
     # --- server ---
     host: str = "127.0.0.1"
@@ -104,8 +114,23 @@ class Settings(BaseSettings):
     # In production: "/" (same origin, frontend served at /ui by FastAPI).
     # In development: "http://localhost:5173/ui/" (Vite dev server).
     frontend_base_url: str = "/"
+    # Marks the session cookie Secure. Defaults on for any non-loopback bind,
+    # since that means the app is reachable off-box and the cookie must not
+    # travel in clear text.
+    cookie_secure: bool | None = None
 
     # ------------------------------------------------------------------
+    @property
+    def is_public_bind(self) -> bool:
+        """True when the server listens on something other than loopback."""
+        return self.host not in ("127.0.0.1", "localhost", "::1")
+
+    @property
+    def session_cookie_secure(self) -> bool:
+        if self.cookie_secure is not None:
+            return self.cookie_secure
+        return self.is_public_bind
+
     @property
     def is_auth_required(self) -> bool:
         return self.auth_enabled or bool(self.auth_password)
@@ -156,6 +181,23 @@ class Settings(BaseSettings):
     def ensure_dirs(self) -> None:
         for d in (self.data_dir, self.resume_dir, self.artifact_dir, self.cache_dir):
             d.mkdir(parents=True, exist_ok=True)
+
+    def startup_errors(self) -> list[str]:
+        """Misconfigurations that must stop the boot.
+
+        Only the signing key qualifies today. Serving other people's data while
+        signing sessions with a key published in the repo means any reader can
+        mint a cookie for any account, so this fails closed instead of warning.
+        """
+        errors: list[str] = []
+        if self.is_public_bind and self.secret_key == DEFAULT_SECRET_KEY:
+            errors.append(
+                "SECRET_KEY is still the built-in default while listening on "
+                f"{self.host}. Session cookies would be forgeable by anyone who "
+                "has read the source. Set SECRET_KEY to a random value "
+                '(e.g. `python -c "import secrets; print(secrets.token_urlsafe(48))"`).'
+            )
+        return errors
 
     def startup_warnings(self) -> list[str]:
         """Non-fatal misconfigurations worth surfacing at boot and on the dashboard."""

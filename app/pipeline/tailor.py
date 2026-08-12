@@ -31,7 +31,12 @@ class TailorError(RuntimeError):
 
 
 async def tailor_for_job(
-    session: Session, job: Job, profile: Profile, *, force: bool = False
+    session: Session,
+    job: Job,
+    profile: Profile,
+    *,
+    force: bool = False,
+    user_id: int | None = None,
 ) -> ResumeVersion:
     """Generate and verify a tailored resume for one job.
 
@@ -46,8 +51,11 @@ async def tailor_for_job(
     if not resume_text:
         raise TailorError("no base resume on file; upload one on the Profile page")
 
+    owner = user_id if user_id is not None else profile.user_id
     existing = session.exec(
-        select(ResumeVersion).where(ResumeVersion.job_id == job.id)
+        select(ResumeVersion).where(
+            ResumeVersion.job_id == job.id, ResumeVersion.user_id == owner
+        )
     ).first()
     if existing and not force:
         return existing
@@ -55,7 +63,11 @@ async def tailor_for_job(
     evidence = GithubEvidence.from_dict(profile.github_evidence or {})
     evidence_text = evidence.as_prompt_text()
 
-    score = session.exec(select(JobScore).where(JobScore.job_id == job.id)).first()
+    score = session.exec(
+        select(JobScore).where(
+            JobScore.job_id == job.id, JobScore.user_id == owner
+        )
+    ).first()
     missing = list(score.missing_keywords) if score else []
     if not missing:
         _, _, missing = keyword_overlap(resume_text, job.description)
@@ -113,7 +125,7 @@ async def tailor_for_job(
 
     after = evaluate(rebuilt, job_description=job.description)
 
-    version = existing or ResumeVersion(job_id=job.id)
+    version = existing or ResumeVersion(job_id=job.id, user_id=owner)
     version.text = rebuilt
     version.text_html = _render_cv_html(rebuilt)
     version.diff_summary = diff_sum

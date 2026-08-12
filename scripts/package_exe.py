@@ -66,7 +66,7 @@ def build_portable_bundle() -> None:
         shutil.rmtree(portable_dir)
 
     portable_dir.mkdir(parents=True)
-    
+
     # Copy app files
     shutil.copytree(ROOT_DIR / "app", portable_dir / "app")
     shutil.copy(ROOT_DIR / "run.py", portable_dir / "run.py")

@@ -6,10 +6,9 @@ dashboard reads without hitting `database is locked`.
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Iterator
 from contextlib import contextmanager
-
-import logging
 
 from sqlalchemy import event
 from sqlalchemy.engine import Engine

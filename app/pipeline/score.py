@@ -16,9 +16,10 @@ from dataclasses import dataclass, field
 
 from sqlmodel import Session, select
 
+from app.deps import user_job
 from app.llm.client import cached_system, get_llm
 from app.llm.prompts import SCORING_SYSTEM, build_scoring_user
-from app.models import Job, JobScore, JobStatus, Profile, utcnow
+from app.models import Job, JobScore, JobStatus, Profile, UserJob, utcnow
 from app.pipeline.ats_rules import evaluate as evaluate_ats
 from app.pipeline.keywords import keyword_overlap
 from app.pipeline.relevance import relevance_disqualifier, title_mismatch_penalty
@@ -174,7 +175,9 @@ async def tier2(job: Job, profile: Profile, base: Decision) -> Decision:
 # ---------------------------------------------------------------- driver
 
 
-async def score_job(session: Session, job: Job, profile: Profile) -> Decision:
+async def score_job(
+    session: Session, job: Job, profile: Profile, *, user_id: int | None = None
+) -> Decision:
     """Two-tier scoring plus the ATS structure pass.
 
     ATS structure is the rule engine's verdict on the resume *as tailored for
@@ -183,6 +186,7 @@ async def score_job(session: Session, job: Job, profile: Profile) -> Decision:
     or tailoring fails, the same rules run on the stored base resume so the
     meter is never left at zero.
     """
+    owner = user_id if user_id is not None else profile.user_id
     decision = tier1(job, profile)
     decision.ats_score = _base_ats_score(profile, job)
 
@@ -190,7 +194,7 @@ async def score_job(session: Session, job: Job, profile: Profile) -> Decision:
         return decision
 
     decision = await tier2(job, profile, decision)
-    decision.ats_score = await _tailored_ats_score(session, job, profile)
+    decision.ats_score = await _tailored_ats_score(session, job, profile, owner)
     return _apply_title_penalty(decision, job, profile)
 
 
@@ -225,7 +229,7 @@ def _base_ats_score(profile: Profile, job: Job) -> float:
 
 
 async def _tailored_ats_score(
-    session: Session, job: Job, profile: Profile
+    session: Session, job: Job, profile: Profile, user_id: int | None = None
 ) -> float:
     """Rule-engine score of the Claude-tailored resume, or the base fallback."""
     llm = get_llm()
@@ -233,7 +237,7 @@ async def _tailored_ats_score(
         return _base_ats_score(profile, job)
 
     try:
-        version = await tailor_for_job(session, job, profile)
+        version = await tailor_for_job(session, job, profile, user_id=user_id)
     except TailorError as exc:
         log.debug("job %s: tailoring unavailable for ATS pass (%s)", job.id, exc)
         return _base_ats_score(profile, job)
@@ -245,23 +249,35 @@ async def _tailored_ats_score(
     return version.ats_score_after
 
 
-async def score_pending(session: Session, *, limit: int = 25) -> int:
-    """Score up to `limit` unscored jobs. Returns how many were scored.
+async def score_pending(session: Session, *, user_id: int, limit: int = 25) -> int:
+    """Score up to `limit` of one user's unscored jobs. Returns how many were scored.
 
     Newest postings first: a fresh job is worth acting on before a stale one, and
     that ordering is what preserves the fast-apply advantage when a backlog builds.
     """
-    profile = session.exec(select(Profile)).first()
+    profile = session.exec(
+        select(Profile).where(Profile.user_id == user_id)
+    ).first()
     if profile is None:
-        log.info("no profile configured; skipping scoring")
+        log.info("user %s has no profile; skipping scoring", user_id)
         return 0
     if not (profile.base_resume_text or profile.skills):
-        log.info("profile has no resume text or skills; skipping scoring")
+        log.info("user %s profile has no resume text or skills; skipping", user_id)
         return 0
 
+    # A job is a candidate when this user has no state row for it yet, or has
+    # one still marked NEW. The outer join is what keeps users independent:
+    # another user scoring a job no longer removes it from this user's queue.
     jobs = session.exec(
         select(Job)
-        .where(Job.status == JobStatus.NEW)
+        .outerjoin(
+            UserJob,
+            (UserJob.job_id == Job.id) & (UserJob.user_id == user_id),
+        )
+        .where(Job.expired_at.is_(None))
+        .where(
+            (UserJob.id.is_(None)) | (UserJob.status == JobStatus.NEW)
+        )
         .order_by(Job.posted_at.desc().nullslast(), Job.first_seen_at.desc())
         .limit(limit)
     ).all()
@@ -269,23 +285,30 @@ async def score_pending(session: Session, *, limit: int = 25) -> int:
     scored = 0
     for job in jobs:
         try:
-            decision = await score_job(session, job, profile)
+            decision = await score_job(session, job, profile, user_id=user_id)
         except Exception:  # noqa: BLE001
             log.exception("scoring job %s failed", job.id)
-            job.status = JobStatus.FAILED
-            session.add(job)
+            state = user_job(session, user_id, job.id)
+            state.status = JobStatus.FAILED
+            session.add(state)
             continue
 
-        _persist_decision(session, job, decision)
+        _persist_decision(session, job, decision, user_id=user_id)
         scored += 1
 
     session.commit()
     return scored
 
 
-def _persist_decision(session: Session, job: Job, decision: Decision) -> None:
-    existing = session.exec(select(JobScore).where(JobScore.job_id == job.id)).first()
-    score = existing or JobScore(job_id=job.id)
+def _persist_decision(
+    session: Session, job: Job, decision: Decision, *, user_id: int
+) -> None:
+    existing = session.exec(
+        select(JobScore).where(
+            JobScore.job_id == job.id, JobScore.user_id == user_id
+        )
+    ).first()
+    score = existing or JobScore(job_id=job.id, user_id=user_id)
 
     score.keyword_score = decision.keyword_score
     score.semantic_score = decision.semantic_score
@@ -300,14 +323,15 @@ def _persist_decision(session: Session, job: Job, decision: Decision) -> None:
     score.model_used = decision.model_used
     score.scored_at = utcnow()
 
-    job.status = (
+    state = user_job(session, user_id, job.id)
+    state.status = (
         JobStatus.REJECTED
         if decision.verdict in ("disqualified", "weak")
         else JobStatus.SCORED
     )
 
     session.add(score)
-    session.add(job)
+    session.add(state)
 
 
 # ---------------------------------------------------------------- helpers

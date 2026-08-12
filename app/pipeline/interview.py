@@ -25,10 +25,18 @@ class InterviewPrepError(RuntimeError):
 
 
 async def prep_for_job(
-    session: Session, job: Job, profile: Profile, *, force: bool = False
+    session: Session,
+    job: Job,
+    profile: Profile,
+    *,
+    force: bool = False,
+    user_id: int | None = None,
 ) -> InterviewPrep:
+    owner = user_id if user_id is not None else profile.user_id
     existing = session.exec(
-        select(InterviewPrep).where(InterviewPrep.job_id == job.id)
+        select(InterviewPrep).where(
+            InterviewPrep.job_id == job.id, InterviewPrep.user_id == owner
+        )
     ).first()
     if existing is not None and not force:
         return existing
@@ -63,7 +71,7 @@ async def prep_for_job(
     except Exception as exc:  # noqa: BLE001
         raise InterviewPrepError(f"interview prep call failed: {exc}") from exc
 
-    prep = existing or InterviewPrep(job_id=job.id)
+    prep = existing or InterviewPrep(job_id=job.id, user_id=owner)
     prep.technical_questions = _questions(parsed.get("technical_questions"))
     prep.behavioural_questions = _questions(parsed.get("behavioural_questions"))
     prep.questions_to_ask = [

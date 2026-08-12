@@ -39,6 +39,11 @@ async def lifespan(app: FastAPI):  # noqa: ANN201, ARG001
     configure_logging()
     settings = get_settings()
 
+    if problems := settings.startup_errors():
+        for problem in problems:
+            log.error("refusing to start: %s", problem)
+        raise RuntimeError("; ".join(problems))
+
     init_db()
     log.info("database ready at %s", settings.db_path)
 
@@ -88,20 +93,30 @@ def create_app() -> FastAPI:
     @app.middleware("http")
     async def auth_middleware(request: Request, call_next):  # noqa: ANN001, ANN202
         from fastapi.responses import JSONResponse, RedirectResponse
+        from sqlmodel import Session
 
-        from app.auth import check_request_authenticated
+        from app.auth import resolve_current_user
+        from app.db import engine
 
         path = request.url.path
         if (
             path == "/health"
-            or path == "/login"
+            or path in ("/login", "/register")
             or path.startswith("/static/")
             or path.startswith("/ui/assets/")
             or path == "/favicon.ico"
         ):
             return await call_next(request)
 
-        if not check_request_authenticated(request):
+        # Resolve the caller once here and hand it to the handlers, rather than
+        # each of them re-deriving identity from the cookie. `request.state` is
+        # set before routing, so the `current_user` dependency and the SPA
+        # catch-alls (which take no Request) both read the same answer.
+        with Session(engine) as session:
+            user = resolve_current_user(request, session)
+            request.state.user_id = user.id if user is not None else None
+
+        if user is None:
             if path.startswith("/api/"):
                 return JSONResponse(
                     status_code=401,

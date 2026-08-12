@@ -24,11 +24,25 @@ from sqlmodel import select
 
 from app.config import get_settings
 from app.db import session_scope
-from app.models import Job, JobScore, JobStatus, Profile, utcnow
+from app.models import Job, JobScore, JobStatus, Profile, User, UserJob, utcnow
 
 log = logging.getLogger(__name__)
 
 _scheduler: AsyncIOScheduler | None = None
+
+
+def _active_profiles(session) -> list[Profile]:  # noqa: ANN001
+    """Every active user's profile, for jobs that must run once per user.
+
+    Ingestion is shared — one poll serves everyone. Everything downstream of it
+    (scoring, tailoring, submitting, digests) is per-user work and fans out over
+    this list.
+    """
+    return list(
+        session.exec(
+            select(Profile).join(User, User.id == Profile.user_id).where(User.is_active)
+        ).all()
+    )
 
 
 def _guard(name: str, fn: Callable[[], Coroutine[Any, Any, Any]]):  # noqa: ANN202
@@ -73,92 +87,124 @@ async def job_score_new() -> None:
     from app.notify import email as notify
     from app.pipeline.score import score_pending
 
-    settings = get_settings()
     with session_scope() as session:
-        count = await score_pending(session, limit=25)
-        if not count:
-            return
-        log.info("score_new: scored %d jobs", count)
+        for profile in _active_profiles(session):
+            count = await score_pending(session, user_id=profile.user_id, limit=25)
+            if not count:
+                continue
+            log.info("score_new: scored %d jobs for user %s", count, profile.user_id)
 
-        # Alert immediately on exceptional matches; waiting for the daily digest
-        # would forfeit the early-application advantage.
-        rows = session.exec(
-            select(Job, JobScore)
-            .join(JobScore, JobScore.job_id == Job.id)
-            .where(Job.status == JobStatus.SCORED)
-            .where(JobScore.total >= settings.alert_min_score)
-            .order_by(JobScore.total.desc())
-            .limit(5)
-        ).all()
-        for job, score in rows:
-            await notify.send_alert(job, score)
+            # Alert immediately on exceptional matches; waiting for the daily
+            # digest would forfeit the early-application advantage. Both the
+            # score and the status are this user's own.
+            rows = session.exec(
+                select(Job, JobScore)
+                .join(
+                    JobScore,
+                    (JobScore.job_id == Job.id)
+                    & (JobScore.user_id == profile.user_id),
+                )
+                .join(
+                    UserJob,
+                    (UserJob.job_id == Job.id) & (UserJob.user_id == profile.user_id),
+                )
+                .where(UserJob.status == JobStatus.SCORED)
+                .where(JobScore.total >= profile.alert_min_score)
+                .order_by(JobScore.total.desc())
+                .limit(5)
+            ).all()
+            for job, score in rows:
+                await notify.send_alert(job, score, profile=profile)
 
 
 async def job_prepare_queue() -> None:
     from app.apply.runner import prepare_queue
 
     with session_scope() as session:
-        count = await prepare_queue(session, limit=8)
-        if count:
-            log.info("prepare_queue: prepared %d applications", count)
+        for profile in _active_profiles(session):
+            count = await prepare_queue(session, user_id=profile.user_id, limit=8)
+            if count:
+                log.info(
+                    "prepare_queue: prepared %d applications for user %s",
+                    count, profile.user_id,
+                )
 
 
 async def job_auto_submit() -> None:
-    """Submit eligible jobs. A no-op unless ENABLE_AUTO_SUBMIT is true."""
+    """Submit eligible jobs for each user who has opted in."""
     from app.apply.runner import submit
 
-    settings = get_settings()
-    if not settings.enable_auto_submit:
-        return
-
     with session_scope() as session:
-        profile = session.exec(select(Profile)).first()
-        if profile is None:
-            return
+        for profile in _active_profiles(session):
+            # Auto-submit is a per-user preference now, so one user enabling it
+            # never causes sends on another user's behalf.
+            if not profile.enable_auto_submit:
+                continue
 
-        rows = session.exec(
-            select(Job, JobScore)
-            .join(JobScore, JobScore.job_id == Job.id)
-            .where(Job.status == JobStatus.QUEUED)
-            .where(JobScore.total >= settings.auto_submit_min_score)
-            .order_by(JobScore.total.desc())
-            .limit(5)
-        ).all()
+            rows = session.exec(
+                select(Job, JobScore)
+                .join(
+                    JobScore,
+                    (JobScore.job_id == Job.id)
+                    & (JobScore.user_id == profile.user_id),
+                )
+                .join(
+                    UserJob,
+                    (UserJob.job_id == Job.id) & (UserJob.user_id == profile.user_id),
+                )
+                .where(UserJob.status == JobStatus.QUEUED)
+                .where(JobScore.total >= profile.auto_submit_min_score)
+                .order_by(JobScore.total.desc())
+                .limit(5)
+            ).all()
 
-        for job, _score in rows:
-            result = await submit(session, job, profile)
-            log.info("auto_submit job %s: ok=%s %s", job.id, result.ok,
-                     result.error or result.confirmation)
+            for job, _score in rows:
+                result = await submit(
+                    session, job, profile, user_id=profile.user_id
+                )
+                log.info("auto_submit job %s (user %s): ok=%s %s",
+                         job.id, profile.user_id, result.ok,
+                         result.error or result.confirmation)
 
 
 async def job_refresh_github() -> None:
     from app.pipeline.github import scan
 
     with session_scope() as session:
-        profile = session.exec(select(Profile)).first()
-        if profile is None or not profile.github_username:
-            return
-        evidence = await scan(profile.github_username)
-        if evidence.ok:
-            profile.github_evidence = evidence.to_dict()
-            profile.github_synced_at = utcnow()
-            session.add(profile)
-            log.info("github: refreshed %d repos", len(evidence.repos))
-        else:
-            log.warning("github refresh failed: %s", evidence.error)
+        for profile in _active_profiles(session):
+            if not profile.github_username:
+                continue
+            evidence = await scan(profile.github_username)
+            if evidence.ok:
+                profile.github_evidence = evidence.to_dict()
+                profile.github_synced_at = utcnow()
+                session.add(profile)
+                log.info(
+                    "github: refreshed %d repos for user %s",
+                    len(evidence.repos), profile.user_id,
+                )
+            else:
+                log.warning(
+                    "github refresh failed for user %s: %s",
+                    profile.user_id, evidence.error,
+                )
 
 
 async def job_digest() -> None:
     from app.notify import email as notify
 
     with session_scope() as session:
-        await notify.send_digest(session)
+        for profile in _active_profiles(session):
+            await notify.send_digest(session, profile=profile)
 
 
 async def job_expire_stale() -> None:
-    """Mark jobs not seen in a fortnight as expired.
+    """Mark postings not seen in a fortnight as expired.
 
-    Applied jobs are never expired: that record is the user's application history.
+    Expiry is global: the posting itself is gone from every source, which is
+    true for all users at once. Users who applied or queued keep their own
+    UserJob rows and application history regardless — that record is theirs, and
+    it is no longer entangled with the posting's lifecycle.
     """
     from datetime import timedelta
 
@@ -167,12 +213,10 @@ async def job_expire_stale() -> None:
         stale = session.exec(
             select(Job)
             .where(Job.last_seen_at < cutoff)
-            .where(Job.status.not_in([
-                JobStatus.APPLIED, JobStatus.EXPIRED, JobStatus.QUEUED,
-            ]))
+            .where(Job.expired_at.is_(None))
         ).all()
         for job in stale:
-            job.status = JobStatus.EXPIRED
+            job.expired_at = utcnow()
             session.add(job)
         if stale:
             log.info("expired %d stale jobs", len(stale))

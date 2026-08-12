@@ -1,115 +1,297 @@
-"""Tests for authentication and session token verification."""
+"""Tests for password hashing, session tokens, and the auth middleware."""
 
 from __future__ import annotations
 
-import base64
-
 import pytest
 from fastapi.testclient import TestClient
+from sqlmodel import Session, select
 
-from app.auth import create_session_token, validate_session_token
+from app.auth import (
+    SESSION_COOKIE_NAME,
+    create_session_token,
+    hash_password,
+    parse_session_token,
+    verify_password,
+)
 from app.config import get_settings
-from app.db import init_db
+from app.db import engine, init_db
 from app.main import create_app
+from app.models import InviteCode, Profile, User, utcnow
+
+PASSWORD = "correct-horse-battery"
 
 
 @pytest.fixture
 def isolated_db():
-    """Ensure the schema exists before a test boots the app.
+    """Create the schema and hand back a clean `user` table.
 
-    The database itself is already redirected to a temp dir by conftest. Tables
-    are created explicitly because these tests build `TestClient` without a
-    context manager, so the startup lifespan that would normally call `init_db`
-    never runs, and the endpoints below query tables like `job`.
+    The database is already redirected to a temp dir by conftest. Tables are
+    created explicitly because these tests build `TestClient` without a context
+    manager, so the startup lifespan that would call `init_db` never runs.
     """
     init_db()
+    with Session(engine) as session:
+        # Children before parents: SQLite enforces foreign keys here
+        # (PRAGMA foreign_keys=ON in app/db.py), so deleting users while
+        # invite_code.used_by_id still points at them raises IntegrityError.
+        for row in session.exec(select(Profile)).all():
+            session.delete(row)
+        for row in session.exec(select(InviteCode)).all():
+            session.delete(row)
+        session.commit()
+        for row in session.exec(select(User)).all():
+            session.delete(row)
+        session.commit()
     yield
     get_settings.cache_clear()
 
 
-def test_session_token_lifecycle():
-    token = create_session_token("admin")
-    assert token is not None
-    user = validate_session_token(token)
-    assert user == "admin"
-
-    assert validate_session_token("invalid_token") is None
-
-
-def test_auth_disabled_by_default(isolated_db, monkeypatch):
-    monkeypatch.setenv("AUTH_ENABLED", "false")
-    monkeypatch.setenv("AUTH_PASSWORD", "")
-    get_settings.cache_clear()
-
-    app = create_app()
-    client = TestClient(app)
-
-    # All endpoints should be accessible without credentials
-    res = client.get("/")
-    assert res.status_code == 200
-
-    res_api = client.get("/api/jobs")
-    assert res_api.status_code == 200
-
-    res_health = client.get("/health")
-    assert res_health.status_code == 200
-    get_settings.cache_clear()
+def _make_user(*, email: str = "user@example.com", admin: bool = False) -> User:
+    with Session(engine) as session:
+        user = User(
+            email=email, password_hash=hash_password(PASSWORD), is_admin=admin
+        )
+        session.add(user)
+        session.commit()
+        session.refresh(user)
+        return user
 
 
-def test_auth_required_blocks_unauthenticated(isolated_db, monkeypatch):
-    monkeypatch.setenv("AUTH_ENABLED", "true")
-    monkeypatch.setenv("AUTH_USERNAME", "admin")
-    monkeypatch.setenv("AUTH_PASSWORD", "secret123")
-    get_settings.cache_clear()
+# ------------------------------------------------------------------ hashing
+
+
+def test_password_round_trip():
+    stored = hash_password(PASSWORD)
+    assert stored != PASSWORD
+    assert verify_password(PASSWORD, stored)
+    assert not verify_password("wrong", stored)
+
+
+def test_hash_is_salted():
+    """Two hashes of one password must differ, or equal hashes leak equal
+    passwords across accounts."""
+    assert hash_password(PASSWORD) != hash_password(PASSWORD)
+
+
+def test_verify_rejects_malformed_hash():
+    for junk in ("", "not-a-hash", "scrypt$onlytwo"):
+        assert not verify_password(PASSWORD, junk)
+
+
+# ------------------------------------------------------------- session token
+
+
+def test_session_token_round_trip(isolated_db):
+    user = _make_user()
+    parsed = parse_session_token(create_session_token(user))
+    assert parsed == (user.id, user.token_version)
+
+
+def test_session_token_rejects_tampering(isolated_db):
+    user = _make_user()
+    token = create_session_token(user)
+    assert parse_session_token("invalid_token") is None
+    assert parse_session_token(token[:-4] + "AAAA") is None
+
+
+def test_token_version_bump_invalidates_cookie(isolated_db):
+    """A password change must log out sessions issued before it."""
+    user = _make_user()
+    token = create_session_token(user)
 
     app = create_app()
     client = TestClient(app, follow_redirects=False)
+    client.cookies.set(SESSION_COOKIE_NAME, token)
+    assert client.get("/api/jobs").status_code == 200
 
-    # Health check must remain unauthenticated
-    res_health = client.get("/health")
-    assert res_health.status_code == 200
+    with Session(engine) as session:
+        row = session.get(User, user.id)
+        row.token_version += 1
+        session.add(row)
+        session.commit()
 
-    # UI redirects to login
+    client.cookies.set(SESSION_COOKIE_NAME, token)
+    assert client.get("/api/jobs").status_code == 401
+
+
+def test_inactive_user_is_rejected(isolated_db):
+    user = _make_user()
+    token = create_session_token(user)
+
+    with Session(engine) as session:
+        row = session.get(User, user.id)
+        row.is_active = False
+        session.add(row)
+        session.commit()
+
+    client = TestClient(create_app(), follow_redirects=False)
+    client.cookies.set(SESSION_COOKIE_NAME, token)
+    assert client.get("/api/jobs").status_code == 401
+
+
+# ------------------------------------------------------------------ gateway
+
+
+def test_unauthenticated_requests_are_blocked(isolated_db):
+    client = TestClient(create_app(), follow_redirects=False)
+
+    assert client.get("/health").status_code == 200
+
     res_ui = client.get("/")
     assert res_ui.status_code == 303
     assert res_ui.headers["location"] == "/login"
 
-    # API returns 401
     res_api = client.get("/api/jobs")
     assert res_api.status_code == 401
 
-    # Basic Auth succeeds
-    valid_auth = base64.b64encode(b"admin:secret123").decode()
-    res_basic = client.get("/api/jobs", headers={"Authorization": f"Basic {valid_auth}"})
-    assert res_basic.status_code == 200
 
-    # Cookie auth succeeds
-    token = create_session_token("admin")
-    client.cookies.set("applycanary_session", token)
-    res_cookie = client.get("/")
-    assert res_cookie.status_code == 200
+def test_login_and_logout(isolated_db):
+    _make_user(email="me@example.com")
+    client = TestClient(create_app(), follow_redirects=False)
 
-    get_settings.cache_clear()
-
-
-def test_login_route(monkeypatch):
-    monkeypatch.setenv("AUTH_ENABLED", "true")
-    monkeypatch.setenv("AUTH_USERNAME", "admin")
-    monkeypatch.setenv("AUTH_PASSWORD", "secret123")
-    get_settings.cache_clear()
-
-    app = create_app()
-    client = TestClient(app, follow_redirects=False)
-
-    # Invalid login
-    res_bad = client.post("/login", data={"username": "admin", "password": "wrongpassword"})
+    res_bad = client.post(
+        "/login", data={"username": "me@example.com", "password": "wrong"}
+    )
     assert res_bad.status_code == 303
     assert "error=" in res_bad.headers["location"]
+    assert SESSION_COOKIE_NAME not in res_bad.cookies
 
-    # Valid login
-    res_good = client.post("/login", data={"username": "admin", "password": "secret123"})
+    res_good = client.post(
+        "/login", data={"username": "me@example.com", "password": PASSWORD}
+    )
     assert res_good.status_code == 303
     assert res_good.headers["location"] == "/"
-    assert "applycanary_session" in res_good.cookies
+    assert SESSION_COOKIE_NAME in res_good.cookies
 
-    get_settings.cache_clear()
+    assert client.get("/api/jobs").status_code == 200
+
+    client.post("/logout")
+    assert client.get("/api/jobs").status_code == 401
+
+
+def test_login_is_case_insensitive_on_email(isolated_db):
+    _make_user(email="me@example.com")
+    client = TestClient(create_app(), follow_redirects=False)
+    res = client.post(
+        "/login", data={"username": "ME@Example.COM ", "password": PASSWORD}
+    )
+    assert res.status_code == 303
+    assert res.headers["location"] == "/"
+
+
+# ----------------------------------------------------------------- register
+
+
+def _make_invite(code: str = "GOODCODE") -> None:
+    with Session(engine) as session:
+        session.add(InviteCode(code=code))
+        session.commit()
+
+
+def test_register_requires_valid_invite(isolated_db):
+    client = TestClient(create_app(), follow_redirects=False)
+    res = client.post(
+        "/register",
+        data={
+            "email": "new@example.com",
+            "password": "a-long-enough-pw",
+            "invite_code": "NOPE",
+        },
+    )
+    assert res.status_code == 303
+    assert "invite" in res.headers["location"].lower()
+
+    with Session(engine) as session:
+        assert session.exec(select(User)).first() is None
+
+
+def test_register_consumes_invite_and_creates_profile(isolated_db):
+    _make_invite()
+    client = TestClient(create_app(), follow_redirects=False)
+
+    res = client.post(
+        "/register",
+        data={
+            "email": "New@Example.com",
+            "password": "a-long-enough-pw",
+            "invite_code": "GOODCODE",
+        },
+    )
+    assert res.status_code == 303
+    assert res.headers["location"] == "/profile"
+    assert SESSION_COOKIE_NAME in res.cookies
+
+    with Session(engine) as session:
+        user = session.exec(select(User)).one()
+        assert user.email == "new@example.com"
+        assert verify_password("a-long-enough-pw", user.password_hash)
+
+        invite = session.exec(select(InviteCode)).one()
+        assert invite.used_by_id == user.id
+        assert not invite.is_redeemable()
+
+        profile = session.exec(select(Profile)).one()
+        assert profile.user_id == user.id
+
+
+def test_invite_cannot_be_reused(isolated_db):
+    _make_invite()
+    client = TestClient(create_app(), follow_redirects=False)
+    payload = {"password": "a-long-enough-pw", "invite_code": "GOODCODE"}
+
+    first = client.post("/register", data={"email": "one@example.com", **payload})
+    assert first.headers["location"] == "/profile"
+
+    second = client.post("/register", data={"email": "two@example.com", **payload})
+    assert "invite" in second.headers["location"].lower()
+
+    with Session(engine) as session:
+        assert len(session.exec(select(User)).all()) == 1
+
+
+def test_expired_invite_is_refused(isolated_db):
+    with Session(engine) as session:
+        session.add(
+            InviteCode(
+                code="STALE",
+                expires_at=utcnow().replace(year=utcnow().year - 1),
+            )
+        )
+        session.commit()
+
+    client = TestClient(create_app(), follow_redirects=False)
+    res = client.post(
+        "/register",
+        data={
+            "email": "late@example.com",
+            "password": "a-long-enough-pw",
+            "invite_code": "STALE",
+        },
+    )
+    assert "invite" in res.headers["location"].lower()
+
+
+def test_register_rejects_duplicate_email_and_short_password(isolated_db):
+    _make_user(email="taken@example.com")
+    _make_invite()
+    client = TestClient(create_app(), follow_redirects=False)
+
+    dup = client.post(
+        "/register",
+        data={
+            "email": "taken@example.com",
+            "password": "a-long-enough-pw",
+            "invite_code": "GOODCODE",
+        },
+    )
+    assert "already" in dup.headers["location"].lower()
+
+    short = client.post(
+        "/register",
+        data={"email": "new@example.com", "password": "short", "invite_code": "GOODCODE"},
+    )
+    assert "10" in short.headers["location"]
+
+    # Neither failure may burn the invite.
+    with Session(engine) as session:
+        assert session.exec(select(InviteCode)).one().is_redeemable()

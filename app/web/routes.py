@@ -18,14 +18,19 @@ from sqlmodel import Session, func, select
 
 from app.config import get_settings
 from app.db import get_session
+from app.deps import current_user, user_job
 from app.models import (
     Application,
     InterviewPrep,
+    InviteCode,
     Job,
     JobScore,
     JobStatus,
     Profile,
     ResumeVersion,
+    User,
+    UserJob,
+    utcnow,
 )
 
 log = logging.getLogger(__name__)
@@ -117,13 +122,22 @@ templates = Jinja2Templates(directory=str(get_settings().templates_dir))
 templates.env.filters["render_cv"] = _render_cv
 
 
-def _profile(session: Session) -> Profile | None:
-    return session.exec(select(Profile)).first()
+def _profile(session: Session, user_id: int) -> Profile | None:
+    return session.exec(
+        select(Profile).where(Profile.user_id == user_id)
+    ).first()
 
 
-def _counts(session: Session) -> dict[str, int]:
+def _counts(session: Session, user_id: int) -> dict[str, int]:
+    """Status tallies for one user.
+
+    Counts come from `userjob`, not `job`: the postings table is shared, so
+    grouping by `job.status` would show every user the same numbers.
+    """
     rows = session.exec(
-        select(Job.status, func.count(Job.id)).group_by(Job.status)
+        select(UserJob.status, func.count(UserJob.id))
+        .where(UserJob.user_id == user_id)
+        .group_by(UserJob.status)
     ).all()
     counts = {str(status): n for status, n in rows}
     counts["total"] = sum(counts.values())
@@ -138,32 +152,94 @@ def login_page(request: Request, error: str = "") -> HTMLResponse:
     return templates.TemplateResponse(request, "login.html", {"error": error})
 
 
+def _set_session_cookie(response: RedirectResponse, user: User) -> None:
+    from app.auth import SESSION_COOKIE_NAME, SESSION_MAX_AGE, create_session_token
+
+    response.set_cookie(
+        key=SESSION_COOKIE_NAME,
+        value=create_session_token(user),
+        max_age=SESSION_MAX_AGE,
+        httponly=True,
+        samesite="lax",
+        # Secure whenever the app is reachable off-box, so the session cookie
+        # never travels in clear text. See Settings.session_cookie_secure.
+        secure=get_settings().session_cookie_secure,
+    )
+
+
 @router.post("/login")
 def login_action(
     request: Request,
     username: str = Form(""),
     password: str = Form(""),
+    session: Session = Depends(get_session),
 ) -> RedirectResponse:
-    from app.auth import (
-        SESSION_COOKIE_NAME,
-        SESSION_MAX_AGE,
-        create_session_token,
-        verify_credentials,
-    )
+    from app.auth import authenticate
 
-    if verify_credentials(username, password):
-        token = create_session_token(username)
-        response = RedirectResponse(url="/", status_code=303)
-        response.set_cookie(
-            key=SESSION_COOKIE_NAME,
-            value=token,
-            max_age=SESSION_MAX_AGE,
-            httponly=True,
-            samesite="lax",
-        )
-        return response
+    user = authenticate(session, username, password)
+    if user is None:
+        # Deliberately vague: naming which half was wrong tells an attacker
+        # which email addresses have accounts.
+        return _redirect("/login?error=Invalid+credentials")
 
-    return _redirect("/login?error=Invalid+credentials")
+    user.last_login_at = utcnow()
+    session.add(user)
+    session.commit()
+
+    response = RedirectResponse(url="/", status_code=303)
+    _set_session_cookie(response, user)
+    return response
+
+
+@router.get("/register", response_class=HTMLResponse)
+def register_page(request: Request, error: str = "") -> HTMLResponse:
+    return templates.TemplateResponse(request, "register.html", {"error": error})
+
+
+@router.post("/register")
+def register_action(
+    email: str = Form(""),
+    password: str = Form(""),
+    invite_code: str = Form(""),
+    session: Session = Depends(get_session),
+) -> RedirectResponse:
+    from app.auth import hash_password
+
+    email = (email or "").strip().lower()
+    if not email or not password:
+        return _redirect("/register?error=Email+and+password+are+required")
+    if len(password) < 10:
+        return _redirect("/register?error=Password+must+be+at+least+10+characters")
+
+    invite = session.exec(
+        select(InviteCode).where(InviteCode.code == invite_code.strip())
+    ).first()
+    if invite is None or not invite.is_redeemable():
+        return _redirect("/register?error=That+invite+code+is+not+valid")
+
+    if session.exec(select(User).where(User.email == email)).first() is not None:
+        return _redirect("/register?error=That+email+is+already+registered")
+
+    user = User(email=email, password_hash=hash_password(password))
+    session.add(user)
+    session.commit()
+    session.refresh(user)
+
+    # Mark the code spent only after the account exists, so a failure above
+    # leaves the invite usable rather than burning it.
+    invite.used_by_id = user.id
+    invite.used_at = utcnow()
+    session.add(invite)
+
+    # Every user needs a profile row; create an empty one so the dashboard has
+    # something to render before they fill it in.
+    session.add(Profile(user_id=user.id, email=email))
+    session.commit()
+
+    log.info("registered new user %s", email)
+    response = RedirectResponse(url="/profile", status_code=303)
+    _set_session_cookie(response, user)
+    return response
 
 
 @router.get("/logout")
@@ -180,6 +256,7 @@ def logout_action() -> RedirectResponse:
 def dashboard(
     request: Request,
     session: Session = Depends(get_session),
+    user: User = Depends(current_user),
     min_score: int = 0,
     status: str = "",
     source: str = "",
@@ -187,19 +264,31 @@ def dashboard(
 ) -> HTMLResponse:
     """Job list, highest score first. Unscored jobs appear after scored ones."""
     stmt = (
-        select(Job, JobScore)
-        .join(JobScore, JobScore.job_id == Job.id, isouter=True)
-        .where(Job.status != JobStatus.EXPIRED)
+        select(Job, JobScore, UserJob)
+        .join(
+            JobScore,
+            (JobScore.job_id == Job.id) & (JobScore.user_id == user.id),
+            isouter=True,
+        )
+        .join(
+            UserJob,
+            (UserJob.job_id == Job.id) & (UserJob.user_id == user.id),
+            isouter=True,
+        )
+        .where(Job.expired_at.is_(None))
     )
     if status == "rejected":
-        stmt = stmt.where(Job.status == JobStatus.REJECTED)
+        stmt = stmt.where(UserJob.status == JobStatus.REJECTED)
     elif status:
-        stmt = stmt.where(Job.status == status)
+        stmt = stmt.where(UserJob.status == status)
     else:
         # Relevance filtering (target titles / seniority) runs at tier 1 and marks
         # non-matching jobs REJECTED. Hide them by default so the dashboard shows
-        # only jobs worth acting on; pick "rejected" above to audit them.
-        stmt = stmt.where(Job.status != JobStatus.REJECTED)
+        # only jobs worth acting on; pick "rejected" above to audit them. A NULL
+        # status means "never seen", which is not rejected.
+        stmt = stmt.where(
+            (UserJob.status.is_(None)) | (UserJob.status != JobStatus.REJECTED)
+        )
     if source:
         stmt = stmt.where(Job.source == source)
     if q:
@@ -224,35 +313,46 @@ def dashboard(
         "dashboard.html",
         {
             "rows": rows,
-            "counts": _counts(session),
+            "counts": _counts(session, user.id),
             "sources": sources,
             "filters": {
                 "min_score": min_score, "status": status, "source": source, "q": q,
             },
             "settings": get_settings(),
-            "profile": _profile(session),
+            "profile": _profile(session, user.id),
         },
     )
 
 
 @router.get("/job/{job_id}", response_class=HTMLResponse)
 def job_detail(
-    job_id: int, request: Request, session: Session = Depends(get_session)
+    job_id: int,
+    request: Request,
+    session: Session = Depends(get_session),
+    user: User = Depends(current_user),
 ) -> HTMLResponse:
     job = session.get(Job, job_id)
     if job is None:
         raise HTTPException(404, "job not found")
 
-    score = session.exec(select(JobScore).where(JobScore.job_id == job_id)).first()
+    score = session.exec(
+        select(JobScore).where(
+            JobScore.job_id == job_id, JobScore.user_id == user.id
+        )
+    ).first()
     app_row = session.exec(
-        select(Application).where(Application.job_id == job_id)
+        select(Application).where(
+            Application.job_id == job_id, Application.user_id == user.id
+        )
     ).first()
     version = (
         session.get(ResumeVersion, app_row.resume_version_id)
         if app_row and app_row.resume_version_id else None
     )
     prep = session.exec(
-        select(InterviewPrep).where(InterviewPrep.job_id == job_id)
+        select(InterviewPrep).where(
+            InterviewPrep.job_id == job_id, InterviewPrep.user_id == user.id
+        )
     ).first()
 
     return templates.TemplateResponse(
@@ -261,21 +361,30 @@ def job_detail(
         {
             "job": job, "score": score, "application": app_row,
             "version": version, "prep": prep,
-            "settings": get_settings(), "profile": _profile(session),
+            "settings": get_settings(), "profile": _profile(session, user.id),
         },
     )
 
 
 @router.get("/review", response_class=HTMLResponse)
 def review_queue(
-    request: Request, session: Session = Depends(get_session)
+    request: Request,
+    session: Session = Depends(get_session),
+    user: User = Depends(current_user),
 ) -> HTMLResponse:
     """Prepared applications awaiting a human decision."""
     rows = session.exec(
         select(Application, Job, JobScore)
         .join(Job, Job.id == Application.job_id)
-        .join(JobScore, JobScore.job_id == Job.id, isouter=True)
-        .where(Application.submitted_at.is_(None))
+        .join(
+            JobScore,
+            (JobScore.job_id == Job.id) & (JobScore.user_id == user.id),
+            isouter=True,
+        )
+        .where(
+            Application.submitted_at.is_(None),
+            Application.user_id == user.id,
+        )
         .order_by(JobScore.total.desc().nullslast())
     ).all()
 
@@ -283,20 +392,25 @@ def review_queue(
         request,
         "review.html",
         {
-            "rows": rows, "counts": _counts(session),
-            "settings": get_settings(), "profile": _profile(session),
+            "rows": rows, "counts": _counts(session, user.id),
+            "settings": get_settings(), "profile": _profile(session, user.id),
         },
     )
 
 
 @router.get("/applications", response_class=HTMLResponse)
 def applications(
-    request: Request, session: Session = Depends(get_session)
+    request: Request,
+    session: Session = Depends(get_session),
+    user: User = Depends(current_user),
 ) -> HTMLResponse:
     rows = session.exec(
         select(Application, Job)
         .join(Job, Job.id == Application.job_id)
-        .where(Application.submitted_at.is_not(None))
+        .where(
+            Application.submitted_at.is_not(None),
+            Application.user_id == user.id,
+        )
         .order_by(Application.submitted_at.desc())
     ).all()
 
@@ -304,21 +418,24 @@ def applications(
         request,
         "applications.html",
         {
-            "rows": rows, "counts": _counts(session),
-            "settings": get_settings(), "profile": _profile(session),
+            "rows": rows, "counts": _counts(session, user.id),
+            "settings": get_settings(), "profile": _profile(session, user.id),
         },
     )
 
 
 @router.get("/profile", response_class=HTMLResponse)
 def profile_page(
-    request: Request, session: Session = Depends(get_session)
+    request: Request,
+    session: Session = Depends(get_session),
+    user: User = Depends(current_user),
 ) -> HTMLResponse:
     return templates.TemplateResponse(
         request,
         "profile.html",
         {
-            "profile": _profile(session), "counts": _counts(session),
+            "profile": _profile(session, user.id),
+            "counts": _counts(session, user.id),
             "settings": get_settings(),
         },
     )
@@ -326,7 +443,9 @@ def profile_page(
 
 @router.get("/sources", response_class=HTMLResponse)
 def sources_page(
-    request: Request, session: Session = Depends(get_session)
+    request: Request,
+    session: Session = Depends(get_session),
+    user: User = Depends(current_user),
 ) -> HTMLResponse:
     """Connector health. Surfaces a source that broke quietly."""
     from app.models import SourceRun
@@ -367,21 +486,28 @@ def sources_page(
         {
             "sources": sorted(by_source.values(), key=lambda e: e["source"]),
             "recent": latest[:40],
-            "counts": _counts(session),
+            "counts": _counts(session, user.id),
             "settings": get_settings(),
-            "profile": _profile(session),
+            "profile": _profile(session, user.id),
         },
     )
 
 
 @router.get("/health")
 def health(session: Session = Depends(get_session)) -> dict:
+    """Liveness probe. Unauthenticated, so it exposes no per-user data.
+
+    This is what Fly.io polls. It reports the shared postings count and process
+    state only — the per-user status tallies that used to live here were
+    readable by anyone who could reach the port.
+    """
     from app import scheduler as sched
 
     scheduler = sched.get_scheduler()
+    total_jobs = session.exec(select(func.count(Job.id))).one()
     return {
         "ok": True,
-        "jobs": _counts(session),
+        "jobs": {"total": total_jobs},
         "scheduler_running": bool(scheduler and scheduler.running),
         "scheduled_jobs": [j.id for j in scheduler.get_jobs()] if scheduler else [],
         "llm_enabled": get_settings().llm_enabled,
@@ -397,6 +523,7 @@ def health(session: Session = Depends(get_session)) -> dict:
 async def save_profile(
     request: Request,
     session: Session = Depends(get_session),
+    user: User = Depends(current_user),
     full_name: str = Form(""),
     email: str = Form(""),
     phone: str = Form(""),
@@ -413,7 +540,7 @@ async def save_profile(
     years_experience: str = Form(""),
     remote_only: str = Form(""),
 ) -> RedirectResponse:
-    profile = _profile(session) or Profile()
+    profile = _profile(session, user.id) or Profile(user_id=user.id)
 
     profile.full_name = full_name.strip()
     profile.email = email.strip()
@@ -441,7 +568,9 @@ async def save_profile(
 
 @router.post("/profile/resume")
 async def upload_resume(
-    request: Request, session: Session = Depends(get_session)
+    request: Request,
+    session: Session = Depends(get_session),
+    user: User = Depends(current_user),
 ) -> RedirectResponse:
     """Store the uploaded resume, extract its text, and run the ATS check."""
     from app.pipeline.keywords import extract_skills
@@ -461,7 +590,11 @@ async def upload_resume(
     if suffix not in SUPPORTED:
         return _redirect(f"/profile?error=unsupported+type+{suffix}")
 
-    dest = settings.resume_dir / f"base{suffix}"
+    # Per-user directory: a shared "base.pdf" meant each upload overwrote the
+    # previous user's résumé on disk.
+    user_dir = settings.resume_dir / f"user_{user.id}"
+    user_dir.mkdir(parents=True, exist_ok=True)
+    dest = user_dir / f"base{suffix}"
     dest.write_bytes(await upload.read())
 
     try:
@@ -470,7 +603,7 @@ async def upload_resume(
         log.exception("resume parse failed")
         return _redirect(f"/profile?error={type(exc).__name__}")
 
-    profile = _profile(session) or Profile()
+    profile = _profile(session, user.id) or Profile(user_id=user.id)
     profile.base_resume_path = str(dest)
     profile.base_resume_text = parsed.text
     profile.skills = sorted(extract_skills(parsed.text))
@@ -487,17 +620,19 @@ async def upload_resume(
 
 @router.post("/job/{job_id}/tailor")
 async def tailor_job(
-    job_id: int, session: Session = Depends(get_session)
+    job_id: int,
+    session: Session = Depends(get_session),
+    user: User = Depends(current_user),
 ) -> RedirectResponse:
     from app.apply.runner import prepare
 
     job = session.get(Job, job_id)
-    profile = _profile(session)
+    profile = _profile(session, user.id)
     if job is None or profile is None:
         raise HTTPException(404, "job or profile not found")
 
     try:
-        await prepare(session, job, profile)
+        await prepare(session, job, profile, user_id=user.id)
     except Exception as exc:  # noqa: BLE001
         log.exception("tailoring job %s failed", job_id)
         return _redirect(f"/job/{job_id}?error={type(exc).__name__}")
@@ -508,6 +643,7 @@ async def tailor_job(
 async def submit_job(
     job_id: int,
     session: Session = Depends(get_session),
+    user: User = Depends(current_user),
     force: str = Form(""),
 ) -> RedirectResponse:
     """Submit an application. `force` is the user's explicit approval.
@@ -518,41 +654,51 @@ async def submit_job(
     from app.apply.runner import submit
 
     job = session.get(Job, job_id)
-    profile = _profile(session)
+    profile = _profile(session, user.id)
     if job is None or profile is None:
         raise HTTPException(404, "job or profile not found")
 
     result = await submit(
-        session, job, profile, force=force.lower() in ("on", "true", "yes", "1")
+        session, job, profile,
+        force=force.lower() in ("on", "true", "yes", "1"),
+        user_id=user.id,
     )
     flag = "submitted=1" if result.ok else f"error={result.error[:120]}"
     return _redirect(f"/job/{job_id}?{flag}")
 
 
 @router.post("/job/{job_id}/skip")
-def skip_job(job_id: int, session: Session = Depends(get_session)) -> RedirectResponse:
+def skip_job(
+    job_id: int,
+    session: Session = Depends(get_session),
+    user: User = Depends(current_user),
+) -> RedirectResponse:
     job = session.get(Job, job_id)
     if job is None:
         raise HTTPException(404, "job not found")
-    job.status = JobStatus.SKIPPED
-    session.add(job)
+    row = user_job(session, user.id, job_id)
+    row.status = JobStatus.SKIPPED
+    row.updated_at = utcnow()
+    session.add(row)
     session.commit()
     return _redirect("/")
 
 
 @router.post("/job/{job_id}/prep")
 async def make_prep(
-    job_id: int, session: Session = Depends(get_session)
+    job_id: int,
+    session: Session = Depends(get_session),
+    user: User = Depends(current_user),
 ) -> RedirectResponse:
     from app.pipeline.interview import prep_for_job
 
     job = session.get(Job, job_id)
-    profile = _profile(session)
+    profile = _profile(session, user.id)
     if job is None or profile is None:
         raise HTTPException(404, "job or profile not found")
 
     try:
-        await prep_for_job(session, job, profile)
+        await prep_for_job(session, job, profile, user_id=user.id)
     except Exception as exc:  # noqa: BLE001
         log.exception("interview prep for job %s failed", job_id)
         return _redirect(f"/job/{job_id}?error={type(exc).__name__}")
@@ -570,19 +716,25 @@ async def trigger_poll() -> RedirectResponse:
 
 
 @router.post("/actions/score")
-async def trigger_score(session: Session = Depends(get_session)) -> RedirectResponse:
+async def trigger_score(
+    session: Session = Depends(get_session),
+    user: User = Depends(current_user),
+) -> RedirectResponse:
     from app.pipeline.score import score_pending
 
-    await score_pending(session, limit=50)
+    await score_pending(session, user_id=user.id, limit=50)
     return _redirect("/")
 
 
 @router.post("/actions/github")
-async def trigger_github(session: Session = Depends(get_session)) -> RedirectResponse:
+async def trigger_github(
+    session: Session = Depends(get_session),
+    user: User = Depends(current_user),
+) -> RedirectResponse:
     from app.models import utcnow
     from app.pipeline.github import scan
 
-    profile = _profile(session)
+    profile = _profile(session, user.id)
     if profile is None or not profile.github_username:
         return _redirect("/profile?error=no+github+username")
 
