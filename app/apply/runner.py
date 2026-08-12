@@ -16,7 +16,7 @@ from sqlmodel import Session, select
 
 from app.apply.base import BaseSubmitter, SubmitGate, SubmitResult, get_submitter
 from app.apply.manual import build_form_answers
-from app.config import get_settings
+from app.deps import user_job
 from app.llm.client import get_llm
 from app.llm.prompts import COVER_LETTER_SYSTEM, build_cover_letter_user
 from app.models import (
@@ -26,6 +26,7 @@ from app.models import (
     JobStatus,
     Profile,
     ResumeVersion,
+    UserJob,
     utcnow,
 )
 from app.pipeline.tailor import TailorError, tailor_for_job
@@ -35,21 +36,28 @@ log = logging.getLogger(__name__)
 
 
 async def prepare(
-    session: Session, job: Job, profile: Profile, *, write_files: bool = True
+    session: Session,
+    job: Job,
+    profile: Profile,
+    *,
+    write_files: bool = True,
+    user_id: int,
 ) -> Application:
     """Build the tailored resume, cover letter and form answers. Sends nothing.
 
     Idempotent: an already-prepared job returns its existing Application.
     """
     existing = session.exec(
-        select(Application).where(Application.job_id == job.id)
+        select(Application).where(
+            Application.job_id == job.id, Application.user_id == user_id
+        )
     ).first()
     if existing is not None and existing.submitted_at is not None:
         return existing
 
     version: ResumeVersion | None = None
     try:
-        version = await tailor_for_job(session, job, profile)
+        version = await tailor_for_job(session, job, profile, user_id=user_id)
     except TailorError as exc:
         log.warning("job %s: tailoring unavailable (%s); using base resume", job.id, exc)
 
@@ -73,16 +81,17 @@ async def prepare(
 
     cover = await _cover_letter(job, profile, version)
 
-    app = existing or Application(job_id=job.id)
+    app = existing or Application(job_id=job.id, user_id=user_id)
     app.resume_version_id = version.id if version is not None else None
     app.cover_letter = cover
     app.form_answers = build_form_answers(job, profile)
     app.method = ApplyMethod.MANUAL
     app.queued_at = utcnow()
 
-    job.status = JobStatus.QUEUED
+    state = user_job(session, user_id, job.id)
+    state.status = JobStatus.QUEUED
     session.add(app)
-    session.add(job)
+    session.add(state)
     session.commit()
     session.refresh(app)
 
@@ -91,19 +100,28 @@ async def prepare(
 
 
 async def submit(
-    session: Session, job: Job, profile: Profile, *, force: bool = False
+    session: Session,
+    job: Job,
+    profile: Profile,
+    *,
+    force: bool = False,
+    user_id: int,
 ) -> SubmitResult:
     """Attempt submission. Every gate is evaluated before any network call."""
-    app = session.exec(select(Application).where(Application.job_id == job.id)).first()
+    app = session.exec(
+        select(Application).where(
+            Application.job_id == job.id, Application.user_id == user_id
+        )
+    ).first()
     if app is None:
-        app = await prepare(session, job, profile)
+        app = await prepare(session, job, profile, user_id=user_id)
 
     version = (
         session.get(ResumeVersion, app.resume_version_id)
         if app.resume_version_id else None
     )
 
-    gate = SubmitGate.check(session, job, version, force=force)
+    gate = SubmitGate.check(session, job, version, force=force, user_id=user_id, profile=profile)
     if not gate.allowed:
         log.info("job %s: submission blocked — %s", job.id, gate.reason)
         app.error = gate.reason
@@ -125,19 +143,20 @@ async def submit(
     app.confirmation = result.confirmation
     app.error = result.error
 
+    state = user_job(session, user_id, job.id)
     if result.ok and not result.dry_run:
         app.submitted_at = utcnow()
-        job.status = JobStatus.APPLIED
+        state.status = JobStatus.APPLIED
         log.info("job %s: APPLIED via %s", job.id, result.method)
     elif result.ok:
-        job.status = JobStatus.QUEUED
+        state.status = JobStatus.QUEUED
         log.info("job %s: queued (%s)", job.id, result.confirmation)
     else:
-        job.status = JobStatus.FAILED
+        state.status = JobStatus.FAILED
         log.warning("job %s: submission failed — %s", job.id, result.error)
 
     session.add(app)
-    session.add(job)
+    session.add(state)
     session.commit()
     return result
 
@@ -175,25 +194,34 @@ async def _cover_letter(
         return ""
 
 
-async def prepare_queue(session: Session, limit: int = 10) -> int:
-    """Prepare artifacts for high-scoring jobs that are scored but not yet queued.
+async def prepare_queue(session: Session, user_id: int, limit: int = 10) -> int:
+    """Prepare artifacts for one user's high-scoring, not-yet-queued jobs.
 
     This is the step that makes fast application possible: by the time the user
     looks, the paperwork is already done.
     """
     from app.models import JobScore
 
-    profile = session.exec(select(Profile)).first()
+    profile = session.exec(
+        select(Profile).where(Profile.user_id == user_id)
+    ).first()
     if profile is None:
-        log.warning("no profile configured; skipping queue preparation")
+        log.warning("user %s has no profile; skipping queue preparation", user_id)
         return 0
 
-    settings = get_settings()
+    threshold = profile.alert_min_score - 15
     rows = session.exec(
         select(Job, JobScore)
-        .join(JobScore, JobScore.job_id == Job.id)
-        .where(Job.status == JobStatus.SCORED)
-        .where(JobScore.total >= settings.alert_min_score - 15)
+        .join(
+            JobScore,
+            (JobScore.job_id == Job.id) & (JobScore.user_id == user_id),
+        )
+        .join(
+            UserJob,
+            (UserJob.job_id == Job.id) & (UserJob.user_id == user_id),
+        )
+        .where(UserJob.status == JobStatus.SCORED)
+        .where(JobScore.total >= threshold)
         .order_by(JobScore.total.desc())
         .limit(limit)
     ).all()
@@ -201,7 +229,7 @@ async def prepare_queue(session: Session, limit: int = 10) -> int:
     prepared = 0
     for job, _score in rows:
         try:
-            await prepare(session, job, profile)
+            await prepare(session, job, profile, user_id=user_id)
             prepared += 1
         except Exception:  # noqa: BLE001
             log.exception("failed preparing job %s", job.id)
