@@ -1,9 +1,11 @@
-# fly.toml app configuration file generated for applycanary on 2026-08-12T06:35:06Z
+# fly.toml app configuration file for applycanary.
 #
 # See https://fly.io/docs/reference/configuration/ for information about how to use this file.
 #
 
 app = 'applycanary'
+# Region comes from the actual `fly launch`; changing it here does not move an
+# existing machine, so it is left as deployed.
 primary_region = 'ams'
 
 [build]
@@ -13,15 +15,26 @@ primary_region = 'ams'
   destination = '/data'
 
 [http_service]
-  internal_port = 8080
+  # Must match PORT in the Dockerfile (8000). Fly's generated default of 8080
+  # points the proxy at a socket nothing listens on.
+  internal_port = 8000
   force_https = true
-  auto_stop_machines = 'stop'
+  # The scheduler runs inside this process: a stopped machine means no polling,
+  # scoring or digests, so the machine must never auto-stop.
+  auto_stop_machines = 'off'
   auto_start_machines = true
-  min_machines_running = 0
+  min_machines_running = 1
   processes = ['app']
 
+  [[http_service.checks]]
+    interval = '60s'
+    timeout = '10s'
+    grace_period = '30s'
+    method = 'get'
+    path = '/health'
+
 [[vm]]
+  # 256mb (Fly's default) is not enough for the scheduler plus LLM calls.
   memory = '1gb'
   cpu_kind = 'shared'
   cpus = 1
-  memory_mb = 256
