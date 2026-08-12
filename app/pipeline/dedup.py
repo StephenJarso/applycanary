@@ -20,7 +20,7 @@ from dataclasses import dataclass
 from rapidfuzz import fuzz
 from sqlmodel import Session, select
 
-from app.models import Job, JobAlias, JobStatus, utcnow
+from app.models import Job, JobAlias, utcnow
 from app.pipeline.normalize import norm_company, norm_title
 
 log = logging.getLogger(__name__)
@@ -87,8 +87,10 @@ def _find_by_fuzzy_title(session: Session, company: str, title: str) -> tuple[Jo
     nc = norm_company(company)
     if not nc:
         return None, 0.0
+    # Expiry is a property of the posting, not of any user's workflow, so this
+    # stays a plain column check on Job.
     candidates = session.exec(
-        select(Job).where(Job.status != JobStatus.EXPIRED)
+        select(Job).where(Job.expired_at.is_(None))
     ).all()
     best: Job | None = None
     best_score = 0.0

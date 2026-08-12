@@ -45,15 +45,70 @@ class Severity(StrEnum):
     INFO = "info"
 
 
+# ---------------------------------------------------------------- accounts
+
+
+class User(SQLModel, table=True):
+    """One account. Owns a Profile and a private view of the shared job pool."""
+
+    __tablename__ = "user"
+
+    id: int | None = Field(default=None, primary_key=True)
+    email: str = Field(index=True, unique=True)
+    password_hash: str = ""
+
+    is_active: bool = True
+    # The first account (migrated from the legacy single-user install) is admin:
+    # only an admin can mint invite codes.
+    is_admin: bool = False
+
+    # Bumped on password change so previously-issued session tokens stop
+    # validating. Without it a stolen cookie outlives the password it was
+    # obtained with, for the full 30-day token lifetime.
+    token_version: int = 1
+
+    created_at: datetime = Field(default_factory=utcnow)
+    last_login_at: datetime | None = None
+
+
+class InviteCode(SQLModel, table=True):
+    """Single-use registration token.
+
+    Signup is invite-only because the operator's API keys pay for every user's
+    scoring and tailoring; open registration would let anyone spend that quota.
+    """
+
+    __tablename__ = "invite_code"
+
+    id: int | None = Field(default=None, primary_key=True)
+    code: str = Field(index=True, unique=True)
+
+    created_by_id: int | None = Field(default=None, foreign_key="user.id")
+    used_by_id: int | None = Field(default=None, foreign_key="user.id")
+    used_at: datetime | None = None
+    expires_at: datetime | None = None
+
+    created_at: datetime = Field(default_factory=utcnow)
+
+    def is_redeemable(self, *, now: datetime | None = None) -> bool:
+        moment = now or utcnow()
+        if self.used_at is not None:
+            return False
+        return self.expires_at is None or self.expires_at > moment
+
+
 # ---------------------------------------------------------------- profile
 
 
 class Profile(SQLModel, table=True):
-    """Single-row table holding the job seeker's details."""
+    """One job seeker's details. Exactly one row per user."""
 
     __tablename__ = "profile"
 
     id: int | None = Field(default=None, primary_key=True)
+    user_id: int | None = Field(
+        default=None, foreign_key="user.id", index=True, unique=True
+    )
     full_name: str = ""
     email: str = ""
     phone: str = ""
@@ -79,6 +134,14 @@ class Profile(SQLModel, table=True):
     github_evidence: dict = Field(default_factory=dict, sa_column=Column(JSON))
     github_synced_at: datetime | None = None
 
+    # Per-user preferences. These used to be process-wide settings; they move to
+    # the profile so one user's auto-submit thresholds cannot affect another's.
+    alert_min_score: float = 90.0
+    auto_submit_min_score: float = 70.0
+    daily_apply_cap: int = 5
+    enable_auto_submit: bool = False
+    digest_to: str = ""
+
     created_at: datetime = Field(default_factory=utcnow)
     updated_at: datetime = Field(default_factory=utcnow)
 
@@ -86,10 +149,33 @@ class Profile(SQLModel, table=True):
 # ---------------------------------------------------------------- jobs
 
 
+class UserJob(SQLModel, table=True):
+    """A user's private view of one shared job posting.
+
+    `Job` holds the posting itself (identical for every user); this row holds
+    the workflow state that used to live on `Job.status` — whether *this* user
+    has seen, scored, queued, applied to or skipped the job. A missing row means
+    "not yet seen" (NEW).
+    """
+
+    __tablename__ = "user_job"
+    __table_args__ = (
+        UniqueConstraint("user_id", "job_id", name="uq_userjob_user_job"),
+        Index("ix_userjob_user_status", "user_id", "status"),
+    )
+
+    id: int | None = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="user.id", index=True)
+    job_id: int = Field(foreign_key="job.id", index=True)
+    status: JobStatus = Field(default=JobStatus.NEW)
+
+    created_at: datetime = Field(default_factory=utcnow)
+
+
 class Job(SQLModel, table=True):
     __tablename__ = "job"
     __table_args__ = (
-        Index("ix_job_status_score", "status", "posted_at"),
+        Index("ix_job_status_score", "posted_at"),
         Index("ix_job_source_sourceid", "source", "source_id"),
     )
 
@@ -125,20 +211,29 @@ class Job(SQLModel, table=True):
     first_seen_at: datetime = Field(default_factory=utcnow, index=True)
     last_seen_at: datetime = Field(default_factory=utcnow)
 
-    status: JobStatus = Field(default=JobStatus.NEW, index=True)
+    # Genuinely global lifecycle: the posting vanished from every source. The
+    # per-user workflow state (scored/queued/applied/skipped) lives in UserJob.
+    expired_at: datetime | None = None
     seen_count: int = 1
 
-    score: Optional["JobScore"] = Relationship(
+    # Collections, not scalars: one row per user now that the posting is shared.
+    # Handlers must select the row for the requesting user rather than reading
+    # `job.score` / `job.application` directly, or they would see whichever row
+    # the ORM happened to load first — another user's.
+    scores: list["JobScore"] = Relationship(
         back_populates="job",
-        sa_relationship_kwargs={"uselist": False, "cascade": "all, delete-orphan"},
+        sa_relationship_kwargs={"cascade": "all, delete-orphan"},
     )
     aliases: list["JobAlias"] = Relationship(
         back_populates="job",
         sa_relationship_kwargs={"cascade": "all, delete-orphan"},
     )
-    application: Optional["Application"] = Relationship(
+    applications: list["Application"] = Relationship(
         back_populates="job",
-        sa_relationship_kwargs={"uselist": False, "cascade": "all, delete-orphan"},
+        sa_relationship_kwargs={"cascade": "all, delete-orphan"},
+    )
+    user_states: list["UserJob"] = Relationship(
+        sa_relationship_kwargs={"cascade": "all, delete-orphan"},
     )
 
     @property
@@ -172,9 +267,15 @@ class JobAlias(SQLModel, table=True):
 
 class JobScore(SQLModel, table=True):
     __tablename__ = "job_score"
+    # Composite rather than a bare unique on job_id: the same posting is scored
+    # once per user, against each user's own resume.
+    __table_args__ = (
+        UniqueConstraint("user_id", "job_id", name="uq_score_user_job"),
+    )
 
     id: int | None = Field(default=None, primary_key=True)
-    job_id: int = Field(foreign_key="job.id", index=True, unique=True)
+    user_id: int | None = Field(default=None, foreign_key="user.id", index=True)
+    job_id: int = Field(foreign_key="job.id", index=True)
 
     keyword_score: float = 0.0      # tier 1, TF-IDF overlap
     semantic_score: float = 0.0     # tier 2, LLM fit
@@ -192,7 +293,7 @@ class JobScore(SQLModel, table=True):
     model_used: str = ""
     scored_at: datetime = Field(default_factory=utcnow)
 
-    job: Optional["Job"] = Relationship(back_populates="score")
+    job: Optional["Job"] = Relationship(back_populates="scores")
 
 
 # ---------------------------------------------------------------- artifacts
@@ -202,6 +303,7 @@ class ResumeVersion(SQLModel, table=True):
     __tablename__ = "resume_version"
 
     id: int | None = Field(default=None, primary_key=True)
+    user_id: int | None = Field(default=None, foreign_key="user.id", index=True)
     job_id: int | None = Field(default=None, foreign_key="job.id", index=True)
 
     docx_path: str = ""
@@ -226,9 +328,13 @@ class ResumeVersion(SQLModel, table=True):
 
 class Application(SQLModel, table=True):
     __tablename__ = "application"
+    __table_args__ = (
+        UniqueConstraint("user_id", "job_id", name="uq_application_user_job"),
+    )
 
     id: int | None = Field(default=None, primary_key=True)
-    job_id: int = Field(foreign_key="job.id", index=True, unique=True)
+    user_id: int | None = Field(default=None, foreign_key="user.id", index=True)
+    job_id: int = Field(foreign_key="job.id", index=True)
     resume_version_id: int | None = Field(default=None, foreign_key="resume_version.id")
 
     method: ApplyMethod = Field(default=ApplyMethod.MANUAL)
@@ -246,14 +352,18 @@ class Application(SQLModel, table=True):
     response_received: bool = False
     outcome: str = ""               # interview | rejected | ghosted | offer
 
-    job: Optional["Job"] = Relationship(back_populates="application")
+    job: Optional["Job"] = Relationship(back_populates="applications")
 
 
 class InterviewPrep(SQLModel, table=True):
     __tablename__ = "interview_prep"
+    __table_args__ = (
+        UniqueConstraint("user_id", "job_id", name="uq_prep_user_job"),
+    )
 
     id: int | None = Field(default=None, primary_key=True)
-    job_id: int = Field(foreign_key="job.id", index=True, unique=True)
+    user_id: int | None = Field(default=None, foreign_key="user.id", index=True)
+    job_id: int = Field(foreign_key="job.id", index=True)
 
     technical_questions: list[dict] = Field(default_factory=list, sa_column=Column(JSON))
     behavioural_questions: list[dict] = Field(default_factory=list, sa_column=Column(JSON))

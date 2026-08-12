@@ -1,9 +1,17 @@
-"""Authentication helpers, token signing, and request authentication checks.
+"""Password hashing, session tokens, and per-request user resolution.
 
-Supports:
-1. Session Cookie (`applycanary_session`)
-2. HTTP Basic Auth (`Authorization: Basic <base64>`)
-3. Optional disabling via configuration (AUTH_ENABLED=false and AUTH_PASSWORD="")
+Three things changed when the app went multi-user, and each was a correctness
+problem rather than a preference:
+
+1. Passwords are hashed (scrypt) instead of compared as plaintext config values.
+2. A session token names a *user id* and a *token version*, so a handler can ask
+   "who is this?" rather than only "is this anybody?", and a password change
+   invalidates tokens issued before it.
+3. `resolve_current_user` returns the User (or None) instead of a bool.
+
+scrypt comes from hashlib rather than bcrypt/argon2 because it is memory-hard,
+ships in the stdlib on the Python 3.12 this project already requires, and avoids
+a compiled dependency in the image and in CI.
 """
 
 from __future__ import annotations
@@ -12,94 +20,159 @@ import base64
 import hashlib
 import hmac
 import logging
+import os
+import secrets
 import time
 
 from fastapi import Request
+from sqlmodel import Session, select
 
 from app.config import get_settings
+from app.models import User
 
 log = logging.getLogger(__name__)
 
 SESSION_COOKIE_NAME = "applycanary_session"
 SESSION_MAX_AGE = 86400 * 30  # 30 days
 
+# scrypt parameters. n=2**14 with r=8, p=1 costs ~16MB and a few tens of ms per
+# hash: enough to make offline cracking expensive without making login feel slow.
+_SCRYPT_N = 2**14
+_SCRYPT_R = 8
+_SCRYPT_P = 1
+_SALT_BYTES = 16
+_KEY_BYTES = 32
+
+# Stored as: scrypt$n$r$p$<salt-b64>$<hash-b64>. The parameters travel with the
+# hash so they can be raised later without invalidating existing passwords.
+_HASH_PREFIX = "scrypt"
+
+
+def hash_password(password: str) -> str:
+    """Hash a password for storage. Never store or log the plaintext."""
+    if not password:
+        raise ValueError("password must not be empty")
+    salt = os.urandom(_SALT_BYTES)
+    derived = hashlib.scrypt(
+        password.encode("utf-8"), salt=salt,
+        n=_SCRYPT_N, r=_SCRYPT_R, p=_SCRYPT_P, dklen=_KEY_BYTES,
+    )
+    return "$".join((
+        _HASH_PREFIX, str(_SCRYPT_N), str(_SCRYPT_R), str(_SCRYPT_P),
+        base64.b64encode(salt).decode("ascii"),
+        base64.b64encode(derived).decode("ascii"),
+    ))
+
+
+def verify_password(password: str, stored: str) -> bool:
+    """Check a password against a stored hash, in constant time."""
+    if not password or not stored:
+        return False
+    try:
+        prefix, n_s, r_s, p_s, salt_b64, hash_b64 = stored.split("$")
+        if prefix != _HASH_PREFIX:
+            return False
+        salt = base64.b64decode(salt_b64)
+        expected = base64.b64decode(hash_b64)
+        derived = hashlib.scrypt(
+            password.encode("utf-8"), salt=salt,
+            n=int(n_s), r=int(r_s), p=int(p_s), dklen=len(expected),
+        )
+    except (ValueError, TypeError):
+        # Malformed hash: treat as a failed login, not a crash.
+        return False
+    return hmac.compare_digest(derived, expected)
+
+
+def generate_invite_code() -> str:
+    """A URL-safe, unguessable single-use registration code."""
+    return secrets.token_urlsafe(12)
+
+
+# ---------------------------------------------------------------- sessions
+
 
 def _get_secret() -> bytes:
-    settings = get_settings()
-    return settings.secret_key.encode("utf-8")
+    return get_settings().secret_key.encode("utf-8")
 
 
-def create_session_token(username: str) -> str:
-    """Generate a HMAC-SHA256 signed session token for a username."""
-    timestamp = str(int(time.time()))
-    payload = f"{username}:{timestamp}"
-    signature = hmac.new(_get_secret(), payload.encode("utf-8"), hashlib.sha256).hexdigest()
+def create_session_token(user: User) -> str:
+    """Sign a session token naming the user and their current token version."""
+    payload = f"{user.id}:{user.token_version}:{int(time.time())}"
+    signature = hmac.new(
+        _get_secret(), payload.encode("utf-8"), hashlib.sha256
+    ).hexdigest()
     token = f"{payload}:{signature}"
     return base64.urlsafe_b64encode(token.encode("utf-8")).decode("utf-8")
 
 
-def validate_session_token(token: str) -> str | None:
-    """Validate a signed session token. Returns username if valid, None otherwise."""
+def parse_session_token(token: str) -> tuple[int, int] | None:
+    """Return (user_id, token_version) from a valid token, else None.
+
+    Verifies the signature and the age only. Whether the user still exists, is
+    active, and still carries this token_version is decided against the database
+    in `resolve_current_user` — a signature alone must never be enough.
+    """
     if not token:
         return None
     try:
         decoded = base64.urlsafe_b64decode(token.encode("utf-8")).decode("utf-8")
-        parts = decoded.split(":")
-        if len(parts) != 3:
-            return None
-        username, timestamp_str, signature = parts
+        user_id_s, version_s, timestamp_s, signature = decoded.split(":")
 
-        # Verify timestamp (expire after 30 days)
-        timestamp = int(timestamp_str)
-        if time.time() - timestamp > SESSION_MAX_AGE:
+        if time.time() - int(timestamp_s) > SESSION_MAX_AGE:
             return None
 
-        # Verify signature
-        payload = f"{username}:{timestamp_str}"
-        expected_sig = hmac.new(_get_secret(), payload.encode("utf-8"), hashlib.sha256).hexdigest()
-        if hmac.compare_digest(signature, expected_sig):
-            return username
-    except Exception:
-        pass
-    return None
+        payload = f"{user_id_s}:{version_s}:{timestamp_s}"
+        expected = hmac.new(
+            _get_secret(), payload.encode("utf-8"), hashlib.sha256
+        ).hexdigest()
+        if not hmac.compare_digest(signature, expected):
+            return None
+        return int(user_id_s), int(version_s)
+    except (ValueError, TypeError, AttributeError):
+        return None
 
 
-def verify_credentials(username: str, password: str) -> bool:
-    """Check username and password against settings."""
-    settings = get_settings()
-    if not settings.is_auth_required:
-        return True
-
-    expected_user = settings.auth_username or "admin"
-    expected_pass = settings.auth_password
-
-    user_match = hmac.compare_digest(username, expected_user)
-    pass_match = hmac.compare_digest(password, expected_pass)
-    return user_match and pass_match
+# ---------------------------------------------------------------- resolution
 
 
-def check_request_authenticated(request: Request) -> bool:
-    """Return True if auth is disabled or if the request carries valid auth credentials."""
-    settings = get_settings()
-    if not settings.is_auth_required:
-        return True
+def authenticate(session: Session, email: str, password: str) -> User | None:
+    """Look up a user by email and verify their password."""
+    if not email or not password:
+        return None
+    user = session.exec(
+        select(User).where(User.email == email.strip().lower())
+    ).first()
+    if user is None or not user.is_active:
+        # Hash anyway so a missing account and a wrong password take the same
+        # time, which keeps the endpoint from confirming which emails exist.
+        verify_password(password, hash_password("dummy"))
+        return None
+    if not verify_password(password, user.password_hash):
+        return None
+    return user
 
-    # 1. Check Session Cookie
-    cookie_token = request.cookies.get(SESSION_COOKIE_NAME)
-    if cookie_token and validate_session_token(cookie_token):
-        return True
 
-    # 2. Check HTTP Basic Auth Header
-    auth_header = request.headers.get("Authorization")
-    if auth_header and auth_header.startswith("Basic "):
+def resolve_current_user(request: Request, session: Session) -> User | None:
+    """Identify the caller from their session cookie or Basic Auth header."""
+    cookie = request.cookies.get(SESSION_COOKIE_NAME)
+    parsed = parse_session_token(cookie) if cookie else None
+    if parsed is not None:
+        user_id, token_version = parsed
+        user = session.get(User, user_id)
+        # token_version mismatch means the password changed after this token was
+        # issued, so the token is stale even though its signature is still good.
+        if user is not None and user.is_active and user.token_version == token_version:
+            return user
+
+    header = request.headers.get("Authorization") or ""
+    if header.startswith("Basic "):
         try:
-            encoded_creds = auth_header.split(" ", 1)[1]
-            decoded_creds = base64.b64decode(encoded_creds).decode("utf-8")
-            if ":" in decoded_creds:
-                username, password = decoded_creds.split(":", 1)
-                if verify_credentials(username, password):
-                    return True
-        except Exception:
-            pass
+            decoded = base64.b64decode(header.split(" ", 1)[1]).decode("utf-8")
+        except (ValueError, TypeError):
+            return None
+        if ":" in decoded:
+            email, password = decoded.split(":", 1)
+            return authenticate(session, email, password)
 
-    return False
+    return None

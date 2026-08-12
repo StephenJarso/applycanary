@@ -23,6 +23,7 @@ from sqlmodel import Session, func, select
 
 from app.config import get_settings
 from app.db import get_session
+from app.deps import current_user, user_job
 from app.models import (
     Application,
     InterviewPrep,
@@ -33,6 +34,8 @@ from app.models import (
     Profile,
     ResumeVersion,
     SourceRun,
+    User,
+    UserJob,
     utcnow,
 )
 
@@ -192,7 +195,19 @@ def _score_out(score: JobScore | None) -> ScoreOut | None:
     )
 
 
-def _job_out(job: Job, score: JobScore | None) -> JobOut:
+def _job_out(
+    job: Job, score: JobScore | None, user_job: UserJob | None = None
+) -> JobOut:
+    """Serialize a job for one user.
+
+    `user_job` carries that user's workflow status; absent means they have never
+    acted on this posting, which reads as NEW. A globally expired posting is
+    reported as EXPIRED regardless of any per-user state.
+    """
+    if job.expired_at is not None:
+        status = JobStatus.EXPIRED
+    else:
+        status = user_job.status if user_job else JobStatus.NEW
     return JobOut(
         id=job.id or 0,
         company=job.company,
@@ -200,7 +215,7 @@ def _job_out(job: Job, score: JobScore | None) -> JobOut:
         location=job.location,
         is_remote=job.is_remote,
         source=job.source,
-        status=str(job.status),
+        status=str(status),
         apply_url=job.apply_url,
         ats_platform=job.ats_platform,
         salary_min=job.salary_min,
@@ -215,16 +230,36 @@ def _job_out(job: Job, score: JobScore | None) -> JobOut:
     )
 
 
-def _profile_or_404(session: Session) -> Profile:
-    profile = session.exec(select(Profile)).first()
+def _profile_or_404(session: Session, user: User) -> Profile:
+    profile = session.exec(
+        select(Profile).where(Profile.user_id == user.id)
+    ).first()
     if profile is None:
         raise HTTPException(404, "no profile configured; save one first")
     return profile
 
 
-def _counts(session: Session) -> dict[str, int]:
-    rows = session.exec(select(Job.status, func.count(Job.id)).group_by(Job.status)).all()
+def _counts(session: Session, user: User) -> dict[str, int]:
+    """Status tallies for one user.
+
+    Counts come from UserJob, not Job: a posting's status is per-user now, so a
+    global GROUP BY would report everyone's pipeline to whoever asked. Jobs the
+    user has never touched have no UserJob row and are reported as NEW.
+    """
+    rows = session.exec(
+        select(UserJob.status, func.count(UserJob.id))
+        .where(UserJob.user_id == user.id)
+        .group_by(UserJob.status)
+    ).all()
     counts = {str(status): n for status, n in rows}
+
+    live_jobs = session.exec(
+        select(func.count(Job.id)).where(Job.expired_at.is_(None))
+    ).one()
+    tracked = sum(counts.values())
+    counts[str(JobStatus.NEW)] = counts.get(str(JobStatus.NEW), 0) + max(
+        0, live_jobs - tracked
+    )
     counts["total"] = sum(counts.values())
     return counts
 
@@ -233,28 +268,39 @@ def _counts(session: Session) -> dict[str, int]:
 
 
 @router.get("/status", response_model=StatusOut)
-def status(session: Session = Depends(get_session)) -> StatusOut:
+def status(
+    session: Session = Depends(get_session),
+    user: User = Depends(current_user),
+) -> StatusOut:
     from app import scheduler as sched
 
     settings = get_settings()
     scheduler = sched.get_scheduler()
+    profile = session.exec(
+        select(Profile).where(Profile.user_id == user.id)
+    ).first()
     return StatusOut(
         ok=True,
-        counts=_counts(session),
+        counts=_counts(session, user),
         scheduler_running=bool(scheduler and scheduler.running),
         scheduled_jobs=[j.id for j in scheduler.get_jobs()] if scheduler else [],
         llm_enabled=settings.llm_enabled,
-        auto_submit=settings.enable_auto_submit,
-        auto_submit_min_score=settings.auto_submit_min_score,
-        daily_apply_cap=settings.daily_apply_cap,
+        # Submission thresholds are per-user preferences now; fall back to the
+        # process defaults only when the user has no profile yet.
+        auto_submit=profile.enable_auto_submit if profile else False,
+        auto_submit_min_score=(
+            profile.auto_submit_min_score if profile else settings.auto_submit_min_score
+        ),
+        daily_apply_cap=profile.daily_apply_cap if profile else settings.daily_apply_cap,
         warnings=settings.startup_warnings(),
-        has_profile=session.exec(select(Profile)).first() is not None,
+        has_profile=profile is not None,
     )
 
 
 @router.get("/jobs", response_model=JobListOut)
 def list_jobs(
     session: Session = Depends(get_session),
+    user: User = Depends(current_user),
     q: str = "",
     status: str = "",
     source: str = "",
@@ -264,19 +310,34 @@ def list_jobs(
     limit: int = Query(100, ge=1, le=500),
     offset: int = Query(0, ge=0),
 ) -> JobListOut:
+    # Both joins are per-user: an outer join on UserJob so postings this user has
+    # never seen still appear (as NEW), and on JobScore so another user's score
+    # never leaks into this list.
     stmt = (
-        select(Job, JobScore)
-        .join(JobScore, JobScore.job_id == Job.id, isouter=True)
-        .where(Job.status != JobStatus.EXPIRED)
+        select(Job, JobScore, UserJob)
+        .join(
+            JobScore,
+            (JobScore.job_id == Job.id) & (JobScore.user_id == user.id),
+            isouter=True,
+        )
+        .join(
+            UserJob,
+            (UserJob.job_id == Job.id) & (UserJob.user_id == user.id),
+            isouter=True,
+        )
+        .where(Job.expired_at.is_(None))
     )
     if status == "rejected":
-        stmt = stmt.where(Job.status == JobStatus.REJECTED)
+        stmt = stmt.where(UserJob.status == JobStatus.REJECTED)
     elif status:
-        stmt = stmt.where(Job.status == status)
+        stmt = stmt.where(UserJob.status == status)
     else:
         # Default to relevant jobs only; REJECTED jobs are tier-1 disqualifications
-        # (irrelevant titles/seniority etc.) and are hidden unless explicitly requested.
-        stmt = stmt.where(Job.status != JobStatus.REJECTED)
+        # (irrelevant titles/seniority etc.) and are hidden unless explicitly
+        # requested. A NULL status means "never seen", which is not rejected.
+        stmt = stmt.where(
+            (UserJob.status.is_(None)) | (UserJob.status != JobStatus.REJECTED)
+        )
     if source:
         stmt = stmt.where(Job.source == source)
     if remote_only:
@@ -302,30 +363,54 @@ def list_jobs(
     sources = sorted([s for s in (distinct_db_sources | all_configured) if s])
 
     return JobListOut(
-        jobs=[_job_out(job, score) for job, score in rows],
+        jobs=[_job_out(job, score, uj) for job, score, uj in rows],
         total=len(rows),
-        counts=_counts(session),
+        counts=_counts(session, user),
         sources=sources,
     )
 
 
 @router.get("/jobs/{job_id}", response_model=JobDetailOut)
-def job_detail(job_id: int, session: Session = Depends(get_session)) -> JobDetailOut:
+def job_detail(
+    job_id: int,
+    session: Session = Depends(get_session),
+    user: User = Depends(current_user),
+) -> JobDetailOut:
     job = session.get(Job, job_id)
     if job is None:
         raise HTTPException(404, "job not found")
 
-    score = session.exec(select(JobScore).where(JobScore.job_id == job_id)).first()
-    app_row = session.exec(select(Application).where(Application.job_id == job_id)).first()
+    # Every per-user row is filtered by user_id as well as job_id. Without that
+    # second predicate this endpoint would serve whichever user's score, résumé
+    # and cover letter happened to be attached to the posting.
+    score = session.exec(
+        select(JobScore).where(
+            JobScore.job_id == job_id, JobScore.user_id == user.id
+        )
+    ).first()
+    app_row = session.exec(
+        select(Application).where(
+            Application.job_id == job_id, Application.user_id == user.id
+        )
+    ).first()
     version = (
         session.get(ResumeVersion, app_row.resume_version_id)
         if app_row and app_row.resume_version_id
         else None
     )
-    prep = session.exec(select(InterviewPrep).where(InterviewPrep.job_id == job_id)).first()
+    prep = session.exec(
+        select(InterviewPrep).where(
+            InterviewPrep.job_id == job_id, InterviewPrep.user_id == user.id
+        )
+    ).first()
     aliases = session.exec(select(JobAlias).where(JobAlias.job_id == job_id)).all()
+    state = session.exec(
+        select(UserJob).where(
+            UserJob.job_id == job_id, UserJob.user_id == user.id
+        )
+    ).first()
 
-    base = _job_out(job, score)
+    base = _job_out(job, score, state)
     return JobDetailOut(
         **base.model_dump(),
         description=job.description,
@@ -382,28 +467,58 @@ def job_detail(job_id: int, session: Session = Depends(get_session)) -> JobDetai
 
 
 @router.get("/review", response_model=list[JobOut])
-def review_queue(session: Session = Depends(get_session)) -> list[JobOut]:
+def review_queue(
+    session: Session = Depends(get_session),
+    user: User = Depends(current_user),
+) -> list[JobOut]:
     """Applications prepared but not yet submitted."""
     rows = session.exec(
-        select(Job, JobScore)
-        .join(Application, Application.job_id == Job.id)
-        .join(JobScore, JobScore.job_id == Job.id, isouter=True)
+        select(Job, JobScore, UserJob)
+        .join(
+            Application,
+            (Application.job_id == Job.id) & (Application.user_id == user.id),
+        )
+        .join(
+            JobScore,
+            (JobScore.job_id == Job.id) & (JobScore.user_id == user.id),
+            isouter=True,
+        )
+        .join(
+            UserJob,
+            (UserJob.job_id == Job.id) & (UserJob.user_id == user.id),
+            isouter=True,
+        )
         .where(Application.submitted_at.is_(None))
         .order_by(JobScore.total.desc().nullslast())
     ).all()
-    return [_job_out(job, score) for job, score in rows]
+    return [_job_out(job, score, uj) for job, score, uj in rows]
 
 
 @router.get("/applications", response_model=list[JobOut])
-def applications(session: Session = Depends(get_session)) -> list[JobOut]:
+def applications(
+    session: Session = Depends(get_session),
+    user: User = Depends(current_user),
+) -> list[JobOut]:
     rows = session.exec(
-        select(Job, JobScore)
-        .join(Application, Application.job_id == Job.id)
-        .join(JobScore, JobScore.job_id == Job.id, isouter=True)
+        select(Job, JobScore, UserJob)
+        .join(
+            Application,
+            (Application.job_id == Job.id) & (Application.user_id == user.id),
+        )
+        .join(
+            JobScore,
+            (JobScore.job_id == Job.id) & (JobScore.user_id == user.id),
+            isouter=True,
+        )
+        .join(
+            UserJob,
+            (UserJob.job_id == Job.id) & (UserJob.user_id == user.id),
+            isouter=True,
+        )
         .where(Application.submitted_at.is_not(None))
         .order_by(Application.submitted_at.desc())
     ).all()
-    return [_job_out(job, score) for job, score in rows]
+    return [_job_out(job, score, uj) for job, score, uj in rows]
 
 
 @router.get("/sources", response_model=list[SourceHealthOut])
@@ -447,8 +562,13 @@ def sources(session: Session = Depends(get_session)) -> list[SourceHealthOut]:
 
 
 @router.get("/profile", response_model=ProfileOut)
-def get_profile(session: Session = Depends(get_session)) -> ProfileOut:
-    profile = session.exec(select(Profile)).first()
+def get_profile(
+    session: Session = Depends(get_session),
+    user: User = Depends(current_user),
+) -> ProfileOut:
+    profile = session.exec(
+        select(Profile).where(Profile.user_id == user.id)
+    ).first()
     if profile is None:
         return ProfileOut()
     evidence = profile.github_evidence or {}
@@ -481,21 +601,27 @@ def get_profile(session: Session = Depends(get_session)) -> ProfileOut:
 
 @router.put("/profile", response_model=ProfileOut)
 def save_profile(
-    payload: ProfileIn, session: Session = Depends(get_session)
+    payload: ProfileIn,
+    session: Session = Depends(get_session),
+    user: User = Depends(current_user),
 ) -> ProfileOut:
-    profile = session.exec(select(Profile)).first() or Profile()
+    profile = session.exec(
+        select(Profile).where(Profile.user_id == user.id)
+    ).first() or Profile(user_id=user.id)
     for field, value in payload.model_dump().items():
         setattr(profile, field, value)
     profile.github_username = profile.github_username.strip().removeprefix("@")
     profile.updated_at = utcnow()
     session.add(profile)
     session.commit()
-    return get_profile(session)
+    return get_profile(session, user)
 
 
 @router.post("/profile/resume", response_model=ActionResult)
 async def upload_resume(
-    request: Request, session: Session = Depends(get_session)
+    request: Request,
+    session: Session = Depends(get_session),
+    user: User = Depends(current_user),
 ) -> ActionResult:
     from pathlib import Path
 
@@ -513,7 +639,11 @@ async def upload_resume(
 
     settings = get_settings()
     settings.ensure_dirs()
-    dest = settings.resume_dir / f"base{suffix}"
+    # Namespaced per user: a shared "base.pdf" meant each upload silently
+    # overwrote the previous user's résumé on disk.
+    user_dir = settings.resume_dir / f"user_{user.id}"
+    user_dir.mkdir(parents=True, exist_ok=True)
+    dest = user_dir / f"base{suffix}"
     dest.write_bytes(await upload.read())
 
     try:
@@ -522,7 +652,9 @@ async def upload_resume(
         log.exception("resume parse failed")
         raise HTTPException(400, f"could not parse resume: {exc}") from exc
 
-    profile = session.exec(select(Profile)).first() or Profile()
+    profile = session.exec(
+        select(Profile).where(Profile.user_id == user.id)
+    ).first() or Profile(user_id=user.id)
     profile.base_resume_path = str(dest)
     profile.base_resume_text = parsed.text
     profile.skills = sorted(extract_skills(parsed.text))
@@ -541,11 +673,14 @@ async def upload_resume(
 
 
 @router.get("/profile/ats", response_model=dict)
-def profile_ats(session: Session = Depends(get_session)) -> dict:
+def profile_ats(
+    session: Session = Depends(get_session),
+    user: User = Depends(current_user),
+) -> dict:
     """Structural ATS report for the stored resume, independent of any job."""
     from app.pipeline.ats_rules import evaluate
 
-    profile = _profile_or_404(session)
+    profile = _profile_or_404(session, user)
     if not profile.base_resume_text:
         raise HTTPException(404, "no resume uploaded")
     return evaluate(profile.base_resume_text).as_dict()
@@ -556,6 +691,7 @@ def download_resume_version(
     version_id: int,
     fmt: Literal["docx", "pdf", "txt"],
     session: Session = Depends(get_session),
+    user: User = Depends(current_user),
 ) -> FileResponse:
     """Serve a tailored resume artifact, rendering it on demand if absent.
 
@@ -567,11 +703,18 @@ def download_resume_version(
     version = session.get(ResumeVersion, version_id)
     if version is None:
         raise HTTPException(404, "resume version not found")
+    # Ownership check. version_id comes straight from the URL, so without this a
+    # user could walk the id space and download everyone else's résumé. 404
+    # rather than 403: whether a given id exists is itself not their business.
+    if version.user_id is not None and version.user_id != user.id:
+        raise HTTPException(404, "resume version not found")
     if not (version.text or "").strip():
         raise HTTPException(409, "this resume version has no text to render")
 
     job = session.get(Job, version.job_id)
-    profile = session.exec(select(Profile)).first()
+    profile = session.exec(
+        select(Profile).where(Profile.user_id == user.id)
+    ).first()
     settings = get_settings()
 
     if fmt == "txt":
@@ -631,15 +774,19 @@ def _download_stem(job: Job | None, profile: Profile | None) -> str:
 
 
 @router.post("/jobs/{job_id}/tailor", response_model=ActionResult)
-async def tailor(job_id: int, session: Session = Depends(get_session)) -> ActionResult:
+async def tailor(
+    job_id: int,
+    session: Session = Depends(get_session),
+    user: User = Depends(current_user),
+) -> ActionResult:
     from app.apply.runner import prepare
 
     job = session.get(Job, job_id)
     if job is None:
         raise HTTPException(404, "job not found")
-    profile = _profile_or_404(session)
+    profile = _profile_or_404(session, user)
     try:
-        app_row = await prepare(session, job, profile)
+        app_row = await prepare(session, job, profile, user_id=user.id)
     except Exception as exc:  # noqa: BLE001
         log.exception("tailoring failed for job %s", job_id)
         raise HTTPException(500, str(exc)) from exc
@@ -651,15 +798,18 @@ async def tailor(job_id: int, session: Session = Depends(get_session)) -> Action
 
 @router.post("/jobs/{job_id}/submit", response_model=ActionResult)
 async def submit(
-    job_id: int, force: bool = False, session: Session = Depends(get_session)
+    job_id: int,
+    force: bool = False,
+    session: Session = Depends(get_session),
+    user: User = Depends(current_user),
 ) -> ActionResult:
     from app.apply.runner import submit as do_submit
 
     job = session.get(Job, job_id)
     if job is None:
         raise HTTPException(404, "job not found")
-    profile = _profile_or_404(session)
-    result = await do_submit(session, job, profile, force=force)
+    profile = _profile_or_404(session, user)
+    result = await do_submit(session, job, profile, force=force, user_id=user.id)
     return ActionResult(
         ok=result.ok,
         message=result.confirmation or result.error,
@@ -668,26 +818,35 @@ async def submit(
 
 
 @router.post("/jobs/{job_id}/skip", response_model=ActionResult)
-def skip(job_id: int, session: Session = Depends(get_session)) -> ActionResult:
+def skip(
+    job_id: int,
+    session: Session = Depends(get_session),
+    user: User = Depends(current_user),
+) -> ActionResult:
     job = session.get(Job, job_id)
     if job is None:
         raise HTTPException(404, "job not found")
-    job.status = JobStatus.SKIPPED
-    session.add(job)
+    state = user_job(session, user.id, job_id)
+    state.status = JobStatus.SKIPPED
+    session.add(state)
     session.commit()
     return ActionResult(ok=True, message="Skipped.")
 
 
 @router.post("/jobs/{job_id}/prep", response_model=ActionResult)
-async def make_prep(job_id: int, session: Session = Depends(get_session)) -> ActionResult:
+async def make_prep(
+    job_id: int,
+    session: Session = Depends(get_session),
+    user: User = Depends(current_user),
+) -> ActionResult:
     from app.pipeline.interview import prep_for_job
 
     job = session.get(Job, job_id)
     if job is None:
         raise HTTPException(404, "job not found")
-    profile = _profile_or_404(session)
+    profile = _profile_or_404(session, user)
     try:
-        await prep_for_job(session, job, profile)
+        await prep_for_job(session, job, profile, user_id=user.id)
     except Exception as exc:  # noqa: BLE001
         log.exception("interview prep failed for job %s", job_id)
         raise HTTPException(500, str(exc)) from exc
@@ -715,18 +874,24 @@ async def trigger_poll() -> ActionResult:
 
 
 @router.post("/actions/score", response_model=ActionResult)
-async def trigger_score(session: Session = Depends(get_session)) -> ActionResult:
+async def trigger_score(
+    session: Session = Depends(get_session),
+    user: User = Depends(current_user),
+) -> ActionResult:
     from app.pipeline.score import score_pending
 
-    count = await score_pending(session, limit=50)
+    count = await score_pending(session, user_id=user.id, limit=50)
     return ActionResult(ok=True, message=f"Scored {count} jobs.", detail={"scored": count})
 
 
 @router.post("/actions/github", response_model=ActionResult)
-async def trigger_github(session: Session = Depends(get_session)) -> ActionResult:
+async def trigger_github(
+    session: Session = Depends(get_session),
+    user: User = Depends(current_user),
+) -> ActionResult:
     from app.pipeline.github import scan
 
-    profile = _profile_or_404(session)
+    profile = _profile_or_404(session, user)
     if not profile.github_username:
         raise HTTPException(400, "no GitHub username on the profile")
     evidence = await scan(profile.github_username)
