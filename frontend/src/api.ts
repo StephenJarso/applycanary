@@ -1,11 +1,22 @@
 /**
  * Typed client for the FastAPI backend.
  *
- * These interfaces mirror the Pydantic response models in `app/web/api.py`.
+ * These interfaces mirror the Pydantic response models in `app/api/router.py`.
  * They are hand-written rather than generated: the surface is small, and a
  * generator would be another build step to keep working. If a shape drifts,
  * the mismatch shows up here first.
  */
+
+export interface AuthUser {
+  id: number;
+  email: string;
+  is_admin: boolean;
+}
+
+export interface Invite {
+  code: string;
+  link: string;
+}
 
 export interface Score {
   total: number;
@@ -106,6 +117,28 @@ export interface JobList {
   sources: string[];
 }
 
+export interface PublicJob {
+  id: number;
+  company: string;
+  title: string;
+  location: string;
+  is_remote: boolean;
+  source: string;
+  apply_url: string;
+  salary_min: number | null;
+  salary_max: number | null;
+  salary_currency: string;
+  salary_is_estimate: boolean;
+  posted_at: string | null;
+  first_seen_at: string;
+}
+
+export interface PublicJobList {
+  jobs: PublicJob[];
+  total: number;
+  sources: string[];
+}
+
 export interface Profile {
   full_name: string;
   email: string;
@@ -195,9 +228,13 @@ export class ApiError extends Error {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const headers = new Headers(init?.headers);
+  if (typeof init?.body === "string" && !headers.has("Content-Type")) {
+    headers.set("Content-Type", "application/json");
+  }
   const res = await fetch(`/api${path}`, {
-    headers: init?.body instanceof FormData ? {} : { "Content-Type": "application/json" },
     ...init,
+    headers,
   });
 
   if (!res.ok) {
@@ -229,8 +266,18 @@ const qs = (filters: JobFilters): string => {
 };
 
 export const api = {
+  auth: {
+    me: () => request<AuthUser>("/auth/me"),
+    login: (email: string, password: string) =>
+      request<AuthUser>("/auth/login", { method: "POST", body: JSON.stringify({ email, password }) }),
+    register: (email: string, password: string, invite_code: string) =>
+      request<AuthUser>("/auth/register", { method: "POST", body: JSON.stringify({ email, password, invite_code }) }),
+    logout: () => request<void>("/auth/logout", { method: "POST" }),
+    invite: () => request<Invite>("/auth/invite"),
+  },
   status: () => request<Status>("/status"),
   jobs: (filters: JobFilters = {}) => request<JobList>(`/jobs${qs(filters)}`),
+  publicJobs: (filters: { q?: string; source?: string; remote_only?: boolean; sort?: "newest" | "oldest" } = {}) => request<PublicJobList>(`/public/jobs${qs(filters as JobFilters)}`),
   job: (id: number) => request<JobDetail>(`/jobs/${id}`),
   review: () => request<Job[]>("/review"),
   applications: () => request<Job[]>("/applications"),
