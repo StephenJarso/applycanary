@@ -44,6 +44,7 @@ class Settings(BaseSettings):
     # 2. OpenRouter (free models) - needs OPENROUTER_API_KEY
     # 3. Groq (free tier) - needs GROQ_API_KEY
     # 4. Ollama (local) - needs OLLAMA_HOST (default http://localhost:11434)
+    # 5. Amazon Bedrock - needs AWS_ACCESS_KEY_ID + AWS_SECRET_ACCESS_KEY
     anthropic_api_key: str = ""
     model_triage: str = "claude-haiku-4-5-20251001"
     model_tailor: str = "claude-sonnet-5"
@@ -89,6 +90,34 @@ class Settings(BaseSettings):
     smtp_password: str = ""
     digest_to: str = ""
     alert_min_score: int = 90
+
+    # --- amazon web services (Bedrock, Polly, Transcribe, S3) ---
+    # All optional. Bedrock adds a Claude + Titan-embedding provider to the LLM
+    # chain; Polly/Transcribe power the voice interview; S3 stores interview
+    # audio. Without them the app degrades gracefully (browser speech, local
+    # storage, hashing embeddings) so the demo still runs.
+    aws_access_key_id: str = ""
+    aws_secret_access_key: str = ""
+    aws_session_token: str = ""
+    aws_region: str = "us-east-1"
+    bedrock_model_id: str = "anthropic.claude-3-5-sonnet-20241022-v2:0"
+    bedrock_embedding_model_id: str = "amazon.titan-embed-text-v2:0"
+    # Titan v2 emits 1024 dims by default; the vector columns must match.
+    embedding_dims: int = 1024
+    polly_voice_id: str = "Joanna"
+    polly_engine: str = "neural"
+    s3_bucket: str = ""
+    s3_prefix: str = "applycanary"
+
+    # --- cockroachdb operations (ccloud CLI / MCP server) ---
+    # The managed MCP server (https://cockroachlabs.cloud/mcp) lets an agent
+    # inspect and operate the cluster read-only by default with full audit
+    # logging. The token comes from the Cloud Console; ccloud service-account
+    # keys come from `ccloud iam service-account create`.
+    cockroach_mcp_url: str = "https://cockroachlabs.cloud/api/v2/mcp"
+    cockroach_mcp_token: str = ""
+    ccloud_api_key: str = ""
+    ccloud_api_secret: str = ""
 
     # --- aggregators ---
     adzuna_app_id: str = ""
@@ -137,7 +166,27 @@ class Settings(BaseSettings):
 
     @property
     def llm_enabled(self) -> bool:
-        return bool(self.gemini_api_key or self.anthropic_api_key)
+        return bool(
+            self.gemini_api_key
+            or self.anthropic_api_key
+            or self.aws_access_key_id
+        )
+
+    @property
+    def aws_enabled(self) -> bool:
+        return bool(self.aws_access_key_id and self.aws_secret_access_key)
+
+    @property
+    def polly_enabled(self) -> bool:
+        return self.aws_enabled
+
+    @property
+    def transcribe_enabled(self) -> bool:
+        return self.aws_enabled
+
+    @property
+    def s3_enabled(self) -> bool:
+        return self.aws_enabled and bool(self.s3_bucket)
 
     @property
     def email_enabled(self) -> bool:

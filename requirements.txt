@@ -12,6 +12,13 @@ python-multipart>=0.0.9,<0.1
 # --- persistence ---
 sqlmodel>=0.0.22,<0.1
 sqlalchemy>=2.0,<3.0
+# CockroachDB (Postgres wire protocol) driver. Optional: the app falls back to
+# SQLite when DATABASE_URL is sqlite:///...
+psycopg[binary]>=3.2,<4.0
+
+# --- amazon web services (Bedrock LLM/embeddings, Polly, Transcribe, S3) ---
+# Optional: everything degrades gracefully without AWS credentials.
+boto3>=1.34,<2.0
 
 # --- config ---
 pydantic>=2.8,<3.0
