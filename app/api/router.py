@@ -109,6 +109,7 @@ class ProfileOut(BaseModel):
     linkedin_url: str = ""
     github_username: str = ""
     portfolio_url: str = ""
+    referral_link: str = ""
     min_salary: int | None = None
     salary_currency: str = "USD"
     target_titles: list[str] = Field(default_factory=list)
@@ -131,6 +132,7 @@ class ProfileIn(BaseModel):
     location: str = ""
     linkedin_url: str = ""
     github_username: str = ""
+    referral_link: str = ""
     portfolio_url: str = ""
     min_salary: int | None = None
     salary_currency: str = "USD"
@@ -140,6 +142,8 @@ class ProfileIn(BaseModel):
     work_authorization: str = ""
     years_experience: int | None = None
     remote_only: bool = False
+    # User-confirmed skills supplement skills detected from the uploaded resume.
+    skills: list[str] = Field(default_factory=list)
 
 
 class SourceHealthOut(BaseModel):
@@ -297,6 +301,40 @@ def status(
     )
 
 
+@router.get("/public/jobs")
+def public_jobs(
+    session: Session = Depends(get_session),
+    q: str = "",
+    source: str = "",
+    remote_only: bool = False,
+    sort: Literal["newest", "oldest"] = "newest",
+    limit: int = Query(100, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+) -> dict:
+    """Read-only job browsing for guests; no profile or workflow data."""
+    stmt = select(Job).where(Job.expired_at.is_(None))
+    if source:
+        stmt = stmt.where(Job.source == source)
+    if remote_only:
+        stmt = stmt.where(Job.is_remote == True)  # noqa: E712 - SQL, not Python
+    if q:
+        like = f"%{q}%"
+        stmt = stmt.where(Job.title.ilike(like) | Job.company.ilike(like))
+    stmt = stmt.order_by(Job.first_seen_at.desc() if sort == "newest" else Job.first_seen_at.asc())
+    rows = session.exec(stmt.offset(offset).limit(limit)).all()
+    sources = sorted(session.exec(select(Job.source).distinct()).all())
+    return {
+        "jobs": [{
+            "id": job.id, "company": job.company, "title": job.title,
+            "location": job.location, "is_remote": job.is_remote,
+            "source": job.source, "apply_url": job.apply_url,
+            "salary_min": job.salary_min, "salary_max": job.salary_max,
+            "salary_currency": job.salary_currency,
+            "salary_is_estimate": job.salary_is_estimate,
+            "posted_at": job.posted_at, "first_seen_at": job.first_seen_at,
+        } for job in rows], "total": len(rows), "sources": sources,
+    }
+
 @router.get("/jobs", response_model=JobListOut)
 def list_jobs(
     session: Session = Depends(get_session),
@@ -327,6 +365,8 @@ def list_jobs(
         )
         .where(Job.expired_at.is_(None))
     )
+    profile = session.exec(select(Profile).where(Profile.user_id == user.id)).first()
+    has_profile_evidence = bool(profile and (profile.base_resume_text or profile.skills))
     if status == "rejected":
         stmt = stmt.where(UserJob.status == JobStatus.REJECTED)
     elif status:
@@ -338,6 +378,10 @@ def list_jobs(
         stmt = stmt.where(
             (UserJob.status.is_(None)) | (UserJob.status != JobStatus.REJECTED)
         )
+        if has_profile_evidence:
+            # Unscored postings are intentionally hidden from the default view;
+            # they have not yet been judged against this user's profile.
+            stmt = stmt.where(JobScore.id.is_not(None))
     if source:
         stmt = stmt.where(Job.source == source)
     if remote_only:
@@ -566,6 +610,8 @@ def get_profile(
     session: Session = Depends(get_session),
     user: User = Depends(current_user),
 ) -> ProfileOut:
+    from app.pipeline.keywords import extract_skills
+
     profile = session.exec(
         select(Profile).where(Profile.user_id == user.id)
     ).first()
@@ -580,6 +626,7 @@ def get_profile(
         linkedin_url=profile.linkedin_url,
         github_username=profile.github_username,
         portfolio_url=profile.portfolio_url,
+        referral_link=profile.referral_link,
         min_salary=profile.min_salary,
         salary_currency=profile.salary_currency,
         target_titles=list(profile.target_titles or []),
@@ -605,11 +652,16 @@ def save_profile(
     session: Session = Depends(get_session),
     user: User = Depends(current_user),
 ) -> ProfileOut:
+    from app.pipeline.keywords import extract_skills
+
     profile = session.exec(
         select(Profile).where(Profile.user_id == user.id)
     ).first() or Profile(user_id=user.id)
     for field, value in payload.model_dump().items():
         setattr(profile, field, value)
+    # Store canonical skill names so variants such as "Golang" and "go" score
+    # identically and display consistently.
+    profile.skills = sorted(extract_skills(", ".join(payload.skills)))
     profile.github_username = profile.github_username.strip().removeprefix("@")
     profile.updated_at = utcnow()
     session.add(profile)
@@ -630,7 +682,7 @@ async def upload_resume(
 
     form = await request.form()
     upload = form.get("resume")
-    if not isinstance(upload, UploadFile) or not upload.filename:
+    if upload is None or not getattr(upload, "filename", None) or not hasattr(upload, "read"):
         raise HTTPException(400, "no file uploaded under field 'resume'")
 
     suffix = Path(upload.filename).suffix.lower()
@@ -657,7 +709,7 @@ async def upload_resume(
     ).first() or Profile(user_id=user.id)
     profile.base_resume_path = str(dest)
     profile.base_resume_text = parsed.text
-    profile.skills = sorted(extract_skills(parsed.text))
+    profile.skills = sorted(extract_skills(parsed.text) | set(profile.skills or []))
     if not profile.email and parsed.emails:
         profile.email = parsed.emails[0]
     if not profile.phone and parsed.phones:
@@ -854,18 +906,23 @@ async def make_prep(
 
 
 @router.post("/actions/poll", response_model=ActionResult)
-async def trigger_poll() -> ActionResult:
+async def trigger_poll(
+    session: Session = Depends(get_session),
+    user: User = Depends(current_user),
+) -> ActionResult:
     from app.pipeline.ingest import poll_broad, poll_curated
+    from app.pipeline.score import score_pending
 
     curated = await poll_curated()
     broad = await poll_broad()
     found = curated.found + broad.found
     new = curated.new + broad.new
+    scored = await score_pending(session, user_id=user.id, limit=50)
     return ActionResult(
         ok=True,
-        message=f"Found {found} postings, {new} new.",
+        message=f"Found {found} postings, {new} new; scored {scored} for your profile.",
         detail={
-            "found": found, "new": new,
+            "found": found, "new": new, "scored": scored,
             "duplicates": curated.duplicates + broad.duplicates,
             "failed_sources": curated.sources_failed + broad.sources_failed,
             "errors": [*curated.errors, *broad.errors],

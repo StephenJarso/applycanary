@@ -11,6 +11,8 @@ in run.py before exposing it.
 from __future__ import annotations
 
 import logging
+import time
+from collections import defaultdict, deque
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
@@ -89,6 +91,8 @@ def create_app() -> FastAPI:
         version="0.1.0",
         lifespan=lifespan,
     )
+    request_windows: dict[tuple[str, str], deque[float]] = defaultdict(deque)
+    limits = {"auth": (10, 60.0), "api-write": (30, 60.0), "api-read": (120, 60.0)}
 
     @app.middleware("http")
     async def auth_middleware(request: Request, call_next):  # noqa: ANN001, ANN202
@@ -99,11 +103,23 @@ def create_app() -> FastAPI:
         from app.db import engine
 
         path = request.url.path
+        bucket = "auth" if path.startswith("/api/auth/") else ("api-write" if path.startswith("/api/") and request.method not in {"GET", "HEAD", "OPTIONS"} else "api-read" if path.startswith("/api/") else "")
+        if bucket:
+            now = time.monotonic()
+            window = request_windows[(request.client.host if request.client else "unknown", bucket)]
+            maximum, period = limits[bucket]
+            while window and now - window[0] >= period:
+                window.popleft()
+            if len(window) >= maximum:
+                retry_after = max(1, int(period - (now - window[0])))
+                return JSONResponse(status_code=429, content={"detail": "Too many requests; please try again later."}, headers={"Retry-After": str(retry_after)})
         if (
             path == "/health"
-            or path in ("/login", "/register")
-            or path.startswith("/static/")
-            or path.startswith("/ui/assets/")
+            or path in ("/login", "/register", "/api/auth/login", "/api/auth/register")
+            or path.startswith("/assets/")
+            or path == "/guest"
+            or path.startswith("/guest/")
+            or path.startswith("/api/public/")
             or path == "/favicon.ico"
         ):
             return await call_next(request)
@@ -127,53 +143,38 @@ def create_app() -> FastAPI:
 
         return await call_next(request)
 
-    from app.web import api, routes
+    from app.api import auth, router
 
-    # JSON API first: /api/* is matched before the SPA catch-all below.
-    app.include_router(api.router)
-    # Server-rendered Jinja dashboard, kept working as a fallback.
-    app.include_router(routes.router)
-
-    static_dir = settings.static_dir
-    if static_dir.exists():
-        app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
-
+    # API routes are registered before the SPA catch-all.
+    app.include_router(auth.router)
+    app.include_router(router.router)
     _mount_spa(app, settings)
 
     return app
 
 
 def _mount_spa(app: FastAPI, settings: object) -> None:
-    """Serve the built React app at /ui, when it has been built.
+    """Serve the built React application from the site root."""
+    from fastapi.responses import FileResponse, PlainTextResponse
 
-    Absent a build the route simply does not exist, so the backend still runs
-    from a clean checkout without Node installed — `npm run build` is optional,
-    not a prerequisite.
-    """
     dist = settings.frontend_dist  # type: ignore[attr-defined]
-    if not (dist / "index.html").exists():
-        log.info("no frontend build at %s — serving Jinja dashboard only", dist)
+    index = dist / "index.html"
+    if not index.exists():
+        @app.get("/{path:path}", include_in_schema=False)
+        def frontend_not_built(path: str = "") -> PlainTextResponse:  # noqa: ARG001
+            return PlainTextResponse("Frontend is not built. Run: cd frontend && npm run build", status_code=503)
         return
 
     assets = dist / "assets"
     if assets.exists():
-        app.mount("/ui/assets", StaticFiles(directory=str(assets)), name="spa-assets")
+        app.mount("/assets", StaticFiles(directory=str(assets)), name="frontend-assets")
 
-    from fastapi.responses import FileResponse
-
-    index = dist / "index.html"
-
-    @app.get("/ui", include_in_schema=False)
-    @app.get("/ui/{path:path}", include_in_schema=False)
+    @app.get("/", include_in_schema=False)
+    @app.get("/{path:path}", include_in_schema=False)
     def spa(path: str = "") -> FileResponse:  # noqa: ARG001
-        """Return index.html for any /ui route.
-
-        Client-side routing means deep links like /ui/job/42 have no server
-        counterpart; the router resolves them once the bundle loads.
-        """
         return FileResponse(index)
 
-    log.info("React dashboard mounted at /ui")
+    log.info("React dashboard mounted at /")
 
 
 app = create_app()

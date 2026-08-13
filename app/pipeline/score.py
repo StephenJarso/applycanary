@@ -96,7 +96,7 @@ def tier1(job: Job, profile: Profile) -> Decision:
             disqualifier=reason, reasoning=f"Filtered locally: {reason}.",
         )
 
-    resume_text = profile.base_resume_text or " ".join(profile.skills or [])
+    resume_text = _profile_match_text(profile)
     coverage, matched, missing = keyword_overlap(resume_text, job.description)
 
     if coverage < TIER1_MIN_COVERAGE:
@@ -336,12 +336,24 @@ def _persist_decision(
 
 # ---------------------------------------------------------------- helpers
 
+def _profile_match_text(profile: Profile) -> str:
+    """Build the per-user evidence used by deterministic skill matching."""
+    evidence = profile.github_evidence if isinstance(profile.github_evidence, dict) else {}
+    github_skills = evidence.get("skills") or []
+    parts = [profile.base_resume_text or ""]
+    parts.append("Stated skills: " + ", ".join(profile.skills or []))
+    parts.append("GitHub skills: " + ", ".join(str(s) for s in github_skills))
+    return "\n".join(part for part in parts if part.strip())
+
 
 def _profile_block(profile: Profile) -> str:
     parts = [
         f"Name: {profile.full_name or 'not given'}",
         f"Years of experience: {profile.years_experience if profile.years_experience is not None else 'not given'}",
         f"Work authorization: {profile.work_authorization or 'not given'}",
+        f"Location: {profile.location or 'not given'}",
+        f"Target roles: {', '.join(profile.target_titles) if profile.target_titles else 'not specified'}",
+        f"Target locations: {', '.join(profile.target_locations) if profile.target_locations else 'not specified'}",
         f"Stated skills: {', '.join(profile.skills) if profile.skills else 'none recorded'}",
         "",
         "Resume:",

@@ -111,8 +111,8 @@ class Settings(BaseSettings):
     data_dir: Path = Field(default=Path("./data"))
     log_level: str = "INFO"
     # Frontend base URL for redirects.
-    # In production: "/" (same origin, frontend served at /ui by FastAPI).
-    # In development: "http://localhost:5173/ui/" (Vite dev server).
+    # In production: "/" (same origin, React frontend served by FastAPI).
+    # In development: "http://localhost:5173" (Vite dev server).
     frontend_base_url: str = "/"
     # Marks the session cookie Secure. Defaults on for any non-loopback bind,
     # since that means the app is reachable off-box and the cookie must not
@@ -176,7 +176,7 @@ class Settings(BaseSettings):
     @property
     def frontend_dist(self) -> Path:
         """Built React bundle. Absent until `npm run build` has been run."""
-        return self.package_dir / "web" / "dist"
+        return Path("./frontend/dist")
 
     def ensure_dirs(self) -> None:
         for d in (self.data_dir, self.resume_dir, self.artifact_dir, self.cache_dir):
