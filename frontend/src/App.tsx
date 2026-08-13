@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { NavLink, Route, Routes } from "react-router-dom";
+import { Navigate, NavLink, Route, Routes } from "react-router-dom";
 import { api } from "./api";
 import Jobs from "./pages/Jobs";
 import JobDetail from "./pages/JobDetail";
@@ -7,6 +7,10 @@ import Review from "./pages/Review";
 import Applications from "./pages/Applications";
 import Sources from "./pages/Sources";
 import ProfilePage from "./pages/Profile";
+import Login from "./pages/Login";
+import Register from "./pages/Register";
+import GuestJobs from "./pages/GuestJobs";
+import { useAuth } from "./context/AuthContext";
 
 const NAV = [
   { to: "/", label: "Jobs", end: true, countKey: "total" },
@@ -16,7 +20,8 @@ const NAV = [
   { to: "/profile", label: "Profile", countKey: null },
 ] as const;
 
-export default function App() {
+function Dashboard() {
+  const { logout } = useAuth();
   const qc = useQueryClient();
   const status = useQuery({ queryKey: ["status"], queryFn: api.status });
 
@@ -59,6 +64,9 @@ export default function App() {
         ))}
 
         <div className="sidebar-foot">
+          <button className="btn-ghost logout-button" onClick={() => void logout()}>
+            Sign out
+          </button>
           {status.data && (
             <div style={{ fontSize: 11, color: "var(--text-faint)", padding: "0 9px" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -121,4 +129,15 @@ export default function App() {
       </div>
     </div>
   );
+}
+
+export default function App() {
+  const { user, loading } = useAuth();
+  if (loading) return <div className="empty">Loading session…</div>;
+  return <Routes>
+    <Route path="/login" element={user ? <Navigate to="/" replace /> : <Login />} />
+    <Route path="/guest" element={<GuestJobs />} />
+    <Route path="/register" element={user ? <Navigate to="/" replace /> : <Register />} />
+    <Route path="/*" element={user ? <Dashboard /> : <Navigate to="/login" replace />} />
+  </Routes>;
 }

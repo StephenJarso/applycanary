@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, type Profile } from "../api";
 import { Chips, ErrorBox, Loading } from "../components";
 
-const CSV_FIELDS = ["target_titles", "target_locations", "excluded_companies"] as const;
+const CSV_FIELDS = ["skills", "target_titles", "target_locations", "excluded_companies"] as const;
 
 export default function ProfilePage() {
   const qc = useQueryClient();
@@ -31,6 +31,7 @@ export default function ProfilePage() {
     },
   });
   const github = useMutation({ mutationFn: api.syncGithub, onSuccess: invalidate });
+  const invite = useQuery({ queryKey: ["invite"], queryFn: api.auth.invite, retry: false });
 
   const ats = useQuery({
     queryKey: ["ats"],
@@ -47,6 +48,19 @@ export default function ProfilePage() {
 
   return (
     <>
+      <div className="card">
+        <h3 className="card-title">Invite someone</h3>
+        <p className="cell-dim">Share this single-use link to invite someone to create an account.</p>
+        {invite.isPending && <Loading label="Loading invite code" />}
+        {invite.isError && <ErrorBox error={invite.error} />}
+        {invite.data && (
+          <div className="field" style={{ marginTop: 12 }}>
+            <label htmlFor="invite-link">Your invite link</label>
+            <input id="invite-link" readOnly value={`${window.location.origin}${invite.data.link}`} onFocus={(e) => e.currentTarget.select()} />
+            <p className="cell-dim">Code: <code>{invite.data.code}</code> · Click the field to copy.</p>
+          </div>
+        )}
+      </div>
       <div className="card">
         <h3 className="card-title">Resume</h3>
         {data?.has_resume ? (
