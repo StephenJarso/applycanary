@@ -50,7 +50,7 @@ LABEL org.opencontainers.image.title="ApplyCanary" \
 # curl serves the healthcheck below. tzdata lets TZ resolve to a real zone, which
 # the digest and GitHub-refresh cron triggers depend on for correct local hours.
 RUN apt-get update \
- && apt-get install -y --no-install-recommends curl tzdata \
+ && apt-get install -y --no-install-recommends curl gosu tzdata \
  && rm -rf /var/lib/apt/lists/*
 
 COPY --from=build /opt/venv /opt/venv
@@ -78,12 +78,14 @@ COPY --chown=canary:canary run.py ./
 # must be present in the image. Override with a bind mount to edit the curated
 # board list without rebuilding.
 COPY --chown=canary:canary companies.yaml ./
+COPY --chown=root:root docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 
 # Built React bundle from the frontend stage. Copied after app/ so it is not
 # overwritten, and served from / by app/main.py.
 COPY --from=frontend --chown=canary:canary /fe/dist ./frontend/dist
 
-USER canary
+USER root
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
 
 # Declared for documentation; compose does the actual publishing.
 EXPOSE 8000
