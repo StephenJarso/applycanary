@@ -17,6 +17,8 @@ from typing import Optional
 from sqlalchemy import Column, Index, Text, UniqueConstraint
 from sqlmodel import JSON, Field, Relationship, SQLModel
 
+from app.db import VectorType
+
 
 def utcnow() -> datetime:
     return datetime.now(UTC).replace(tzinfo=None)
@@ -386,6 +388,125 @@ class InterviewPrep(SQLModel, table=True):
     # {question, starter_code, expected_solution, time_minutes, evaluation_rubric}
 
     model_used: str = ""
+    created_at: datetime = Field(default_factory=utcnow)
+
+
+# ---------------------------------------------------------------- memory layer
+
+
+class JobEmbedding(SQLModel, table=True):
+    """Vector representation of a job posting, for semantic retrieval.
+
+    This is the CockroachDB distributed vector index at work: the embedding
+    column is a native VECTOR type with a `vec_cosine_ops` index, so "find me
+    postings semantically close to this one" (or to the user's resume) is a
+    database query — no separate vector store, no reindexing, no consistency
+    gap between the embedding and the job row it belongs to.
+    """
+
+    __tablename__ = "job_embedding"
+
+    id: int | None = Field(default=None, primary_key=True)
+    job_id: int = Field(foreign_key="job.id", index=True, unique=True)
+    # Indexed by _ensure_vector_indexes() on CockroachDB.
+    embedding: list[float] = Field(
+        sa_column=Column("embedding", VectorType(1024)),
+    )
+    dims: int = 1024
+    model: str = ""
+    created_at: datetime = Field(default_factory=utcnow)
+
+
+class AgentMemory(SQLModel, table=True):
+    """Long-term agent memory: what the agent has learned about a user.
+
+    Each entry is a piece of durable context — an interview summary, a piece of
+    coaching feedback, a notable outcome — stored with its embedding. The agent
+    recalls the most relevant entries semantically before a new interview or
+    prep pass, which is what makes the memory useful rather than decorative:
+    the coach remembers that the user tends to rush behavioural answers, and
+    that surface again in the next session.
+
+    `kind` is an open vocabulary: "interview_summary", "coaching_feedback",
+    "user_context", "application_outcome". `meta` carries structured extras
+    (job_id, company, score) for filtering without re-parsing prose.
+    """
+
+    __tablename__ = "agent_memory"
+
+    id: int | None = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="user.id", index=True)
+    kind: str = Field(default="user_context", index=True)
+    content: str = Field(default="", sa_column=Column(Text))
+    embedding: list[float] = Field(
+        sa_column=Column("embedding", VectorType(1024)),
+    )
+    meta: dict = Field(default_factory=dict, sa_column=Column(JSON))
+    created_at: datetime = Field(default_factory=utcnow, index=True)
+
+
+class InterviewSession(SQLModel, table=True):
+    """One mock-interview run against a job posting.
+
+    The session is the agent's working memory for the interview: which question
+    is live, how the candidate answered it, and what the coach concluded. It
+    lives in CockroachDB as transactional state, so a dropped browser tab can
+    resume exactly where it left off — the memory layer is what makes the
+    interview stateful across devices and reloads.
+    """
+
+    __tablename__ = "interview_session"
+
+    id: int | None = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="user.id", index=True)
+    job_id: int = Field(foreign_key="job.id", index=True)
+
+    # intro | asking | finished | aborted
+    status: str = Field(default="intro", index=True)
+    # speech (voice) or text
+    mode: str = "speech"
+
+    # The ordered question list, snapshot at start so edits to prep do not
+    # mutate a session in flight.
+    questions: list[dict] = Field(default_factory=list, sa_column=Column(JSON))
+    question_index: int = 0
+    total_questions: int = 0
+
+    summary: dict = Field(default_factory=dict, sa_column=Column(JSON))
+    avg_score: float | None = None
+    model_used: str = ""
+
+    started_at: datetime = Field(default_factory=utcnow)
+    finished_at: datetime | None = None
+
+
+class InterviewTurn(SQLModel, table=True):
+    """One question/answer exchange inside an interview session."""
+
+    __tablename__ = "interview_turn"
+
+    id: int | None = Field(default=None, primary_key=True)
+    session_id: int = Field(foreign_key="interview_session.id", index=True)
+    user_id: int = Field(foreign_key="user.id", index=True)
+    job_id: int = Field(foreign_key="job.id", index=True)
+
+    question_index: int = 0
+    question: str = ""
+    expected_key_points: list[str] = Field(default_factory=list, sa_column=Column(JSON))
+    time_minutes: int | None = None
+    rubric: dict = Field(default_factory=dict, sa_column=Column(JSON))
+
+    answer_text: str = Field(default="", sa_column=Column(Text))
+    # S3 key or local path of the raw recording, when captured.
+    answer_audio: str = ""
+    duration_seconds: int = 0
+
+    score: float | None = None
+    feedback: str = Field(default="", sa_column=Column(Text))
+    strengths: list[str] = Field(default_factory=list, sa_column=Column(JSON))
+    improvements: list[str] = Field(default_factory=list, sa_column=Column(JSON))
+    model_used: str = ""
+
     created_at: datetime = Field(default_factory=utcnow)
 
 
