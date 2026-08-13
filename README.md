@@ -27,8 +27,7 @@ docker compose logs -f
 
 Then open:
 
-- **http://127.0.0.1:8000/ui** — the React dashboard
-- **http://127.0.0.1:8000/** — the server-rendered fallback, no build needed
+- **http://127.0.0.1:8000/** — the React dashboard
 - **http://127.0.0.1:8000/docs** — interactive API reference
 
 Go to **Profile**, upload your resume, and set your target titles and locations.
@@ -38,16 +37,9 @@ Nothing is submitted anywhere until you approve it. See [Auto-submit](#auto-subm
 
 ## Interfaces
 
-There are two UIs over one JSON API, and the API is the real contract — both
-render the same data from `/api/*`.
+The React frontend is the application UI and the JSON API is its contract (`/api/*`).
 
-**React dashboard at `/ui`.** Dense dark-first tables, live filtering, score
-breakdowns, keyboard-navigable rows. Needs `npm run build`; the bundle lands in
-`app/web/dist` and FastAPI serves it. About 89 kB gzipped.
-
-**Jinja dashboard at `/`.** Server-rendered, zero build step, works from a clean
-checkout with Node nowhere in sight. Kept deliberately: it means a broken
-frontend build never costs you access to your own application history.
+**React dashboard at `/`.** It is the sole production UI. Build output stays in `frontend/dist`, alongside its source.
 
 Frontend development, against the real backend rather than mocks:
 

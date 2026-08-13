@@ -17,8 +17,8 @@ RUN if [ -f package-lock.json ]; then npm ci --no-audit --no-fund; \
     else npm install --no-audit --no-fund; fi
 
 COPY frontend/ ./
-# vite.config.ts writes to ../app/web/dist, so give it that path to write into.
-RUN mkdir -p /app/web && npm run build
+# Build the production bundle in frontend/dist.
+RUN npm run build
 
 # ---------------------------------------------------------------- build
 FROM python:3.12-slim AS build
@@ -80,8 +80,8 @@ COPY --chown=canary:canary run.py ./
 COPY --chown=canary:canary companies.yaml ./
 
 # Built React bundle from the frontend stage. Copied after app/ so it is not
-# overwritten, and served at /ui by app/main.py.
-COPY --from=frontend --chown=canary:canary /app/web/dist ./app/web/dist
+# overwritten, and served from / by app/main.py.
+COPY --from=frontend --chown=canary:canary /fe/dist ./frontend/dist
 
 USER canary
 

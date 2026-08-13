@@ -8,9 +8,7 @@ block_cipher = None
 
 added_files = [
     ('companies.yaml', '.'),
-    ('app/web/templates', 'app/web/templates'),
-    ('app/web/static', 'app/web/static'),
-    ('app/web/dist', 'app/web/dist'),
+    ('frontend/dist', 'frontend/dist'),
 ]
 
 # Every app submodule. The entrypoint imports app.main directly (not as a module
