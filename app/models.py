@@ -104,6 +104,7 @@ class Profile(SQLModel, table=True):
     """One job seeker's details. Exactly one row per user."""
 
     __tablename__ = "profile"
+    referral_link: str = ""
 
     id: int | None = Field(default=None, primary_key=True)
     user_id: int | None = Field(
@@ -215,6 +216,12 @@ class Job(SQLModel, table=True):
     # per-user workflow state (scored/queued/applied/skipped) lives in UserJob.
     expired_at: datetime | None = None
     seen_count: int = 1
+
+    # Compatibility with databases created before workflow state moved to
+    # UserJob. Those databases still have a required job.status column, so a
+    # default must be supplied on inserts even though application code no
+    # longer uses this global value.
+    status: JobStatus = Field(default=JobStatus.NEW)
 
     # Collections, not scalars: one row per user now that the posting is shared.
     # Handlers must select the row for the requesting user rather than reading

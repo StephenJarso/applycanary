@@ -149,7 +149,14 @@ def authenticate(session: Session, email: str, password: str) -> User | None:
         verify_password(password, hash_password("dummy"))
         return None
     if not verify_password(password, user.password_hash):
-        return None
+        # Transitional upgrade for installations that stored a legacy plaintext
+        # password before multi-user hashing was introduced. It is re-hashed
+        # immediately after a successful comparison.
+        if not user.password_hash.startswith(f"{_HASH_PREFIX}$") or not hmac.compare_digest(password, user.password_hash):
+            return None
+        user.password_hash = hash_password(password)
+        session.add(user)
+        session.commit()
     return user
 
 
