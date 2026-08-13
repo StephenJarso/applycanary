@@ -88,10 +88,7 @@ USER canary
 # Declared for documentation; compose does the actual publishing.
 EXPOSE 8000
 
-# Persist the SQLite database, resumes, generated CVs and cache. Without a mount
-# here every rebuild discards application history.
-VOLUME ["/data"]
-
+# Persistent data is mounted by the hosting platform at runtime.
 # /health reports scheduler state, so a hung scheduler surfaces as unhealthy
 # rather than staying invisible behind a listening socket.
 HEALTHCHECK --interval=60s --timeout=10s --start-period=25s --retries=3 \
