@@ -143,6 +143,15 @@ def create_app() -> FastAPI:
 
         return await call_next(request)
 
+    @app.get("/health", include_in_schema=False)
+    def health() -> dict:
+        from app import scheduler as sched
+        scheduler = sched.get_scheduler()
+        return {
+            "ok": True,
+            "scheduler_running": bool(scheduler and scheduler.running),
+        }
+
     from app.api import auth, router
 
     # API routes are registered before the SPA catch-all.
