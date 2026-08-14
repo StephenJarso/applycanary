@@ -89,6 +89,8 @@ class LlmClient:
             providers.append("ollama")
         if s.anthropic_api_key:
             providers.append("anthropic")
+        if s.aws_access_key_id and s.aws_secret_access_key:
+            providers.append("bedrock")
         return providers
 
     @property
@@ -114,6 +116,8 @@ class LlmClient:
             return s.ollama_triage_model
         if p == "anthropic":
             return s.model_triage
+        if p == "bedrock":
+            return s.bedrock_model_id
         return ""
 
     @property
@@ -131,6 +135,8 @@ class LlmClient:
             return s.ollama_tailor_model
         if p == "anthropic":
             return s.model_tailor
+        if p == "bedrock":
+            return s.bedrock_model_id
         return ""
 
     async def complete(
@@ -180,6 +186,11 @@ class LlmClient:
                     return await self._complete_anthropic(
                         model=model, system=system, messages=messages,
                         max_tokens=max_tokens, temperature=temperature, json_mode=json_mode,
+                    )
+                if provider == "bedrock":
+                    return await self._complete_bedrock(
+                        model=model, system=system, messages=messages,
+                        max_tokens=max_tokens, temperature=temperature,
                     )
             except ProviderError as e:
                 # Non-retryable error from this provider - try next
@@ -334,6 +345,58 @@ class LlmClient:
             parse_fn=_parse_ollama_response,
             timeout=OLLAMA_TIMEOUT,
         )
+
+    # ---------------------------------------------------------------- bedrock
+
+    async def _complete_bedrock(
+        self,
+        *,
+        model: str,
+        system: str | list[dict],
+        messages: list[dict],
+        max_tokens: int,
+        temperature: float,
+    ) -> LlmResult:
+        """Complete via Amazon Bedrock's Converse API.
+
+        The converse API is the current, model-agnostic surface (Claude and
+        others). It has no strict JSON mode, so callers requesting JSON rely on
+        `extract_json`, exactly as they do for the other providers. The call is
+        synchronous boto3 under the hood, so it runs in a worker thread.
+        """
+        import asyncio
+
+        from app.aws import client
+
+        bedrock = client("bedrock-runtime")
+        if bedrock is None:
+            raise ProviderError("bedrock", 503, "no AWS credentials configured")
+
+        def _call() -> dict:
+            import botocore  # noqa: PLC0415
+
+            body: dict = {
+                "modelId": model,
+                "messages": [
+                    {"role": "user" if m.get("role") != "assistant" else "assistant",
+                     "content": [{"text": str(m.get("content") or "")}]}
+                    for m in messages
+                ],
+                "inferenceConfig": {
+                    "maxTokens": max_tokens,
+                    "temperature": temperature,
+                },
+            }
+            if system_text := _flatten_system(system):
+                body["system"] = [{"text": system_text}]
+            try:
+                return bedrock.converse(**body)
+            except botocore.exceptions.ClientError as exc:
+                code = exc.response.get("ResponseMetadata", {}).get("HTTPStatusCode", 500)
+                raise ProviderError("bedrock", int(code), str(exc)) from exc
+
+        payload = await asyncio.to_thread(_call)
+        return _parse_bedrock_response(model, payload)
 
     # ---------------------------------------------------------------- anthropic (kept for compatibility)
 
@@ -492,6 +555,30 @@ def _parse_openai_compatible_response(model: str, payload: dict) -> LlmResult:
         model=model,
         input_tokens=int(usage.get("prompt_tokens") or 0),
         output_tokens=int(usage.get("completion_tokens") or 0),
+        stop_reason=stop,
+    )
+
+
+def _parse_bedrock_response(model: str, payload: dict) -> LlmResult:
+    """Parse a Bedrock Converse response."""
+    text = ""
+    stop = ""
+    if isinstance(payload, dict):
+        output = payload.get("output") or {}
+        message = output.get("message") or {}
+        parts = message.get("content") or []
+        text = "".join(
+            str(p.get("text") or "") for p in parts if isinstance(p, dict)
+        )
+        stop = str(output.get("stopReason") or "").lower()
+        if stop == "max_tokens":
+            stop = "max_tokens"
+    usage = (payload or {}).get("usage") or {}
+    return LlmResult(
+        text=text,
+        model=model,
+        input_tokens=int(usage.get("inputTokens") or 0),
+        output_tokens=int(usage.get("outputTokens") or 0),
         stop_reason=stop,
     )
 
