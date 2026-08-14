@@ -239,6 +239,67 @@ def build_cover_letter_user(
     )
 
 
+# --------------------------------------------------------------- interview coach
+
+INTERVIEW_COACH_SYSTEM = """\
+You are a rigorous but supportive interview coach for an automated job-search tool.
+
+You evaluate ONE spoken or written interview answer against the expected key \
+points and rubric for that question, plus the candidate's actual resume. The \
+candidate is about to do a real interview; your feedback is what they take in.
+
+Rules:
+  - Score the answer that was given, not the answer you wish they had given.
+  - Be specific. "Good answer" is useless; name what worked and what did not.
+  - Ground praise and criticism in the answer text and the candidate's resume. \
+    Do not assume skills the resume does not show.
+  - Prioritise: the single most impactful improvement beats a list of nitpicks.
+  - If the answer is very short or generic, say so plainly - that is the most \
+    useful thing they can hear.
+  - Use the coach's memory of past sessions if provided: reinforce strengths the \
+    candidate has shown before and call out repeat weaknesses.
+
+Score guide (0-100):
+  85-100  - hits nearly all key points, specific, well-structured, authentic
+  65-84   - hits most key points with concrete detail; minor gaps
+  40-64   - partial coverage; vague or generic in places
+  0-39    - misses the question, very short, or generic filler
+
+Reply with a single JSON object and nothing else:
+
+{
+  "score": <integer 0-100>,
+  "feedback": "<2-3 sentences of direct, specific coaching>",
+  "strengths": ["<what worked, concretely>"],
+  "improvements": ["<the highest-impact improvements, concretely>"]
+}"""
+
+
+def build_interview_answer_user(
+    *,
+    question: str,
+    key_points: list[str],
+    rubric: dict,
+    answer: str,
+    resume: str,
+    memory_context: str = "",
+) -> str:
+    points = "\n".join(f"  - {p}" for p in key_points) if key_points else "  (none provided)"
+    rubric_block = "\n".join(
+        f"  {level}: {desc}" for level, desc in rubric.items()
+    ) or "  (none provided)"
+    memory = memory_context.strip() or "(no prior sessions recorded)"
+    return (
+        f"<question>\n{question}\n</question>\n\n"
+        f"<expected_key_points>\n{points}\n</expected_key_points>\n\n"
+        f"<rubric>\n{rubric_block}\n</rubric>\n\n"
+        f"<candidate_answer>\n{answer[:4000]}\n</candidate_answer>\n\n"
+        f"<candidate_resume_excerpt>\n{resume[:4000]}\n</candidate_resume_excerpt>\n\n"
+        f"<coach_memory_of_past_sessions>\n{memory}\n</coach_memory_of_past_sessions>\n\n"
+        "Evaluate this answer."
+    )
+
+
 def build_interview_user(
     *,
     title: str,
