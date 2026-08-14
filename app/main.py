@@ -152,11 +152,12 @@ def create_app() -> FastAPI:
             "scheduler_running": bool(scheduler and scheduler.running),
         }
 
-    from app.api import auth, router
+    from app.api import auth, interview, router
 
     # API routes are registered before the SPA catch-all.
     app.include_router(auth.router)
     app.include_router(router.router)
+    app.include_router(interview.router)
     _mount_spa(app, settings)
 
     return app

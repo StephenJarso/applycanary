@@ -198,6 +198,22 @@ async def job_digest() -> None:
             await notify.send_digest(session, profile=profile)
 
 
+async def job_embed_new() -> None:
+    """Keep the distributed vector index warm: embed new postings.
+
+    Without this, the semantic "similar jobs" and memory-recall features would
+    miss every posting ingested since the last explicit backfill. Runs far more
+    cheaply than scoring: embedding is one model call per new job, and the
+    function is idempotent (existing embeddings are left untouched).
+    """
+    from app.memory.vectors import backfill_embeddings
+
+    with session_scope() as session:
+        count = await backfill_embeddings(session, limit=100)
+        if count:
+            log.info("embeddings: embedded %d new job(s)", count)
+
+
 async def job_expire_stale() -> None:
     """Mark postings not seen in a fortnight as expired.
 
@@ -258,6 +274,7 @@ def build_scheduler() -> AsyncIOScheduler:
         ("refresh_github", CronTrigger(hour=3, minute=17), job_refresh_github),
         ("digest", CronTrigger(hour=8, minute=3), job_digest),
         ("expire_stale", CronTrigger(hour=4, minute=23), job_expire_stale),
+        ("embed_new", IntervalTrigger(minutes=15, jitter=120), job_embed_new),
     ]
 
     for name, trigger, fn in specs:
