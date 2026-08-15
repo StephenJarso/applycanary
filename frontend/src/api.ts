@@ -216,6 +216,99 @@ export interface JobFilters {
   sort?: "score" | "newest" | "oldest";
 }
 
+export interface VoiceConfig {
+  tts: "polly" | "browser";
+  stt: "transcribe" | "browser";
+  voice_id: string;
+  aws_enabled: boolean;
+}
+
+export interface InterviewQuestion {
+  question: string;
+  expected_key_points: string[];
+  time_minutes: number | null;
+  evaluation_rubric: Record<string, string>;
+}
+
+export interface InterviewTurn {
+  id: number;
+  question_index: number;
+  question: string;
+  expected_key_points: string[];
+  time_minutes: number | null;
+  rubric: Record<string, string>;
+  answer_text: string;
+  score: number | null;
+  feedback: string;
+  strengths: string[];
+  improvements: string[];
+  model_used: string;
+}
+
+export interface InterviewSession {
+  id: number;
+  job_id: number;
+  status: string;
+  mode: string;
+  question_index: number;
+  total_questions: number;
+  avg_score: number | null;
+  summary: Record<string, unknown>;
+  finished: boolean;
+  started_at: string | null;
+  finished_at: string | null;
+}
+
+export interface InterviewState {
+  session: InterviewSession;
+  current_question: InterviewQuestion | null;
+  turn: InterviewTurn | null;
+  memory: Array<{ kind: string; content: string; created_at: string | null }>;
+}
+
+export interface SimilarJob {
+  id: number;
+  title: string;
+  company: string;
+  location: string;
+  is_remote: boolean;
+  source: string;
+  apply_url: string;
+  salary_min: number | null;
+  salary_max: number | null;
+  salary_currency: string;
+  salary_is_estimate: boolean;
+  posted_at: string | null;
+  first_seen_at: string;
+  similarity: number;
+}
+
+export interface MemoryEntry {
+  id: number;
+  kind: string;
+  content: string;
+  metadata: Record<string, unknown>;
+  created_at: string | null;
+}
+
+export interface MemorySession {
+  id: number;
+  job_id: number;
+  status: string;
+  mode: string;
+  avg_score: number | null;
+  summary: Record<string, unknown>;
+  started_at: string | null;
+  finished_at: string | null;
+}
+
+export interface MemoryIndex {
+  entries: MemoryEntry[];
+  sessions: MemorySession[];
+  trend: Array<{ score: number; date: string | null }>;
+  counts: { sessions: number; memories: number };
+}
+
 /** Raised for non-2xx responses, carrying the server's `detail` when present. */
 export class ApiError extends Error {
   constructor(
@@ -303,4 +396,33 @@ export const api = {
   poll: () => request<ActionResult>("/actions/poll", { method: "POST" }),
   score: () => request<ActionResult>("/actions/score", { method: "POST" }),
   syncGithub: () => request<ActionResult>("/actions/github", { method: "POST" }),
+  embedAll: (limit = 100) =>
+    request<{ ok: boolean; embedded: number }>("/actions/embed-all", {
+      method: "POST", body: JSON.stringify({ limit }),
+    }),
+
+  voice: () => request<VoiceConfig>("/interview/voice"),
+  tts: (text: string) =>
+    request<{ audio_b64: string; content_type: string }>("/interview/tts", {
+      method: "POST", body: JSON.stringify({ text }),
+    }),
+  startInterview: (jobId: number, mode: "speech" | "text") =>
+    request<InterviewState>(`/jobs/${jobId}/interview/start`, {
+      method: "POST", body: JSON.stringify({ mode }),
+    }),
+  answerInterview: (
+    jobId: number, sessionId: number,
+    payload: { text?: string; audio_b64?: string; duration_seconds?: number },
+  ) =>
+    request<InterviewState>(`/jobs/${jobId}/interview/sessions/${sessionId}/answer`, {
+      method: "POST", body: JSON.stringify(payload),
+    }),
+  interviewState: (sessionId: number) =>
+    request<InterviewState>(`/interview/sessions/${sessionId}`),
+
+  similarJobs: (jobId: number, limit = 6) =>
+    request<{ jobs: SimilarJob[]; embedded: boolean }>(`/jobs/${jobId}/similar?limit=${limit}`),
+  semanticSearch: (q: string, limit = 12) =>
+    request<{ query: string; jobs: SimilarJob[] }>(`/jobs/search/semantic?q=${encodeURIComponent(q)}&limit=${limit}`),
+  memory: () => request<MemoryIndex>("/memory"),
 };

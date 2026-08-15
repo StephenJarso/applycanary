@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { api } from "../api";
 import { Chips, ErrorBox, Loading, ScoreBadge, formatSalary, relTime } from "../components";
 
@@ -36,6 +36,7 @@ export default function JobDetail() {
   const { id } = useParams();
   const jobId = Number(id);
   const qc = useQueryClient();
+  const navigate = useNavigate();
   const [copied, setCopied] = useState("");
 
   const { data: job, isPending, error } = useQuery({
@@ -98,6 +99,13 @@ export default function JobDetail() {
               Open posting ↗
             </a>
           )}
+          <button
+            onClick={() => navigate(`/job/${job.id}/interview`)}
+            className="btn-primary btn-sm"
+            title="Live mock interview with voice"
+          >
+            🎙 AI Interview
+          </button>
           <button onClick={() => tailor.mutate()} disabled={busy} className="btn-sm">
             {tailor.isPending && <span className="spinner" />} Tailor CV
           </button>
@@ -428,7 +436,43 @@ export default function JobDetail() {
         )}
         <p className="prose">{job.description || "No description captured."}</p>
       </div>
+
+      <SimilarJobs jobId={jobId} />
     </>
+  );
+}
+
+function SimilarJobs({ jobId }: { jobId: number }) {
+  const { data, isPending } = useQuery({
+    queryKey: ["similar", jobId],
+    queryFn: () => api.similarJobs(jobId),
+    enabled: Number.isFinite(jobId),
+  });
+  if (isPending) return null;
+  if (!data || data.jobs.length === 0) return null;
+  return (
+    <div className="card">
+      <h3 className="card-title">
+        Similar roles
+        <span className="chip chip-accent" title="Semantic search over the CockroachDB distributed vector index">
+          vector search
+        </span>
+      </h3>
+      <div className="similar-grid">
+        {data.jobs.map((j) => (
+          <Link key={j.id} to={`/job/${j.id}`} className="similar-card">
+            <div className="cell-title">{j.title}</div>
+            <div className="cell-dim">{j.company}</div>
+            <div className="detail-meta" style={{ marginTop: 6 }}>
+              {j.is_remote ? <span className="chip chip-accent">remote</span> : j.location || "—"}
+              <span className="num" title="Cosine similarity">
+                {Math.round(j.similarity * 100)}% match
+              </span>
+            </div>
+          </Link>
+        ))}
+      </div>
+    </div>
   );
 }
 

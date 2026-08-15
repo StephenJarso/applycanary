@@ -3,6 +3,8 @@ import { Navigate, NavLink, Route, Routes } from "react-router-dom";
 import { api } from "./api";
 import Jobs from "./pages/Jobs";
 import JobDetail from "./pages/JobDetail";
+import InterviewStudio from "./pages/InterviewStudio";
+import Memory from "./pages/Memory";
 import Review from "./pages/Review";
 import Applications from "./pages/Applications";
 import Sources from "./pages/Sources";
@@ -16,6 +18,7 @@ const NAV = [
   { to: "/", label: "Jobs", end: true, countKey: "total" },
   { to: "/review", label: "Review", countKey: "queued" },
   { to: "/applications", label: "Applied", countKey: "applied" },
+  { to: "/memory", label: "Memory", countKey: null },
   { to: "/sources", label: "Sources", countKey: null },
   { to: "/profile", label: "Profile", countKey: null },
 ] as const;
@@ -116,6 +119,8 @@ function Dashboard() {
           <Routes>
             <Route path="/" element={<Jobs />} />
             <Route path="/job/:id" element={<JobDetail />} />
+            <Route path="/job/:id/interview" element={<InterviewStudio />} />
+            <Route path="/memory" element={<Memory />} />
             <Route path="/review" element={<Review />} />
             <Route path="/applications" element={<Applications />} />
             <Route path="/sources" element={<Sources />} />
