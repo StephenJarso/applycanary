@@ -150,22 +150,20 @@ def test_login_and_logout(isolated_db):
     client = TestClient(create_app(), follow_redirects=False)
 
     res_bad = client.post(
-        "/login", data={"username": "me@example.com", "password": "wrong"}
+        "/api/auth/login", json={"email": "me@example.com", "password": "wrong"}
     )
-    assert res_bad.status_code == 303
-    assert "error=" in res_bad.headers["location"]
+    assert res_bad.status_code == 401
     assert SESSION_COOKIE_NAME not in res_bad.cookies
 
     res_good = client.post(
-        "/login", data={"username": "me@example.com", "password": PASSWORD}
+        "/api/auth/login", json={"email": "me@example.com", "password": PASSWORD}
     )
-    assert res_good.status_code == 303
-    assert res_good.headers["location"] == "/"
+    assert res_good.status_code == 200
     assert SESSION_COOKIE_NAME in res_good.cookies
 
     assert client.get("/api/jobs").status_code == 200
 
-    client.post("/logout")
+    client.post("/api/auth/logout")
     assert client.get("/api/jobs").status_code == 401
 
 
@@ -173,10 +171,10 @@ def test_login_is_case_insensitive_on_email(isolated_db):
     _make_user(email="me@example.com")
     client = TestClient(create_app(), follow_redirects=False)
     res = client.post(
-        "/login", data={"username": "ME@Example.COM ", "password": PASSWORD}
+        "/api/auth/login", json={"email": "ME@Example.COM ", "password": PASSWORD}
     )
-    assert res.status_code == 303
-    assert res.headers["location"] == "/"
+    assert res.status_code == 200
+    assert SESSION_COOKIE_NAME in res.cookies
 
 
 # ----------------------------------------------------------------- register
@@ -191,15 +189,15 @@ def _make_invite(code: str = "GOODCODE") -> None:
 def test_register_requires_valid_invite(isolated_db):
     client = TestClient(create_app(), follow_redirects=False)
     res = client.post(
-        "/register",
-        data={
+        "/api/auth/register",
+        json={
             "email": "new@example.com",
             "password": "a-long-enough-pw",
             "invite_code": "NOPE",
         },
     )
-    assert res.status_code == 303
-    assert "invite" in res.headers["location"].lower()
+    assert res.status_code == 400
+    assert "invite" in res.json()["detail"].lower()
 
     with Session(engine) as session:
         assert session.exec(select(User)).first() is None
@@ -210,15 +208,14 @@ def test_register_consumes_invite_and_creates_profile(isolated_db):
     client = TestClient(create_app(), follow_redirects=False)
 
     res = client.post(
-        "/register",
-        data={
+        "/api/auth/register",
+        json={
             "email": "New@Example.com",
             "password": "a-long-enough-pw",
             "invite_code": "GOODCODE",
         },
     )
-    assert res.status_code == 303
-    assert res.headers["location"] == "/profile"
+    assert res.status_code == 201
     assert SESSION_COOKIE_NAME in res.cookies
 
     with Session(engine) as session:
@@ -239,11 +236,12 @@ def test_invite_cannot_be_reused(isolated_db):
     client = TestClient(create_app(), follow_redirects=False)
     payload = {"password": "a-long-enough-pw", "invite_code": "GOODCODE"}
 
-    first = client.post("/register", data={"email": "one@example.com", **payload})
-    assert first.headers["location"] == "/profile"
+    first = client.post("/api/auth/register", json={"email": "one@example.com", **payload})
+    assert first.status_code == 201
 
-    second = client.post("/register", data={"email": "two@example.com", **payload})
-    assert "invite" in second.headers["location"].lower()
+    second = client.post("/api/auth/register", json={"email": "two@example.com", **payload})
+    assert second.status_code == 400
+    assert "invite" in second.json()["detail"].lower()
 
     with Session(engine) as session:
         assert len(session.exec(select(User)).all()) == 1
@@ -261,14 +259,15 @@ def test_expired_invite_is_refused(isolated_db):
 
     client = TestClient(create_app(), follow_redirects=False)
     res = client.post(
-        "/register",
-        data={
+        "/api/auth/register",
+        json={
             "email": "late@example.com",
             "password": "a-long-enough-pw",
             "invite_code": "STALE",
         },
     )
-    assert "invite" in res.headers["location"].lower()
+    assert res.status_code == 400
+    assert "invite" in res.json()["detail"].lower()
 
 
 def test_register_rejects_duplicate_email_and_short_password(isolated_db):
@@ -277,20 +276,21 @@ def test_register_rejects_duplicate_email_and_short_password(isolated_db):
     client = TestClient(create_app(), follow_redirects=False)
 
     dup = client.post(
-        "/register",
-        data={
+        "/api/auth/register",
+        json={
             "email": "taken@example.com",
             "password": "a-long-enough-pw",
             "invite_code": "GOODCODE",
         },
     )
-    assert "already" in dup.headers["location"].lower()
+    assert dup.status_code == 409
+    assert "already" in dup.json()["detail"].lower()
 
     short = client.post(
-        "/register",
-        data={"email": "new@example.com", "password": "short", "invite_code": "GOODCODE"},
+        "/api/auth/register",
+        json={"email": "new@example.com", "password": "short", "invite_code": "GOODCODE"},
     )
-    assert "10" in short.headers["location"]
+    assert short.status_code == 422  # pydantic min_length=10 on password
 
     # Neither failure may burn the invite.
     with Session(engine) as session:

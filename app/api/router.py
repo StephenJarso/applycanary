@@ -16,7 +16,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, UploadFile
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 from sqlmodel import Session, func, select
@@ -610,7 +610,6 @@ def get_profile(
     session: Session = Depends(get_session),
     user: User = Depends(current_user),
 ) -> ProfileOut:
-    from app.pipeline.keywords import extract_skills
 
     profile = session.exec(
         select(Profile).where(Profile.user_id == user.id)
