@@ -11,6 +11,41 @@ declare global {
   }
 }
 
+/** Voice names that are reliably female on the major browsers/OSes. */
+const FEMALE_VOICE_HINTS = [
+  "samantha", "google uk english female", "google us english",
+  "microsoft zira", "microsoft aria", "microsoft jenny", "karen", "moira",
+  "tessa", "serena", "victoria", "allison", "ava", "susan", "female",
+  "salli", "joanna", "aria", "jenny",
+];
+
+function pickFemaleVoice(): SpeechSynthesisVoice | undefined {
+  const voices = speechSynthesis.getVoices();
+  const en = voices.filter((v) => v.lang.toLowerCase().startsWith("en"));
+  if (en.length === 0) return undefined;
+  const hit = (name: string) => FEMALE_VOICE_HINTS.some((h) => name.includes(h));
+  return (
+    en.find((v) => hit(v.name.toLowerCase())) ??
+    en.find((v) => v.localService) ??
+    en[0]
+  );
+}
+
+async function ensureVoices(): Promise<SpeechSynthesisVoice[]> {
+  if (speechSynthesis.getVoices().length > 0) return speechSynthesis.getVoices();
+  // getVoices() is empty until the first voiceschanged event fires; wait for it
+  // (with a timeout guard for browsers that never dispatch it).
+  await new Promise<void>((resolve) => {
+    const handler = () => {
+      speechSynthesis.removeEventListener("voiceschanged", handler);
+      resolve();
+    };
+    speechSynthesis.addEventListener("voiceschanged", handler);
+    setTimeout(resolve, 1000);
+  });
+  return speechSynthesis.getVoices();
+}
+
 interface SpeechRecognitionLike {
   lang: string;
   continuous: boolean;
@@ -161,9 +196,10 @@ export default function InterviewStudio() {
         const audio = new Audio(`data:${content_type};base64,${audio_b64}`);
         await audio.play();
       } else {
+        await ensureVoices();
         const utter = new SpeechSynthesisUtterance(text);
-        const preferred = speechSynthesis.getVoices().find((v) =>
-          v.lang.startsWith("en") && v.localService);
+        // Prefer a female voice so the interviewer consistently sounds female.
+        const preferred = pickFemaleVoice();
         if (preferred) utter.voice = preferred;
         speechSynthesis.cancel();
         speechSynthesis.speak(utter);
@@ -283,7 +319,9 @@ export default function InterviewStudio() {
             ) : null}
             {voice && (
               <span className="chip chip-accent" title="Which engines power the session">
-                {voice.tts === "polly" ? "Polly voice" : "Browser voice"}
+                {voice.tts === "polly"
+                  ? `Polly voice${voice.voice_id ? ` · ${voice.voice_id}` : ""}`
+                  : "Browser voice · female"}
                 {" · "}
                 {voice.stt === "transcribe" ? "Transcribe hearing" : "Browser hearing"}
               </span>
