@@ -1,5 +1,11 @@
 # Architecture
 
+> **Note:** this document describes the core application pipeline. For the
+> current architecture — CockroachDB as the memory layer (vector indexing,
+> interview sessions, agent memory) and the AWS deployment — see the
+> [README](../README.md#architecture) and
+> [deploy/aws/README.md](../deploy/aws/README.md).
+
 ## What this system does
 
 Polls company job boards, deduplicates the results, scores each posting against

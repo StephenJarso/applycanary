@@ -1,255 +1,221 @@
 # ApplyCanary
 
-Self-hosted job discovery, ATS resume tailoring, and application tracking. Runs on
-your own machine, polls job boards around the clock, scores openings against your
-resume, and prepares tailored applications for you to approve.
+**Your job search, remembered.** An agentic job-search assistant that finds,
+scores, and tailors applications — then practises the interview with you out
+loud, **remembering you across sessions** because its memory lives in
+CockroachDB.
+
+Built for the CockroachDB × AWS hackathon: CockroachDB is the agent's
+persistent memory layer (transactions, **distributed vector indexing**, and
+long-term recall), and AWS powers the models and the voice (Bedrock, Polly,
+Transcribe, S3, ECS).
+
+> **Hackathon submission details:** [docs/HACKATHON.md](docs/HACKATHON.md) ·
+> demo video script: [docs/DEMO.md](docs/DEMO.md) · MIT licensed.
+
+---
+
+## What it does
+
+**Finds jobs.** Ten connectors — company ATS boards (Greenhouse, Lever, Ashby,
+SmartRecruiters, Workable) polled every 5 minutes for the apply-early edge, plus
+five aggregators. Dedup collapses cross-posted roles into one row.
+
+**Scores against *your* resume.** Two tiers: free local filters (hard
+knockouts, keyword overlap) then an LLM that reasons about fit using the actual
+job description and your actual experience. Grounded, calibrated, and cached.
+
+**Tailors CVs — truthfully.** Rewrites your resume against the posting with
+your GitHub repos as evidence, then a separate **truthcheck** pass blocks any
+claim that isn't backed by your real history. An unverified draft can never be
+submitted.
+
+**Practises the interview — out loud.** The AI Interview Studio is a live mock
+interview for a real posting. A spoken coach asks the questions an interviewer
+would, hears your answers (Amazon Transcribe, or browser speech), scores each
+one against the posting's rubric, and gives specific coaching. No API keys? It
+still works — browser speech synthesis/recognition take over automatically.
+
+**Remembers you.** Every session is stored as transactional state *and* as an
+embedded memory. The coach semantically recalls your past feedback before each
+new question — "you rushed the last behavioural answer" — and the Memory page
+shows your improvement trend. Memory isn't a feature here; it's the point.
+
+---
+
+## Architecture
+
+```mermaid
+flowchart LR
+    subgraph Browser
+        UI[React dashboard]
+    end
+    subgraph AWS[Amazon ECS Fargate]
+        API[FastAPI agent]
+        SCH[Scheduler]
+    end
+    UI -->|/api| API
+    API -->|transcript| B[Amazon Transcribe]
+    API -->|TTS| P[Amazon Polly]
+    API -->|LLM + embeddings| BR[Amazon Bedrock]
+    API -->|audio| S3[(Amazon S3)]
+    API <-->|postgres wire| CR[(CockroachDB Serverless)]
+    CR -->|VECTOR + vec_cosine_ops index| IDX[(job_embedding, agent_memory)]
+    CR -->|transactions| TX[(jobs, sessions, turns, applications)]
+    MCP[MCP Server read-only] -.inspect.-> CR
+    CCLOUD[ccloud CLI] -.provision/backup/audit.-> CR
+```
+
+## The CockroachDB memory layer
+
+CockroachDB is the database, the vector store, and the agent's long-term
+memory — one system, no consistency gaps:
+
+| Table | Role |
+|---|---|
+| `job`, `job_score`, `application`, … | Transactional state: the shared job pool and per-user pipelines |
+| `interview_session`, `interview_turn` | Interview state machine — close the tab, resume mid-question |
+| `job_embedding` | **Native `VECTOR(1024)` column** with a distributed `vec_cosine_ops` index — semantic "similar roles" and job search are SQL queries |
+| `agent_memory` | Long-term memories (interview summaries, coaching feedback) with embeddings, recalled **semantically** before each session |
+
+Semantic search runs in the database: `1 - vec_cosine_distance(embedding, :q::vector)`.
+On SQLite (dev/tests) the same code falls back to Python distance, so the
+feature set is identical and the test suite stays hermetic.
+
+The cluster is operated agent-first:
+- **ccloud CLI** (`scripts/ccloud/`) — provision, status, backups, audit logs;
+  JSON on every command, service-account RBAC.
+- **CockroachDB Cloud Managed MCP Server** (`mcp/`) — read-only, fully audited
+  agent access to inspect schema and verify the vector index.
+- **CockroachDB Agent Skills** (`AGENTS.md`) — the official
+  `cockroachlabs/cockroachdb-skills` wired in so any agent working here
+  operates the memory layer correctly.
+
+## AWS services
+
+| Service | Role |
+|---|---|
+| **Amazon Bedrock** | Claude inference (in the multi-provider LLM chain) + Titan embeddings for the vector index |
+| **Amazon Polly** | Neural TTS — the spoken interviewer |
+| **Amazon Transcribe** | Streaming STT — hears spoken answers |
+| **Amazon S3** | Versioned, private interview audio |
+| **Amazon ECS / Fargate** | The agent itself, behind an ALB (see `deploy/aws/`) |
+| **CloudWatch** | Logs, metrics, ALB access |
+
+Every AWS feature degrades gracefully: no credentials, and the app still runs
+on Gemini/OpenRouter/Groq/Ollama, browser speech, local embedding, and local
+disk. With credentials it lights up the full stack.
+
+---
 
 ## Quick start
 
 ```bash
 python3 -m venv .venv
 .venv/bin/pip install -r requirements.txt
-cp .env.example .env        # then edit: add ANTHROPIC_API_KEY
+cp .env.example .env        # add an LLM key: GEMINI_API_KEY or AWS_ACCESS_KEY_ID
 
-# Build the React dashboard (optional — the app runs without it)
 cd frontend && npm ci && npm run build && cd ..
 
 .venv/bin/python run.py
 ```
 
-Or with Docker, which builds the frontend for you:
+Or with Docker (builds the frontend for you):
 
 ```bash
-cp .env.example .env        # then edit: add ANTHROPIC_API_KEY
+cp .env.example .env
 docker compose up -d
-docker compose logs -f
 ```
 
-Then open:
+Then open **http://127.0.0.1:8000** (React dashboard) or
+**http://127.0.0.1:8000/docs** (API reference). Create the first admin account
+(which also prints an invite code) with `scripts/bootstrap_admin.py`, then
+register in the UI, upload your resume in **Profile**, and polling starts on
+its own.
 
-- **http://127.0.0.1:8000/** — the React dashboard
-- **http://127.0.0.1:8000/docs** — interactive API reference
+**Interview studio:** open any job → **🎙 AI Interview**. Voice works in
+Chrome/Edge out of the box; with `AWS_*` set you get Polly's neural voice and
+Transcribe-grade accuracy.
 
-Go to **Profile**, upload your resume, and set your target titles and locations.
-Polling starts on its own.
+## Production: CockroachDB + AWS
 
-Nothing is submitted anywhere until you approve it. See [Auto-submit](#auto-submit).
-
-## Interfaces
-
-The React frontend is the application UI and the JSON API is its contract (`/api/*`).
-
-**React dashboard at `/`.** It is the sole production UI. Build output stays in `frontend/dist`, alongside its source.
-
-Frontend development, against the real backend rather than mocks:
-
-```bash
-cd frontend && npm run dev      # :5173, proxies /api to :8000
-```
-
-## What it does
-
-**Finds jobs.** Ten connectors, none needing an API key.
-
-*Company ATS boards* — Greenhouse, Lever, Ashby, SmartRecruiters, Workable —
-are polled every 5 minutes. This is the tight loop that gets you in early, since
-a posting appears on the company's own board before it propagates anywhere else.
-Add boards in `companies.yaml`.
-
-*Aggregators* — RemoteOK, Remotive, Jobicy, Himalayas, Arbeitnow — are polled
-every 30 minutes. Wider reach, lower signal, and heavy overlap with the ATS
-boards, which dedup collapses. Jobicy and Himalayas return structured salary;
-the rest report it as prose or not at all.
-
-Adding a board is one file in `app/sources/` plus a line in
-`app/sources/__init__.py`. Verify any endpoint before relying on it:
-
-```bash
-python3 scripts/verify_sources.py
-```
-
-Tokens go stale — `lever: netflix` was already a 404 the first time it ran — so
-that script exists to tell you whether a source broke or hiring just went quiet.
-
-**Deduplicates.** The same job cross-posted to four boards should appear once.
-Three layers run in order: exact URL match, a normalized `company|title|location`
-key, then fuzzy title similarity within a company. Details in
-`app/pipeline/dedup.py`. On a live run across all ten sources, 1,352 fetched
-postings collapsed to 1,055 stored with 297 recorded as duplicate sightings.
-
-**Scores in two tiers.** Every job runs through free local filters first — hard
-knockouts (excluded companies, salary floor, remote-only) and keyword overlap
-against your resume. Only survivors go to the LLM for real reasoning about fit.
-The job description is the cached prefix in each request, so re-scoring against
-the same posting is cheap.
-
-**Checks ATS compliance.** A deterministic rule engine, not a language model,
-checks the things that actually break resume parsers: multi-column layouts,
-tables, images, missing section headers, keyword gaps against the job description,
-unparseable dates. Rules live in `app/pipeline/ats_rules.py`.
-
-**Tailors your CV — truthfully.** When your resume falls short, the tailoring pass
-rewrites it against the job description using your public GitHub repos as evidence.
-Then a separate truthcheck pass compares every claim in the draft against your
-original resume and GitHub data. A draft that fails truthcheck is blocked from
-submission, not flagged for you to catch later. This is the constraint that keeps
-the feature honest: it can surface real skills you under-sold, and it cannot invent
-experience you do not have.
-
-**Prepares applications.** Renders a plain, ATS-safe resume plus a cover letter,
-and answers standard form fields from your profile.
-
-**Emails you.** A daily digest of what was found, scored, and applied to, plus
-immediate alerts for exceptional matches (default: score >= 90).
-
-**Interview prep.** Per-job likely questions, talking points drawn from your actual
-projects, and questions to ask them.
-
-## Auto-submit
-
-Off by default. Every prepared application waits in **Review** for you.
-
-Turning on `ENABLE_AUTO_SUBMIT=true` lets the scheduler submit applications scoring
-at or above `AUTO_SUBMIT_MIN_SCORE` (default 80) without asking, capped at
-`DAILY_APPLY_CAP` per 24 hours. Before you enable it, sit with the review queue for
-a few days and read what it produces. An automated application is still an
-application with your name on it, and a bad one is not free — some companies keep
-a permanent record.
-
-The truthcheck gate applies in both modes. Nothing unverified goes out either way.
+1. **Provision the cluster** — the memory layer:
+   ```bash
+   export CCLOUD_API_KEY=... CCLOUD_API_SECRET=...
+   ./scripts/ccloud/provision.sh        # cluster + DB + backups, prints DATABASE_URL
+   ```
+2. **Point the app at it**:
+   ```bash
+   DATABASE_URL='postgresql://user:password@host:26257/applycanary?sslmode=require' \
+   SECRET_KEY=$(python3 -c 'import secrets; print(secrets.token_urlsafe(48))') \
+   python run.py
+   ```
+   On boot, `init_db()` creates the schema — including the `VECTOR(1024)`
+   columns and the `vec_cosine_ops` indexes — and `sync_schema()` reconciles
+   missing columns idempotently.
+3. **Deploy on AWS** (ECS Fargate + ALB + S3 + IAM for Bedrock/Polly/Transcribe):
+   see [deploy/aws/README.md](deploy/aws/README.md). Secrets go in SSM, never
+   in git or the image.
+4. **Connect your agent to the cluster** (read-only, audited): see
+   [mcp/README.md](mcp/README.md).
 
 ## Configuration
 
-Everything is environment variables; see `.env.example` for the annotated list.
-The ones that matter most:
+Everything is environment variables; see `.env.example` for the annotated
+list. The ones that matter most:
 
 | Variable | Default | Notes |
 |---|---|---|
-| `ANTHROPIC_API_KEY` | — | Without it, scoring is keyword-only and tailoring is off |
-| `GITHUB_USERNAME` | — | Evidence source for tailoring |
-| `ENABLE_AUTO_SUBMIT` | `false` | See above |
-| `AUTO_SUBMIT_MIN_SCORE` | `80` | Only with auto-submit on |
-| `DAILY_APPLY_CAP` | `20` | Hard ceiling per 24h |
-| `POLL_CURATED_MINUTES` | `5` | Tighten at your own risk of rate limits |
-| `SMTP_HOST` / `SMTP_USER` / `SMTP_PASSWORD` / `DIGEST_TO` | — | Unset means digests are logged, not sent |
-| `HOST` | `127.0.0.1` | Read the security note before changing |
-
-## Running 24/7
-
-The scheduler runs in the same process as the web app, so the app must stay up.
-On a laptop that sleeps, it pauses with the machine. For genuine round-the-clock
-coverage, run it on a box that stays awake — a cheap VPS or a Raspberry Pi is
-plenty.
-
-### With Docker
-
-```bash
-docker compose up -d          # start
-docker compose logs -f        # watch
-docker compose restart        # after editing .env
-docker compose down           # stop (data survives)
-```
-
-One container runs both the dashboard and the scheduler. `restart:
-unless-stopped` brings it back after a reboot.
-
-The database, uploaded resumes and generated CVs live in the named volume
-`applycanary-data`, so rebuilds do not lose your application history. Back it up
-with:
-
-```bash
-docker run --rm -v applycanary-data:/data -v "$PWD":/backup alpine \
-  tar czf /backup/applycanary-backup.tar.gz -C /data .
-```
-
-`docker compose down -v` deletes that volume and everything in it.
-
-Two details worth knowing:
-
-- **The published port is the security boundary.** The container binds `0.0.0.0`
-  internally because `127.0.0.1` inside a container is unreachable from the
-  host. Compose publishes it as `127.0.0.1:8000:8000`, so only this machine can
-  reach it. Changing that to `8000:8000` exposes an unauthenticated dashboard
-  holding your resume to anything that can route to the host.
-- **Set `TZ`.** Containers default to UTC, and the daily digest, GitHub refresh
-  and expiry jobs run on cron triggers in local time. Left unset, an 08:03
-  digest arrives at 11:03 in Nairobi. `.env.example` defaults to
-  `Africa/Nairobi`.
-
-`companies.yaml` is bind-mounted read-only, so you can edit the curated board
-list and `docker compose restart` without rebuilding.
-
-### With systemd
-
-Under systemd instead:
-
-```ini
-[Unit]
-Description=ApplyCanary
-After=network-online.target
-
-[Service]
-WorkingDirectory=/home/YOU/applycanary
-ExecStart=/home/YOU/applycanary/.venv/bin/python run.py
-Restart=always
-User=YOU
-
-[Install]
-WantedBy=multi-user.target
-```
-
-`GET /health` reports scheduler state and job counts for external monitoring.
+| `DATABASE_URL` | `sqlite:///./data/applycanary.db` | CockroachDB: `postgresql://…?sslmode=require` |
+| `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` | — | Enables Bedrock + Polly + Transcribe + S3; IAM in production |
+| `AWS_REGION` | `us-east-1` | Keep near the CockroachDB cluster |
+| `BEDROCK_MODEL_ID` | Claude Sonnet 3.5 | Foundation model for scoring/tailoring/interview |
+| `BEDROCK_EMBEDDING_MODEL_ID` | Titan v2 | Embeddings for the vector index (1024 dims) |
+| `S3_BUCKET` | — | Interview audio storage |
+| `COCKROACH_MCP_TOKEN` | — | MCP server token (agent access to the cluster) |
+| `GEMINI_API_KEY` / `OPENROUTER_API_KEY` / `GROQ_API_KEY` | — | Alternative LLM providers (chain falls through) |
+| `ENABLE_AUTO_SUBMIT` | `false` | Live application submission — off unless you mean it |
+| `SECRET_KEY` | built-in (refused on public bind) | Session signing; random ≥32 bytes in production |
 
 ## Security
 
-There is no login screen. The database holds your resume, contact details, and
-application history, and `.env` holds your API key. The app binds `127.0.0.1` for
-that reason. If you need remote access, put it behind a reverse proxy with
-authentication or reach it over a VPN or SSH tunnel — do not bind `0.0.0.0` and
-leave it open. Startup warns you if `HOST` is not loopback.
-
-Everything stays local. Job descriptions and your resume go to the Anthropic API
-for scoring and tailoring; nothing else leaves the machine.
-
-## Boards and terms of service
-
-Curated connectors use documented public JSON APIs. Aggregator connectors are
-polite: identified user agent, conservative intervals, no parallel hammering.
-Some job sites prohibit automated access in their terms, and some ATS platforms
-prohibit automated submission. Those terms are yours to honor. `companies.yaml`
-is where you decide who to poll.
+- Per-user scoping on every handler; scrypt password hashing; signed session
+  tokens invalidated on password change; invite-gated registration.
+- No auto-submission unless you turn it on, and the truthcheck gate blocks
+  unverifiable CVs in both modes.
+- Secrets in SSM, never in git or the image; private, versioned S3;
+  least-privilege IAM; read-only audited MCP access.
+- `/health` reports scheduler state so a hung agent fails the load-balancer
+  check. Backups are enabled at provision time and on-demand scripted.
 
 ## Tests
 
 ```bash
-.venv/bin/python -m pytest -q
+.venv/bin/python -m pytest -q        # 193 tests: auth, dedup, ATS, truthcheck,
+                                     # interview coach, vector search, memory
+.venv/bin/python -m ruff check app/ tests/ scripts/
+cd frontend && npm run build          # TypeScript + Vite
 ```
 
-Covers dedup collision behavior, ATS rule checks, truthcheck rejection of
-fabricated claims, connector parsing against recorded fixtures, and the scoring
-knockout gates. Tests make no network calls.
+Tests always run on a throwaway SQLite database (`tests/conftest.py` redirects
+it) — never on your real data.
 
-## Layout
+## Repository layout
 
 ```
 app/
-  config.py         settings
-  models.py         SQLModel tables
-  scheduler.py      APScheduler wiring
-  sources/          one module per job board
-  pipeline/         dedup, score, ats_rules, github, tailor, interview
-  resume/           parse, render
-  apply/            form fill, submitters, runner
-  notify/           email digest and alerts
-  web/
-    api.py          JSON API consumed by both UIs
-    routes.py       server-rendered Jinja dashboard
-    templates/      Jinja templates
-    dist/           built React bundle (generated, gitignored)
+  db.py            engine + VectorType + vector-index bootstrap (CockroachDB/SQLite)
+  models.py        SQLModel schema incl. job_embedding, agent_memory, interview_*
+  memory/          embeddings (Bedrock Titan → local), vector search, memory writes
+  speech/          interview coach state machine, Polly TTS, Transcribe STT
+  llm/             multi-provider chain incl. Amazon Bedrock
+  api/             REST API (jobs, profile, interview, memory, similar, search)
+  scheduler.py     background jobs incl. embedding backfill
 frontend/
-  src/api.ts        typed client mirroring the Pydantic models
-  src/pages/        Jobs, JobDetail, Review, Applications, Sources, Profile
-  src/styles.css    design tokens, dark-first
-companies.yaml      boards to poll
-run.py              entrypoint
+  src/pages/       Jobs, JobDetail, InterviewStudio, Memory, …
+mcp/               CockroachDB Cloud Managed MCP server config + docs
+scripts/ccloud/    ccloud CLI: provision, status, backup, audit
+deploy/aws/        Terraform: ECS Fargate + ALB + S3 + IAM
+docs/              HACKATHON.md, DEMO.md, plus ops guides
+AGENTS.md          CockroachDB Agent Skills wiring
 ```
