@@ -291,12 +291,17 @@ async def score_pending(session: Session, *, user_id: int, limit: int = 25) -> i
             state = user_job(session, user_id, job.id)
             state.status = JobStatus.FAILED
             session.add(state)
+            # Commit per item: with tier-2 awaiting LLM calls while holding this
+            # session, an open SQLite write transaction would block every other
+            # writer (login, polling) for the whole batch.
+            session.commit()
             continue
 
         _persist_decision(session, job, decision, user_id=user_id)
         scored += 1
+        # Same reasoning: release the write lock before the next job's LLM call.
+        session.commit()
 
-    session.commit()
     return scored
 
 
