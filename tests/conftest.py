@@ -27,3 +27,19 @@ if str(ROOT) not in sys.path:
 _TMP_DATA_DIR = tempfile.mkdtemp(prefix="applycanary-tests-")
 os.environ["DATA_DIR"] = _TMP_DATA_DIR
 os.environ["DATABASE_URL"] = f"sqlite:///{Path(_TMP_DATA_DIR) / 'test.db'}"
+
+# Blank the LLM provider env vars so the suite never makes paid API calls,
+# even when a developer's .env carries real keys (this one now does).
+# pydantic-settings treats an env var that exists -- even empty -- as
+# authoritative over the .env file, so setting these to "" forces every
+# provider off and keeps the suite hermetic and fast.
+for _k in (
+    "XAI_API_KEY",
+    "GEMINI_API_KEY",
+    "OPENROUTER_API_KEY",
+    "GROQ_API_KEY",
+    "OLLAMA_HOST",
+    "ANTHROPIC_API_KEY",
+    "AWS_ACCESS_KEY_ID",
+):
+    os.environ[_k] = ""
