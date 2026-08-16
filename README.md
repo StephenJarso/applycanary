@@ -21,6 +21,14 @@ Transcribe, S3, ECS).
 SmartRecruiters, Workable) polled every 5 minutes for the apply-early edge, plus
 five aggregators. Dedup collapses cross-posted roles into one row.
 
+**Hunts *your* roles specifically.** Role discovery builds queries from your
+target titles, skills and GitHub evidence and actively searches Adzuna + the
+web for them (every 6 hours, plus a "Discover roles for me" button) — so a Go
+developer actually sees Go roles, not just whatever the configured boards
+happen to carry. Search is tokenized across title/company/description, so
+"go developer" finds "Senior Golang Engineer" and surfaces matches even before
+the scheduler has scored them.
+
 **Scores against *your* resume.** Two tiers: free local filters (hard
 knockouts, keyword overlap) then an LLM that reasons about fit using the actual
 job description and your actual experience. Grounded, calibrated, and cached.
@@ -40,6 +48,13 @@ still works — browser speech synthesis/recognition take over automatically.
 embedded memory. The coach semantically recalls your past feedback before each
 new question — "you rushed the last behavioural answer" — and the Memory page
 shows your improvement trend. Memory isn't a feature here; it's the point.
+
+**Emails you at your threshold.** Set an alert percentage on your profile
+(default 90) — any posting scoring at/above it is emailed to *you* the moment
+it's found (profile email → account email → your digest override), and a
+per-user daily digest summarises applications, the review queue and new
+matches. Per-user filtering means one user's activity never leaks into
+another's mail.
 
 ---
 
@@ -106,6 +121,24 @@ Every AWS feature degrades gracefully: no credentials, and the app still runs
 on Gemini/OpenRouter/Groq/Ollama, browser speech, local embedding, and local
 disk. With credentials it lights up the full stack.
 
+### Free, never-exhausted LLM option: local inference
+
+The provider chain is resilient: **xAI Grok** (OpenAI-compatible, `grok-4.6`)
+→ Gemini free tier → Groq free tier → OpenRouter `:free` models → local
+**Ollama** → Anthropic → Bedrock. Each provider carries a circuit breaker (bad
+keys/quota walls are cooled down for minutes instead of retried into a storm),
+so a dead key can never stall the scheduler or lock the database. **Ollama is
+the only option that genuinely never runs out** — it's local, no quota, no
+rate limit:
+
+```bash
+ollama pull llama3.1:8b
+OLLAMA_HOST=http://localhost:11434 .venv/bin/python run.py
+```
+
+With no LLM at all the app still works: keyword scoring, rule-based ATS
+tailoring (with the same truthcheck gate) and heuristic interview coaching.
+
 ---
 
 ## Quick start
@@ -113,7 +146,7 @@ disk. With credentials it lights up the full stack.
 ```bash
 python3 -m venv .venv
 .venv/bin/pip install -r requirements.txt
-cp .env.example .env        # add an LLM key: GEMINI_API_KEY or AWS_ACCESS_KEY_ID
+cp .env.example .env        # add an LLM key: XAI_API_KEY, GEMINI_API_KEY, ...
 
 cd frontend && npm ci && npm run build && cd ..
 
@@ -173,8 +206,11 @@ list. The ones that matter most:
 | `BEDROCK_EMBEDDING_MODEL_ID` | Titan v2 | Embeddings for the vector index (1024 dims) |
 | `S3_BUCKET` | — | Interview audio storage |
 | `COCKROACH_MCP_TOKEN` | — | MCP server token (agent access to the cluster) |
+| `XAI_API_KEY` | — | xAI Grok — tried first (OpenAI-compatible; `grok-4.6`), needs credits on the team |
 | `GEMINI_API_KEY` / `OPENROUTER_API_KEY` / `GROQ_API_KEY` | — | Alternative LLM providers (chain falls through) |
 | `ENABLE_AUTO_SUBMIT` | `false` | Live application submission — off unless you mean it |
+| `OLLAMA_HOST` | `http://localhost:11434` | Local, quota-free LLM — the "never runs out" option |
+| `POLLY_VOICE_ID` | `Joanna` (female) | Interviewer voice; browser fallback also prefers female voices |
 | `SECRET_KEY` | built-in (refused on public bind) | Session signing; random ≥32 bytes in production |
 
 ## Security
@@ -191,8 +227,9 @@ list. The ones that matter most:
 ## Tests
 
 ```bash
-.venv/bin/python -m pytest -q        # 193 tests: auth, dedup, ATS, truthcheck,
-                                     # interview coach, vector search, memory
+.venv/bin/python -m pytest -q        # 215 tests: auth, dedup, ATS, truthcheck,
+                                     # interview coach, vector search, memory,
+                                     # search, discovery, email, LLM fallback
 .venv/bin/python -m ruff check app/ tests/ scripts/
 cd frontend && npm run build          # TypeScript + Vite
 ```
@@ -208,7 +245,8 @@ app/
   models.py        SQLModel schema incl. job_embedding, agent_memory, interview_*
   memory/          embeddings (Bedrock Titan → local), vector search, memory writes
   speech/          interview coach state machine, Polly TTS, Transcribe STT
-  llm/             multi-provider chain incl. Amazon Bedrock
+  llm/             multi-provider chain incl. Amazon Bedrock + circuit breaker
+  pipeline/discover.py  role-driven discovery (target titles + skills + GitHub)
   api/             REST API (jobs, profile, interview, memory, similar, search)
   scheduler.py     background jobs incl. embedding backfill
 frontend/
