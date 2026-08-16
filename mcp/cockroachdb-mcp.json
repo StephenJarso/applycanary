@@ -1,0 +1,15 @@
+{
+  "//": "ApplyCanary → CockroachDB Cloud Managed MCP Server (read-only by default).",
+  "//2": "1. Create the MCP server in the CockroachDB Cloud Console: Cluster → MCP Server → Create.",
+  "//3": "2. Copy the connection token into COCKROACH_MCP_TOKEN (or .env).",
+  "//4": "3. Point your agent at this file (Claude Code: claude mcp add cockroachdb -f mcp/cockroachdb-mcp.json).",
+  "mcpServers": {
+    "cockroachdb": {
+      "type": "http",
+      "url": "https://cockroachlabs.cloud/api/v2/mcp",
+      "headers": {
+        "Authorization": "Bearer ${COCKROACH_MCP_TOKEN}"
+      }
+    }
+  }
+}
