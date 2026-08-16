@@ -16,10 +16,11 @@ import getpass
 import os
 import sys
 
+from sqlmodel import select
+
 from app.auth import generate_invite_code, hash_password
 from app.db import init_db, session_scope
 from app.models import InviteCode, Profile, User, utcnow
-from sqlmodel import select
 
 
 def main() -> int:
