@@ -56,6 +56,10 @@ class Settings(BaseSettings):
     gemini_api_key: str = ""
     gemini_model: str = "gemini-3.5-flash-lite"
     gemini_tailor_model: str = "gemini-3.5-flash-lite"
+    # 0 = disable chain-of-thought on Gemini models that support thinking
+    # (e.g. gemini-3.5-flash). Non-thinking models like flash-lite reject the
+    # field, so the client falls back to sending it without thinkingConfig.
+    gemini_thinking_budget: int = 0
 
     openrouter_api_key: str = ""
     openrouter_triage_model: str = "openai/gpt-4o-mini"
