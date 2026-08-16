@@ -188,6 +188,23 @@ async def test_xai_provider_wiring(monkeypatch):
     assert captured["json"]["response_format"] == {"type": "json_object"}
 
 
+@pytest.mark.asyncio
+async def test_provider_pacing_spaces_attempts(monkeypatch):
+    """Calls to the same provider are spaced so free-tier bursts do not 429."""
+    sleeps: list[float] = []
+
+    async def fake_sleep(seconds: float) -> None:
+        sleeps.append(seconds)
+
+    monkeypatch.setattr("app.llm.client._sleep", fake_sleep)
+    c = LlmClient()
+    await c._pace("gemini")  # first attempt: nothing to space against
+    assert sleeps == []
+    await c._pace("gemini")  # immediate second attempt: must wait
+    assert len(sleeps) == 1
+    assert sleeps[0] >= 3.5
+
+
 def test_parse_xai_response():
     payload = {
         "choices": [{"message": {"content": "{\"ok\": true}"},
