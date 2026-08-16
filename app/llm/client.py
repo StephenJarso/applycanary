@@ -1,13 +1,23 @@
 """Multi-provider LLM client with automatic fallback chain.
 
 Provider order (tried sequentially until one succeeds):
-1. Gemini (primary) - needs GEMINI_API_KEY
-2. OpenRouter (free models) - needs OPENROUTER_API_KEY
-3. Groq (generous free tier) - needs GROQ_API_KEY
-4. Ollama (local, unlimited) - needs OLLAMA_HOST
+1. xAI Grok - needs XAI_API_KEY (OpenAI-compatible; grok-4.6 by default)
+2. Gemini (primary) - needs GEMINI_API_KEY
+3. OpenRouter (free models) - needs OPENROUTER_API_KEY
+4. Groq (generous free tier) - needs GROQ_API_KEY
+5. Ollama (local, unlimited) - needs OLLAMA_HOST
+6. Anthropic - needs ANTHROPIC_API_KEY
+7. Amazon Bedrock - needs AWS_ACCESS_KEY_ID + AWS_SECRET_ACCESS_KEY
 
 If no API key is configured for any provider, `available` is False and callers
 fall back to local-only behaviour instead of crashing.
+
+Every provider carries a per-provider cooldown (a simple circuit breaker):
+after a provider fails it sits out for a while, so an exhausted quota, an
+invalid key or a dead local model cannot make every pipeline call burn its
+full retry budget. Without this, a broken provider chain turns the scheduler
+into a retry storm that hammers SQLite ("database is locked") and stalls
+login writes.
 """
 
 from __future__ import annotations
@@ -15,6 +25,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+import time
 from dataclasses import dataclass
 from typing import Any
 
@@ -35,12 +46,14 @@ MAX_RETRY_AFTER = 60.0
 GEMINI_TIMEOUT = 120.0
 OPENROUTER_TIMEOUT = 120.0
 GROQ_TIMEOUT = 120.0
+XAI_TIMEOUT = 120.0
 OLLAMA_TIMEOUT = 300.0  # Local models can be slower
 
 # Provider API endpoints
 GEMINI_API = "https://generativelanguage.googleapis.com/v1beta"
 OPENROUTER_API = "https://openrouter.ai/api/v1"
 GROQ_API = "https://api.groq.com/openai/v1"
+XAI_API = "https://api.x.ai/v1"
 
 
 class ProviderError(RuntimeError):
@@ -74,11 +87,21 @@ class LlmClient:
     def __init__(self) -> None:
         self._settings = get_settings()
         self._provider_order = self._build_provider_order()
+        # Circuit breaker state: provider -> monotonic() timestamp at which it
+        # may be tried again. Initialised lazily on first failure.
+        self._cooldowns: dict[str, float] = {}
+        self._anthropic_client: Any | None = None
 
     def _build_provider_order(self) -> list[str]:
         """Build ordered list of available providers."""
         providers = []
         s = self._settings
+        # xAI first: it is the provider the operator most recently activated
+        # (and the one with working credits), so it should answer first. Every
+        # provider behind it stays as a fallback; the circuit breaker keeps a
+        # dead one from stalling the chain.
+        if s.xai_api_key:
+            providers.append("xai")
         if s.gemini_api_key:
             providers.append("gemini")
         if s.openrouter_api_key:
@@ -106,6 +129,8 @@ class LlmClient:
         """Model used for tier-2 scoring. Backend-appropriate."""
         p = self.active_provider
         s = self._settings
+        if p == "xai":
+            return s.xai_triage_model
         if p == "gemini":
             return s.gemini_model
         if p == "openrouter":
@@ -125,6 +150,8 @@ class LlmClient:
         """Model used for CV tailoring, cover letters and interview prep."""
         p = self.active_provider
         s = self._settings
+        if p == "xai":
+            return s.xai_tailor_model
         if p == "gemini":
             return s.gemini_tailor_model
         if p == "openrouter":
@@ -153,60 +180,137 @@ class LlmClient:
         if not self.available:
             raise RuntimeError(
                 "no LLM provider configured. Set one of: "
-                "GEMINI_API_KEY, OPENROUTER_API_KEY, GROQ_API_KEY, "
+                "XAI_API_KEY, GEMINI_API_KEY, OPENROUTER_API_KEY, "
+                "GROQ_API_KEY, ANTHROPIC_API_KEY, AWS_ACCESS_KEY_ID (Bedrock), "
                 "or run Ollama locally (OLLAMA_HOST)"
             )
 
         last_exc: Exception | None = None
 
-        for provider in self._provider_order:
+        # Skip providers currently sitting out their cooldown. If every provider
+        # is cooling down, fail fast rather than trying the soonest-recovering
+        # one: with a dead provider chain that override would still burn retry
+        # budget on every scheduler call, which is exactly what the breaker
+        # exists to stop. Cooldowns expire on their own and the chain recovers.
+        now = time.monotonic()
+        candidates = [
+            p for p in self._provider_order
+            if now >= self._cooldowns.get(p, 0.0)
+        ]
+        if not candidates:
+            cooling = ", ".join(
+                f"{p} (~{int(self._cooldowns[p] - now)}s left)"
+                for p in self._provider_order
+            )
+            raise RuntimeError(
+                f"all LLM providers are cooling down after failures ({cooling}); "
+                "retry once a cooldown expires"
+            )
+
+        for provider in candidates:
             try:
                 log.debug("Trying provider: %s with model: %s", provider, model)
-                if provider == "gemini":
-                    return await self._complete_gemini(
-                        model=model, system=system, messages=messages,
-                        max_tokens=max_tokens, temperature=temperature, json_mode=json_mode,
-                    )
-                if provider == "openrouter":
-                    return await self._complete_openrouter(
-                        model=model, system=system, messages=messages,
-                        max_tokens=max_tokens, temperature=temperature, json_mode=json_mode,
-                    )
-                if provider == "groq":
-                    return await self._complete_groq(
-                        model=model, system=system, messages=messages,
-                        max_tokens=max_tokens, temperature=temperature, json_mode=json_mode,
-                    )
-                if provider == "ollama":
-                    return await self._complete_ollama(
-                        model=model, system=system, messages=messages,
-                        max_tokens=max_tokens, temperature=temperature, json_mode=json_mode,
-                    )
-                if provider == "anthropic":
-                    return await self._complete_anthropic(
-                        model=model, system=system, messages=messages,
-                        max_tokens=max_tokens, temperature=temperature, json_mode=json_mode,
-                    )
-                if provider == "bedrock":
-                    return await self._complete_bedrock(
-                        model=model, system=system, messages=messages,
-                        max_tokens=max_tokens, temperature=temperature,
-                    )
+                result = await self._complete_for(
+                    provider, model=model, system=system, messages=messages,
+                    max_tokens=max_tokens, temperature=temperature, json_mode=json_mode,
+                )
+                # Succeeded - lift any cooldown so a recovered provider is
+                # used again immediately.
+                self._cooldowns.pop(provider, None)
+                return result
             except ProviderError as e:
-                # Non-retryable error from this provider - try next
-                log.warning("Provider %s failed: %s. Trying next...", provider, e)
+                # Non-retryable error from this provider - try next, and sit the
+                # provider out so it cannot burn the retry budget again soon.
+                cooldown = self._cooldown_seconds(provider, e.status)
+                self._cooldowns[provider] = time.monotonic() + cooldown
+                log.warning(
+                    "Provider %s failed (%s); cooling down %.0fs. Trying next...",
+                    provider, e, cooldown,
+                )
                 last_exc = e
                 continue
             except Exception as e:
                 # Unexpected error - try next provider
-                log.warning("Provider %s error: %s. Trying next...", provider, e)
+                cooldown = self._cooldown_seconds(provider, 0)
+                self._cooldowns[provider] = time.monotonic() + cooldown
+                log.warning(
+                    "Provider %s error (%s); cooling down %.0fs. Trying next...",
+                    provider, e, cooldown,
+                )
                 last_exc = e
                 continue
 
         # All providers exhausted
         raise RuntimeError(
-            f"All {len(self._provider_order)} providers failed. Last error: {last_exc}"
+            f"All {len(candidates)} available providers failed. Last error: {last_exc}"
         ) from last_exc
+
+    async def _complete_for(
+        self,
+        provider: str,
+        *,
+        model: str,
+        system: str | list[dict],
+        messages: list[dict],
+        max_tokens: int,
+        temperature: float,
+        json_mode: bool,
+    ) -> LlmResult:
+        """Dispatch a single provider call (used by the fallback loop)."""
+        if provider == "gemini":
+            return await self._complete_gemini(
+                model=model, system=system, messages=messages,
+                max_tokens=max_tokens, temperature=temperature, json_mode=json_mode,
+            )
+        if provider == "openrouter":
+            return await self._complete_openrouter(
+                model=model, system=system, messages=messages,
+                max_tokens=max_tokens, temperature=temperature, json_mode=json_mode,
+            )
+        if provider == "groq":
+            return await self._complete_groq(
+                model=model, system=system, messages=messages,
+                max_tokens=max_tokens, temperature=temperature, json_mode=json_mode,
+            )
+        if provider == "xai":
+            return await self._complete_xai(
+                model=model, system=system, messages=messages,
+                max_tokens=max_tokens, temperature=temperature, json_mode=json_mode,
+            )
+        if provider == "ollama":
+            return await self._complete_ollama(
+                model=model, system=system, messages=messages,
+                max_tokens=max_tokens, temperature=temperature, json_mode=json_mode,
+            )
+        if provider == "anthropic":
+            return await self._complete_anthropic(
+                model=model, system=system, messages=messages,
+                max_tokens=max_tokens, temperature=temperature, json_mode=json_mode,
+            )
+        if provider == "bedrock":
+            return await self._complete_bedrock(
+                model=model, system=system, messages=messages,
+                max_tokens=max_tokens, temperature=temperature,
+            )
+        raise ProviderError(provider, 503, f"unknown provider: {provider}")
+
+    @staticmethod
+    def _cooldown_seconds(provider: str, status: int) -> float:
+        """How long a provider sits out after a failure, by failure class.
+
+        The durations are deliberately coarse: a bad key will not heal on its
+        own, a quota wall needs minutes, and a transient 5xx needs only a short
+        pause before the next attempt is reasonable.
+        """
+        if status in (401, 403):
+            return 1800.0  # invalid/expired key or forbidden model
+        if status == 429:
+            return 600.0  # quota exhausted - give the window time to reset
+        if status == 404:
+            return 900.0  # model id does not exist on this provider
+        if status >= 500 or status == 0:
+            return 120.0  # transient outage or network failure
+        return 300.0  # anything else (400 payload, etc.)
 
     # ---------------------------------------------------------------- gemini
 
@@ -312,6 +416,47 @@ class LlmClient:
             timeout=GROQ_TIMEOUT,
         )
 
+    # ---------------------------------------------------------------- xai (grok)
+
+    async def _complete_xai(
+        self,
+        *,
+        model: str,
+        system: str | list[dict],
+        messages: list[dict],
+        max_tokens: int,
+        temperature: float,
+        json_mode: bool,
+    ) -> LlmResult:
+        """Complete via xAI's OpenAI-compatible Chat Completions API.
+
+        Same wire format as Groq/OpenRouter, so the shared parser applies. A
+        key without credits returns a 403 ("no credits or licenses"); that is
+        a ProviderError and the chain falls through to the next provider, with
+        xAI cooled down so the scheduler does not hammer it.
+        """
+        payload = {
+            "model": model,
+            "messages": [{"role": "system", "content": _flatten_system(system)}] + messages
+            if _flatten_system(system) else messages,
+            "max_tokens": max_tokens,
+            "temperature": temperature,
+        }
+        if json_mode:
+            payload["response_format"] = {"type": "json_object"}
+
+        url = f"{XAI_API}/chat/completions"
+        return await self._post_with_retry(
+            "xai", url, model,
+            headers={
+                "Authorization": f"Bearer {self._settings.xai_api_key}",
+                "Content-Type": "application/json",
+            },
+            json=payload,
+            parse_fn=_parse_openai_compatible_response,
+            timeout=XAI_TIMEOUT,
+        )
+
     # ---------------------------------------------------------------- ollama
 
     async def _complete_ollama(
@@ -398,7 +543,7 @@ class LlmClient:
         payload = await asyncio.to_thread(_call)
         return _parse_bedrock_response(model, payload)
 
-    # ---------------------------------------------------------------- anthropic (kept for compatibility)
+    # ---------------------------------------------------------------- anthropic
 
     async def _complete_anthropic(
         self,
@@ -410,9 +555,88 @@ class LlmClient:
         temperature: float,
         json_mode: bool,
     ) -> LlmResult:
-        # Anthropic implementation kept for compatibility
-        # Uncomment and install `anthropic` package if needed
-        raise ProviderError("anthropic", 501, "Anthropic backend not implemented in multi-provider chain")
+        """Complete via the Anthropic Messages API (official SDK).
+
+        The SDK is an optional dependency and is imported lazily so a missing
+        install only breaks the anthropic provider, not the whole client. The
+        system prompt may carry cache_control blocks (see `cached_system`),
+        which the SDK passes through verbatim. The Anthropic API has no strict
+        JSON mode, so callers requesting JSON rely on `extract_json`, exactly
+        as they do for the other providers.
+        """
+        try:
+            from anthropic import (
+                APIConnectionError,
+                APIStatusError,
+                AsyncAnthropic,
+            )
+        except ImportError as exc:  # pragma: no cover - optional dependency
+            raise ProviderError(
+                "anthropic", 503, "anthropic package not installed"
+            ) from exc
+
+        if self._anthropic_client is None:
+            self._anthropic_client = AsyncAnthropic(
+                api_key=self._settings.anthropic_api_key
+            )
+        client = self._anthropic_client
+
+        # The Anthropic API only accepts user/assistant roles; the app never
+        # sends anything else, but coerce defensively anyway.
+        anon_messages = [
+            {
+                "role": "assistant" if str(m.get("role")) == "assistant" else "user",
+                "content": str(m.get("content") or ""),
+            }
+            for m in messages
+        ]
+
+        last_exc: Exception | None = None
+        for attempt in range(1, MAX_RETRIES + 1):
+            try:
+                resp = await client.messages.create(
+                    model=model,
+                    system=system,
+                    messages=anon_messages,
+                    max_tokens=max_tokens,
+                    temperature=temperature,
+                )
+                break
+            except APIStatusError as exc:
+                status = int(getattr(exc, "status_code", 0) or 0)
+                if status not in _RETRYABLE or attempt == MAX_RETRIES:
+                    raise ProviderError("anthropic", status or 500, str(exc)) from exc
+                last_exc = exc
+                log.warning(
+                    "anthropic %s; retry %d/%d in %ds",
+                    status, attempt, MAX_RETRIES, 2 ** attempt,
+                )
+                await _sleep(2 ** attempt)
+            except APIConnectionError as exc:
+                if attempt == MAX_RETRIES:
+                    raise ProviderError("anthropic", 503, str(exc)) from exc
+                last_exc = exc
+                await _sleep(2 ** attempt)
+        else:  # pragma: no cover - loop only exits via break or raise
+            raise ProviderError("anthropic", 503, str(last_exc)) from last_exc
+
+        text = "".join(
+            block.text for block in resp.content if getattr(block, "type", "") == "text"
+        )
+        usage = resp.usage
+        return LlmResult(
+            text=text,
+            model=model,
+            input_tokens=int(getattr(usage, "input_tokens", 0) or 0),
+            output_tokens=int(getattr(usage, "output_tokens", 0) or 0),
+            cache_read_tokens=int(
+                getattr(usage, "cache_read_input_tokens", 0) or 0
+            ),
+            cache_write_tokens=int(
+                getattr(usage, "cache_creation_input_tokens", 0) or 0
+            ),
+            stop_reason=str(getattr(resp, "stop_reason", "") or ""),
+        )
 
     # ---------------------------------------------------------------- shared retry logic
 

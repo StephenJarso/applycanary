@@ -40,11 +40,16 @@ class Settings(BaseSettings):
 
     # --- llm ---
     # Provider chain (tried in order). First available is used.
-    # 1. Gemini (primary) - needs GEMINI_API_KEY
-    # 2. OpenRouter (free models) - needs OPENROUTER_API_KEY
-    # 3. Groq (free tier) - needs GROQ_API_KEY
-    # 4. Ollama (local) - needs OLLAMA_HOST (default http://localhost:11434)
-    # 5. Amazon Bedrock - needs AWS_ACCESS_KEY_ID + AWS_SECRET_ACCESS_KEY
+    # 1. xAI Grok - needs XAI_API_KEY (OpenAI-compatible, generous trial credits)
+    # 2. Gemini (primary) - needs GEMINI_API_KEY
+    # 3. OpenRouter (free models) - needs OPENROUTER_API_KEY
+    # 4. Groq (free tier) - needs GROQ_API_KEY
+    # 5. Ollama (local) - needs OLLAMA_HOST (default http://localhost:11434)
+    # 6. Anthropic - needs ANTHROPIC_API_KEY
+    # 7. Amazon Bedrock - needs AWS_ACCESS_KEY_ID + AWS_SECRET_ACCESS_KEY
+    xai_api_key: str = ""
+    xai_triage_model: str = "grok-4.6"
+    xai_tailor_model: str = "grok-4.6"
     anthropic_api_key: str = ""
     model_triage: str = "claude-haiku-4-5-20251001"
     model_tailor: str = "claude-sonnet-5"
@@ -167,7 +172,8 @@ class Settings(BaseSettings):
     @property
     def llm_enabled(self) -> bool:
         return bool(
-            self.gemini_api_key
+            self.xai_api_key
+            or self.gemini_api_key
             or self.anthropic_api_key
             or self.aws_access_key_id
         )
