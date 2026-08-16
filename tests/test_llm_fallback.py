@@ -9,6 +9,7 @@ breaker with stubbed dispatchers, so no network traffic is involved.
 
 from __future__ import annotations
 
+import copy
 import time
 
 import pytest
@@ -216,3 +217,95 @@ def test_parse_xai_response():
     assert r.input_tokens == 5
     assert r.output_tokens == 9
     assert not r.truncated
+
+
+# ---------------------------------------------------------------- gemini thinking
+
+
+def _capture_gemini(c: LlmClient, captured: dict):
+    async def fake_post(provider, url, model, *, params=None, headers=None,
+                        json=None, parse_fn=None, timeout=0.0):
+        captured.update(provider=provider, url=url, json=json or {}, model=model)
+        return _StubResult()
+
+    c._post_with_retry = fake_post  # type: ignore[method-assign]
+
+
+@pytest.mark.asyncio
+async def test_gemini_sends_thinking_budget_zero_by_default(monkeypatch):
+    """Thinking models truncate short JSON when chain-of-thought eats the token
+    budget, so the default thinkingBudget=0 must be sent explicitly."""
+    c = LlmClient()
+    captured: dict = {}
+    _capture_gemini(c, captured)
+
+    await c._complete_gemini(
+        model="gemini-3.5-flash", system="sys",
+        messages=[{"role": "user", "content": "hi"}],
+        max_tokens=64, temperature=0.0, json_mode=True,
+    )
+    gc = captured["json"]["generationConfig"]
+    assert gc["thinkingConfig"] == {"thinkingBudget": 0}
+    assert gc["responseMimeType"] == "application/json"
+
+
+@pytest.mark.asyncio
+async def test_gemini_thinking_budget_configured(monkeypatch):
+    c = LlmClient()
+    monkeypatch.setattr(c._settings, "gemini_thinking_budget", 1024)
+    captured: dict = {}
+    _capture_gemini(c, captured)
+
+    await c._complete_gemini(
+        model="gemini-3.5-flash", system="sys",
+        messages=[{"role": "user", "content": "hi"}],
+        max_tokens=64, temperature=0.0, json_mode=False,
+    )
+    gc = captured["json"]["generationConfig"]
+    assert gc["thinkingConfig"] == {"thinkingBudget": 1024}
+
+
+@pytest.mark.asyncio
+async def test_gemini_falls_back_when_model_rejects_thinking_config(monkeypatch):
+    """Non-thinking models (flash-lite) reject thinkingConfig with 400; the
+    client must retry without it rather than failing the whole call."""
+    c = LlmClient()
+    attempts: list[dict] = []
+
+    async def fake_post(provider, url, model, *, params=None, headers=None,
+                        json=None, parse_fn=None, timeout=0.0):
+        attempts.append(copy.deepcopy(json or {}))
+        if len(attempts) == 1:
+            raise ProviderError("gemini", 400, "invalid argument")
+        return _StubResult()
+
+    c._post_with_retry = fake_post  # type: ignore[method-assign]
+
+    result = await c._complete_gemini(
+        model="gemini-3.5-flash-lite", system="sys",
+        messages=[{"role": "user", "content": "hi"}],
+        max_tokens=64, temperature=0.0, json_mode=False,
+    )
+    assert result.text == "ok"
+    assert len(attempts) == 2
+    assert "thinkingConfig" in attempts[0]["generationConfig"]
+    assert "thinkingConfig" not in attempts[1]["generationConfig"]
+
+
+@pytest.mark.asyncio
+async def test_gemini_non_400_error_not_swallowed(monkeypatch):
+    c = LlmClient()
+
+    async def fake_post(provider, url, model, *, params=None, headers=None,
+                        json=None, parse_fn=None, timeout=0.0):
+        raise ProviderError("gemini", 429, "quota")
+
+    c._post_with_retry = fake_post  # type: ignore[method-assign]
+
+    with pytest.raises(ProviderError) as excinfo:
+        await c._complete_gemini(
+            model="gemini-3.5-flash", system="sys",
+            messages=[{"role": "user", "content": "hi"}],
+            max_tokens=64, temperature=0.0, json_mode=False,
+        )
+    assert excinfo.value.status == 429
