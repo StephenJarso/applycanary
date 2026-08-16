@@ -49,6 +49,12 @@ GROQ_TIMEOUT = 120.0
 XAI_TIMEOUT = 120.0
 OLLAMA_TIMEOUT = 300.0  # Local models can be slower
 
+# Minimum seconds between attempts to the same provider. Free tiers (Gemini's
+# especially) 429 on request bursts even when the daily quota is fine — a
+# scoring cycle firing 25 jobs in a row trips the per-minute limit and the
+# whole batch falls back to keywords. Pacing spreads the calls out.
+PROVIDER_MIN_INTERVAL = 4.0
+
 # Provider API endpoints
 GEMINI_API = "https://generativelanguage.googleapis.com/v1beta"
 OPENROUTER_API = "https://openrouter.ai/api/v1"
@@ -91,6 +97,8 @@ class LlmClient:
         # may be tried again. Initialised lazily on first failure.
         self._cooldowns: dict[str, float] = {}
         self._anthropic_client: Any | None = None
+        # Last attempt time per provider, for free-tier rate-limit pacing.
+        self._last_attempt: dict[str, float] = {}
 
     def _build_provider_order(self) -> list[str]:
         """Build ordered list of available providers."""
@@ -209,6 +217,7 @@ class LlmClient:
 
         for provider in candidates:
             try:
+                await self._pace(provider)
                 log.debug("Trying provider: %s with model: %s", provider, model)
                 result = await self._complete_for(
                     provider, model=model, system=system, messages=messages,
@@ -245,6 +254,52 @@ class LlmClient:
             f"All {len(candidates)} available providers failed. Last error: {last_exc}"
         ) from last_exc
 
+    def _model_for_provider(self, provider: str, model: str) -> str:
+        """Map the caller's model (chosen for the active provider) onto the
+        provider actually being tried.
+
+        Without this, when xAI is active every fallback provider receives
+        "grok-4.6" — which Gemini then 404s on. The caller picks one model via
+        ``triage_model``/``tailor_model``; matching it to the slot tells us
+        which model each other provider should use for the same kind of call.
+        """
+        s = self._settings
+        if model and model == self.triage_model:
+            return {
+                "xai": s.xai_triage_model,
+                "gemini": s.gemini_model,
+                "openrouter": s.openrouter_triage_model,
+                "groq": s.groq_triage_model,
+                "ollama": s.ollama_triage_model,
+                "anthropic": s.model_triage,
+                "bedrock": s.bedrock_model_id,
+            }.get(provider, model)
+        if model and model == self.tailor_model:
+            return {
+                "xai": s.xai_tailor_model,
+                "gemini": s.gemini_tailor_model,
+                "openrouter": s.openrouter_tailor_model,
+                "groq": s.groq_tailor_model,
+                "ollama": s.ollama_tailor_model,
+                "anthropic": s.model_tailor,
+                "bedrock": s.bedrock_model_id,
+            }.get(provider, model)
+        return model
+
+    async def _pace(self, provider: str) -> None:
+        """Keep attempts to one provider at least PROVIDER_MIN_INTERVAL apart.
+
+        Free-tier friendly: without this, a scoring cycle's burst of jobs
+        trips the provider's per-minute rate limit (Gemini's free tier 429s on
+        bursts even when the daily quota is fine).
+        """
+        last = self._last_attempt.get(provider)
+        if last is not None:
+            wait = PROVIDER_MIN_INTERVAL - (time.monotonic() - last)
+            if wait > 0:
+                await _sleep(wait)
+        self._last_attempt[provider] = time.monotonic()
+
     async def _complete_for(
         self,
         provider: str,
@@ -257,6 +312,7 @@ class LlmClient:
         json_mode: bool,
     ) -> LlmResult:
         """Dispatch a single provider call (used by the fallback loop)."""
+        model = self._model_for_provider(provider, model)
         if provider == "gemini":
             return await self._complete_gemini(
                 model=model, system=system, messages=messages,
