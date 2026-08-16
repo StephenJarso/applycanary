@@ -160,6 +160,7 @@ export interface Profile {
   skills: string[];
   github_synced_at: string | null;
   github_repo_count: number;
+  alert_min_score: number;
 }
 
 export interface SourceHealth {
@@ -396,6 +397,7 @@ export const api = {
   poll: () => request<ActionResult>("/actions/poll", { method: "POST" }),
   score: () => request<ActionResult>("/actions/score", { method: "POST" }),
   syncGithub: () => request<ActionResult>("/actions/github", { method: "POST" }),
+  discover: () => request<ActionResult>("/actions/discover", { method: "POST" }),
   embedAll: (limit = 100) =>
     request<{ ok: boolean; embedded: number }>("/actions/embed-all", {
       method: "POST", body: JSON.stringify({ limit }),
