@@ -31,6 +31,7 @@ export default function ProfilePage() {
     },
   });
   const github = useMutation({ mutationFn: api.syncGithub, onSuccess: invalidate });
+  const discover = useMutation({ mutationFn: api.discover, onSuccess: invalidate });
   const invite = useQuery({ queryKey: ["invite"], queryFn: api.auth.invite, retry: false });
 
   const ats = useQuery({
@@ -147,6 +148,26 @@ export default function ProfilePage() {
         )}
       </div>
 
+      <div className="card">
+        <h3 className="card-title">Role discovery</h3>
+        <p className="cell-dim">
+          Actively searches Adzuna + the web for your target titles, skills and GitHub
+          evidence, then fetches and scores the matches. Runs every 6 hours
+          automatically — use this to kick one off right now.
+        </p>
+        <button
+          onClick={() => discover.mutate()}
+          disabled={discover.isPending}
+          title={!data?.target_titles.length && !data?.skills.length ? "Add target titles or skills first" : undefined}
+        >
+          {discover.isPending && <span className="spinner" />} Discover roles for me
+        </button>
+        {discover.isError && <ErrorBox error={discover.error} />}
+        {discover.isSuccess && (
+          <div className="banner banner-ok" role="status">{discover.data.message}</div>
+        )}
+      </div>
+
       <form
         className="card"
         onSubmit={(e) => {
@@ -181,6 +202,17 @@ export default function ProfilePage() {
               value={form.min_salary ?? ""}
               onChange={(e) => set("min_salary", e.target.value ? Number(e.target.value) : null)}
             />
+          </div>
+          <div className="field">
+            <label htmlFor="alert">Email alert threshold %</label>
+            <input
+              id="alert" type="number" min={0} max={100} step={1}
+              value={form.alert_min_score ?? ""}
+              onChange={(e) =>
+                set("alert_min_score", e.target.value ? Math.max(0, Math.min(100, Number(e.target.value))) : 0)
+              }
+            />
+            <p className="cell-dim">Email me when a job scores at/above this. 0 = off.</p>
           </div>
         </div>
 
