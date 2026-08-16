@@ -1,0 +1,19 @@
+region      = "us-east-1"
+app_name    = "applycanary"
+image       = "applycanary:latest"
+desired_count = 1
+
+# From: ./scripts/ccloud/provision.sh (the printed connection string)
+db_url      = "postgresql://applycanary:REDACTED@host:26257/applycanary?sslmode=require"
+
+# Generate: python3 -c "import secrets; print(secrets.token_urlsafe(48))"
+secret_key  = "REPLACE_ME"
+
+# Optional (Bedrock needs no key — IAM covers it)
+# llm_api_key = ""
+
+# Optional extras, e.g.:
+# extra_env = {
+#   GITHUB_USERNAME = "yourgithub"
+#   ENABLE_AUTO_SUBMIT = "false"
+# }
