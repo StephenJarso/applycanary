@@ -392,15 +392,40 @@ class LlmClient:
         if json_mode:
             payload["generationConfig"]["responseMimeType"] = "application/json"
 
+        # Thinking models (e.g. gemini-3.5-flash) burn output tokens on hidden
+        # chain-of-thought, truncating short JSON answers (MAX_TOKENS with a few
+        # chars of content). Default to thinkingBudget=0 so scoring/tailoring
+        # responses are complete; operators can raise it per model. Non-thinking
+        # models (flash-lite) reject the field with 400, so retry without it.
+        budget = self._settings.gemini_thinking_budget
+        if budget is not None:
+            payload["generationConfig"]["thinkingConfig"] = {"thinkingBudget": budget}
+
         url = f"{GEMINI_API}/models/{model}:generateContent"
-        return await self._post_with_retry(
-            "gemini", url, model,
-            params={"key": self._settings.gemini_api_key},
-            headers={"Content-Type": "application/json"},
-            json=payload,
-            parse_fn=_parse_gemini_response,
-            timeout=GEMINI_TIMEOUT,
-        )
+        try:
+            return await self._post_with_retry(
+                "gemini", url, model,
+                params={"key": self._settings.gemini_api_key},
+                headers={"Content-Type": "application/json"},
+                json=payload,
+                parse_fn=_parse_gemini_response,
+                timeout=GEMINI_TIMEOUT,
+            )
+        except ProviderError as exc:
+            if exc.status == 400 and "thinkingConfig" in payload["generationConfig"]:
+                log.warning(
+                    "gemini %s rejected thinkingConfig; retrying without it", model
+                )
+                payload["generationConfig"].pop("thinkingConfig", None)
+                return await self._post_with_retry(
+                    "gemini", url, model,
+                    params={"key": self._settings.gemini_api_key},
+                    headers={"Content-Type": "application/json"},
+                    json=payload,
+                    parse_fn=_parse_gemini_response,
+                    timeout=GEMINI_TIMEOUT,
+                )
+            raise
 
     # ---------------------------------------------------------------- openrouter
 
