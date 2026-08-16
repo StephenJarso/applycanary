@@ -58,8 +58,8 @@ class Settings(BaseSettings):
     gemini_tailor_model: str = "gemini-3.5-flash-lite"
 
     openrouter_api_key: str = ""
-    openrouter_triage_model: str = "meta-llama/llama-3.1-8b-instruct:free"
-    openrouter_tailor_model: str = "meta-llama/llama-3.1-8b-instruct:free"
+    openrouter_triage_model: str = "openai/gpt-4o-mini"
+    openrouter_tailor_model: str = "openai/gpt-4o-mini"
 
     groq_api_key: str = ""
     groq_triage_model: str = "llama-3.1-8b-instant"
