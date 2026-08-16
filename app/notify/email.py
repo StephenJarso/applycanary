@@ -13,22 +13,41 @@ from html import escape
 from sqlmodel import Session, select
 
 from app.config import get_settings
-from app.models import Application, Job, JobScore, JobStatus, utcnow
+from app.models import Application, Job, JobScore, JobStatus, UserJob, utcnow
 
 log = logging.getLogger(__name__)
 
 
-async def send(subject: str, html: str, text: str) -> bool:
+def _recipient(profile=None, user=None) -> str:  # noqa: ANN001
+    """Best address for one user: profile email, account email, their override,
+    then the operator's global digest address as a last resort."""
+    settings = get_settings()
+    for candidate in (
+        (profile.email if profile else "") or "",
+        (user.email if user else "") or "",
+        (profile.digest_to if profile else "") or "",
+        settings.digest_to,
+    ):
+        if candidate:
+            return candidate
+    return ""
+
+
+async def send(subject: str, html: str, text: str, *, to: str = "") -> bool:
     """Send one message. Returns False when SMTP is unconfigured or the send fails."""
     settings = get_settings()
+    to = to or settings.digest_to
     if not settings.email_enabled:
         log.info("EMAIL (not sent, SMTP unconfigured) — %s\n%s", subject, text)
+        return False
+    if not to:
+        log.warning("email: no recipient for %r (set profile email or DIGEST_TO)", subject)
         return False
 
     msg = EmailMessage()
     msg["Subject"] = subject
     msg["From"] = settings.smtp_user
-    msg["To"] = settings.digest_to
+    msg["To"] = to
     msg.set_content(text)
     msg.add_alternative(html, subtype="html")
 
@@ -51,35 +70,62 @@ async def send(subject: str, html: str, text: str) -> bool:
         return False
 
 
-async def send_digest(session: Session, hours: int = 24) -> bool:
-    """Summarise the last window: what was applied to, and what needs review."""
+async def send_digest(
+    session: Session,
+    hours: int = 24,
+    *,
+    profile=None,  # noqa: ANN001
+    user=None,  # noqa: ANN001
+) -> bool:
+    """Summarise the last window *for one user*: applications, queue, new matches.
+
+    Everything is filtered by the user's id: with per-user workflow state, a
+    global digest would report the whole instance's activity to whoever happens
+    to be first in the fan-out loop.
+    """
     from datetime import timedelta
 
+    uid = (profile.user_id if profile else None) or (user.id if user else None)
     since = utcnow() - timedelta(hours=hours)
 
-    applied = session.exec(
+    applied_stmt = (
         select(Application, Job)
         .join(Job, Job.id == Application.job_id)
         .where(Application.submitted_at.is_not(None))
         .where(Application.submitted_at >= since)
-        .order_by(Application.submitted_at.desc())
+    )
+    if uid:
+        applied_stmt = applied_stmt.where(Application.user_id == uid)
+    applied = session.exec(
+        applied_stmt.order_by(Application.submitted_at.desc())
     ).all()
 
-    queued = session.exec(
-        select(Job, JobScore)
+    # Per-user queue. The legacy global `job.status` column is always NEW and
+    # must not drive this; the user's workflow state lives in UserJob.
+    queued_stmt = (
+        select(Job, JobScore, UserJob)
         .join(JobScore, JobScore.job_id == Job.id)
-        .where(Job.status == JobStatus.QUEUED)
-        .order_by(JobScore.total.desc())
-        .limit(15)
+        .join(
+            UserJob,
+            (UserJob.job_id == Job.id) & (UserJob.user_id == uid),
+            isouter=True,
+        )
+        .where(UserJob.status == JobStatus.QUEUED)
+    )
+    queued = session.exec(
+        queued_stmt.order_by(JobScore.total.desc()).limit(15)
     ).all()
 
-    new_matches = session.exec(
+    new_stmt = (
         select(Job, JobScore)
         .join(JobScore, JobScore.job_id == Job.id)
         .where(Job.first_seen_at >= since)
         .where(JobScore.total >= 70)
-        .order_by(JobScore.total.desc())
-        .limit(15)
+    )
+    if uid:
+        new_stmt = new_stmt.where(JobScore.user_id == uid)
+    new_matches = session.exec(
+        new_stmt.order_by(JobScore.total.desc()).limit(15)
     ).all()
 
     if not (applied or queued or new_matches):
@@ -120,7 +166,7 @@ async def send_digest(session: Session, hours: int = 24) -> bool:
             "<p style='color:#666;font-size:13px;margin:0 0 8px'>"
             "Resume and cover letter are already prepared.</p><ul>"
         )
-        for job, score in queued:
+        for job, score, _uj in queued:
             text_parts.append(
                 f"  [{score.total:.0f}] {job.title} at {job.company} — {job.apply_url}"
             )
@@ -149,11 +195,24 @@ async def send_digest(session: Session, hours: int = 24) -> bool:
         html_parts.append("</ul>")
 
     html_parts.append("</div>")
-    return await send(subject, "\n".join(html_parts), "\n".join(text_parts))
+    return await send(
+        subject, "\n".join(html_parts), "\n".join(text_parts),
+        to=_recipient(profile, user),
+    )
 
 
-async def send_alert(job: Job, score: JobScore) -> bool:
-    """Immediate notification for an exceptional match, sent as it is found."""
+async def send_alert(
+    job: Job,
+    score: JobScore,
+    *,
+    profile=None,  # noqa: ANN001
+    user=None,  # noqa: ANN001
+) -> bool:
+    """Immediate notification for an exceptional match, sent as it is found.
+
+    Goes to the *user's own* address (profile email -> account email -> their
+    digest override -> operator DIGEST_TO), not a single global inbox.
+    """
     subject = f"Strong match ({score.total:.0f}): {job.title} at {job.company}"
     reasoning = score.reasoning or "No reasoning recorded."
     text = (
@@ -178,4 +237,4 @@ async def send_alert(job: Job, score: JobScore) -> bool:
         "style='background:#111;color:#fff;padding:10px 18px;border-radius:6px;"
         "text-decoration:none'>Open posting</a></p></div>"
     )
-    return await send(subject, html, text)
+    return await send(subject, html, text, to=_recipient(profile, user))

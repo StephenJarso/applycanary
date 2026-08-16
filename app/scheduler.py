@@ -96,7 +96,9 @@ async def job_score_new() -> None:
 
             # Alert immediately on exceptional matches; waiting for the daily
             # digest would forfeit the early-application advantage. Both the
-            # score and the status are this user's own.
+            # score and the status are this user's own. 0 disables alerts.
+            if profile.alert_min_score <= 0:
+                continue
             rows = session.exec(
                 select(Job, JobScore)
                 .join(
@@ -113,8 +115,9 @@ async def job_score_new() -> None:
                 .order_by(JobScore.total.desc())
                 .limit(5)
             ).all()
+            user = session.get(User, profile.user_id)
             for job, score in rows:
-                await notify.send_alert(job, score, profile=profile)
+                await notify.send_alert(job, score, profile=profile, user=user)
 
 
 async def job_prepare_queue() -> None:
@@ -195,7 +198,24 @@ async def job_digest() -> None:
 
     with session_scope() as session:
         for profile in _active_profiles(session):
-            await notify.send_digest(session, profile=profile)
+            user = session.get(User, profile.user_id)
+            await notify.send_digest(session, profile=profile, user=user)
+
+
+async def job_discover_roles() -> None:
+    """Fetch postings for users' actual target roles (title/skills/GitHub).
+
+    The broad poll pulls whole boards; this job actively searches for each
+    user's roles so a Go developer sees Go roles even when the configured
+    boards carry few. Runs rarely because Adzuna's free tier is budgeted.
+    """
+    from app.pipeline.discover import run_discovery
+
+    summary = await run_discovery()
+    log.info(
+        "discover_roles: %d sources, %d new, %d dup, %d failed",
+        summary.sources_run, summary.new, summary.duplicates, summary.sources_failed,
+    )
 
 
 async def job_embed_new() -> None:
@@ -272,6 +292,8 @@ def build_scheduler() -> AsyncIOScheduler:
         ("prepare_queue", IntervalTrigger(minutes=7, jitter=60), job_prepare_queue),
         ("auto_submit", IntervalTrigger(minutes=10, jitter=60), job_auto_submit),
         ("refresh_github", CronTrigger(hour=3, minute=17), job_refresh_github),
+        # Role discovery is slow and budgeted (Adzuna free tier), so 6-hourly.
+        ("discover_roles", CronTrigger(hour="*/6", minute=37), job_discover_roles),
         ("digest", CronTrigger(hour=8, minute=3), job_digest),
         ("expire_stale", CronTrigger(hour=4, minute=23), job_expire_stale),
         ("embed_new", IntervalTrigger(minutes=15, jitter=120), job_embed_new),
