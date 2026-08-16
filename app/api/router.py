@@ -19,6 +19,7 @@ from typing import Any, Literal
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
+from sqlalchemy import and_, or_
 from sqlmodel import Session, func, select
 
 from app.config import get_settings
@@ -123,6 +124,8 @@ class ProfileOut(BaseModel):
     skills: list[str] = Field(default_factory=list)
     github_synced_at: datetime | None = None
     github_repo_count: int = 0
+    # Email alerts: when a posting scores at/above this, email it immediately.
+    alert_min_score: float = 90.0
 
 
 class ProfileIn(BaseModel):
@@ -144,6 +147,8 @@ class ProfileIn(BaseModel):
     remote_only: bool = False
     # User-confirmed skills supplement skills detected from the uploaded resume.
     skills: list[str] = Field(default_factory=list)
+    # Email alerts: send immediately when a posting scores at/above this (0 = off).
+    alert_min_score: float | None = None
 
 
 class SourceHealthOut(BaseModel):
@@ -243,6 +248,36 @@ def _profile_or_404(session: Session, user: User) -> Profile:
     return profile
 
 
+def _apply_text_search(stmt: Any, q: str, model: Any = Job) -> Any:
+    """Search over title, company and description that survives real queries.
+
+    A literal substring match on "go developer" finds nothing, because real
+    postings say "Senior Golang Engineer" or "Backend Engineer (Golang)". A
+    posting matches when any of:
+      - every query token appears somewhere (title/company/description),
+      - the whole query appears as a phrase in the title/company,
+      - the *lead* token appears in the title/company.
+    The lead-token rule is what makes "go developer" match "Senior Golang
+    Engineer": "go" is inside "golang", and a short title/company match is
+    high-signal even when the rest of the query is implied by the role.
+    Still plain SQL, still cheap.
+    """
+    tokens = [t for t in q.split() if len(t) > 1]
+    if not tokens:
+        return stmt
+    phrase = " ".join(tokens)
+    return stmt.where(or_(
+        and_(*(
+            model.title.ilike(f"%{t}%")
+            | model.company.ilike(f"%{t}%")
+            | model.description.ilike(f"%{t}%")
+            for t in tokens
+        )),
+        model.title.ilike(f"%{phrase}%") | model.company.ilike(f"%{phrase}%"),
+        model.title.ilike(f"%{tokens[0]}%") | model.company.ilike(f"%{tokens[0]}%"),
+    ))
+
+
 def _counts(session: Session, user: User) -> dict[str, int]:
     """Status tallies for one user.
 
@@ -318,8 +353,7 @@ def public_jobs(
     if remote_only:
         stmt = stmt.where(Job.is_remote == True)  # noqa: E712 - SQL, not Python
     if q:
-        like = f"%{q}%"
-        stmt = stmt.where(Job.title.ilike(like) | Job.company.ilike(like))
+        stmt = _apply_text_search(stmt, q)
     stmt = stmt.order_by(Job.first_seen_at.desc() if sort == "newest" else Job.first_seen_at.asc())
     rows = session.exec(stmt.offset(offset).limit(limit)).all()
     sources = sorted(session.exec(select(Job.source).distinct()).all())
@@ -381,14 +415,16 @@ def list_jobs(
         if has_profile_evidence:
             # Unscored postings are intentionally hidden from the default view;
             # they have not yet been judged against this user's profile.
-            stmt = stmt.where(JobScore.id.is_not(None))
+            # An explicit search is different: it should find matches, not only
+            # postings the scheduler has already got to.
+            if not q:
+                stmt = stmt.where(JobScore.id.is_not(None))
     if source:
         stmt = stmt.where(Job.source == source)
     if remote_only:
         stmt = stmt.where(Job.is_remote == True)  # noqa: E712 - SQL, not Python
     if q:
-        like = f"%{q}%"
-        stmt = stmt.where(Job.title.ilike(like) | Job.company.ilike(like))
+        stmt = _apply_text_search(stmt, q)
     if min_score:
         stmt = stmt.where(JobScore.total >= min_score)
 
@@ -639,6 +675,7 @@ def get_profile(
         skills=list(profile.skills or []),
         github_synced_at=profile.github_synced_at,
         github_repo_count=len(evidence.get("repos") or []),
+        alert_min_score=profile.alert_min_score,
     )
 
 
@@ -657,6 +694,10 @@ def save_profile(
         select(Profile).where(Profile.user_id == user.id)
     ).first() or Profile(user_id=user.id)
     for field, value in payload.model_dump().items():
+        # None means "leave unchanged" for the optional alert threshold, so an
+        # old client that omits it cannot null out the stored preference.
+        if field == "alert_min_score" and value is None:
+            continue
         setattr(profile, field, value)
     # Store canonical skill names so variants such as "Golang" and "go" score
     # identically and display consistently.
@@ -938,6 +979,27 @@ async def trigger_score(
 
     count = await score_pending(session, user_id=user.id, limit=50)
     return ActionResult(ok=True, message=f"Scored {count} jobs.", detail={"scored": count})
+
+
+@router.post("/actions/discover", response_model=ActionResult)
+async def trigger_discover(
+    session: Session = Depends(get_session),
+    user: User = Depends(current_user),
+) -> ActionResult:
+    """Run role-driven discovery for the requesting user, right now.
+
+    Builds queries from the profile's target titles, skills and GitHub evidence,
+    fetches matching postings (Adzuna + web search), and scores them. This is
+    the manual "go find my roles" button behind the scheduled 6-hourly job.
+    """
+    from app.pipeline.discover import discover_for_user
+
+    result = await discover_for_user(user.id)
+    return ActionResult(
+        ok=result["ok"],
+        message=result.get("message", ""),
+        detail=result.get("detail", {}),
+    )
 
 
 @router.post("/actions/github", response_model=ActionResult)
