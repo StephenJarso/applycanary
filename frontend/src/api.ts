@@ -368,6 +368,7 @@ export const api = {
       request<AuthUser>("/auth/register", { method: "POST", body: JSON.stringify({ email, password, invite_code }) }),
     logout: () => request<void>("/auth/logout", { method: "POST" }),
     invite: () => request<Invite>("/auth/invite"),
+    signupInfo: () => request<{ default_invite_code: string }>("/auth/signup-info"),
   },
   status: () => request<Status>("/status"),
   jobs: (filters: JobFilters = {}) => request<JobList>(`/jobs${qs(filters)}`),

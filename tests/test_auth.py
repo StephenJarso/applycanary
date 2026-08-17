@@ -247,6 +247,46 @@ def test_invite_cannot_be_reused(isolated_db):
         assert len(session.exec(select(User)).all()) == 1
 
 
+def test_register_with_default_invite_code_does_not_consume_a_row(isolated_db, monkeypatch):
+    """Hackathon open-signup: the shared DEFAULT_INVITE_CODE is accepted for
+    every registrant without touching the invite_code table, so it never runs
+    out. Any other code still needs a real, redeemable invite row."""
+    monkeypatch.setenv("DEFAULT_INVITE_CODE", "HACKATHON2026")
+    client = TestClient(create_app(), follow_redirects=False)
+    payload = {"password": "a-long-enough-pw", "invite_code": "HACKATHON2026"}
+
+    for email in ["one@example.com", "two@example.com"]:
+        res = client.post("/api/auth/register", json={"email": email, **payload})
+        assert res.status_code == 201, res.text
+
+    # No invite rows were created or consumed for either registration.
+    with Session(engine) as session:
+        assert session.exec(select(InviteCode)).all() == []
+        assert len(session.exec(select(User)).all()) == 2
+
+    # A wrong code is still rejected even with the default configured.
+    bad = client.post(
+        "/api/auth/register",
+        json={"email": "three@example.com", "password": "a-long-enough-pw", "invite_code": "NOPE"},
+    )
+    assert bad.status_code == 400
+
+
+def test_signup_info_exposes_default_invite_code(isolated_db, monkeypatch):
+    monkeypatch.setenv("DEFAULT_INVITE_CODE", "HACKATHON2026")
+    client = TestClient(create_app(), follow_redirects=False)
+    res = client.get("/api/auth/signup-info")
+    assert res.status_code == 200
+    assert res.json() == {"default_invite_code": "HACKATHON2026"}
+
+
+def test_signup_info_empty_when_no_default(isolated_db):
+    client = TestClient(create_app(), follow_redirects=False)
+    res = client.get("/api/auth/signup-info")
+    assert res.status_code == 200
+    assert res.json() == {"default_invite_code": ""}
+
+
 def test_expired_invite_is_refused(isolated_db):
     with Session(engine) as session:
         session.add(
