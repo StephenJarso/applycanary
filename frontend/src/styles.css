@@ -497,7 +497,14 @@ details > summary:hover { color: var(--text); }
 .guest-actions { display: flex; gap: 10px; align-items: center; }
 .guest-toolbar { display: flex; gap: 12px; align-items: center; margin-bottom: 16px; }
 .guest-toolbar form { display: flex; gap: 8px; flex: 1; }
-.guest-toolbar input { min-width: 0; flex: 1; }
+.guest-toolbar input {
+  min-width: 0;
+  flex: 1;
+  background: var(--bg-raised);
+  border-color: var(--border-strong);
+  padding: 8px 10px;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.25);
+}
 .guest-note { padding: 12px 14px; margin-bottom: 18px; border-left: 3px solid var(--accent); background: var(--panel); color: var(--text-dim); }
 .auth-page {
   min-height: 100%;
