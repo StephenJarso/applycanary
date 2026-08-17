@@ -1,0 +1,38 @@
+# Local-only artifacts — never upload (the Vercel build regenerates the
+# frontend bundle; the backend runs on Railway, not Vercel).
+.venv
+venv
+__pycache__
+*.py[cod]
+*.egg-info
+.pytest_cache
+.ruff_cache
+.mypy_cache
+.coverage
+htmlcov
+
+# Python build artifacts at the repo root
+build
+dist
+
+# Runtime data (SQLite DB, resumes, generated CVs)
+data
+*.db
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+
+# Frontend node_modules + previous build output
+node_modules
+frontend/dist
+frontend/.vite
+*.tsbuildinfo
+npm-debug.log*
+
+# Secrets & local tooling
+.env
+.env.*
+!.env.example
+.claude
+.vercel

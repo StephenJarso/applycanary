@@ -45,3 +45,8 @@ npm-debug.log*
 
 # Volume backups written by scripts/backup.sh — data, not source.
 backups/
+
+# Local AI tooling state (worktrees etc.)
+.claude/
+.vercel
+.vercel
