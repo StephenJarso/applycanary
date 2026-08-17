@@ -192,6 +192,15 @@ Transcribe-grade accuracy.
 4. **Connect your agent to the cluster** (read-only, audited): see
    [mcp/README.md](mcp/README.md).
 
+### Frontend hosting (Vercel)
+
+The React dashboard is served from Vercel. The Vercel project's **Root Directory
+must be `frontend`** — set it under Project Settings → General (it is a project
+setting, *not* a `vercel.json` key). `frontend/vercel.json` rewrites `/api/*` and
+`/health` to the API backend (Railway by default). To deploy manually, run
+`vercel --prod` from the **repository root**; the Root Directory setting then
+resolves `frontend/` correctly.
+
 ## Configuration
 
 Everything is environment variables; see `.env.example` for the annotated
