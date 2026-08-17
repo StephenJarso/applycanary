@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>ApplyCanary architecture</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    width: 1600px; height: 1040px; overflow: hidden;
+    font-family: "Inter", -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: linear-gradient(160deg, #0a0b0e 0%, #0e1226 55%, #0c1b2e 100%);
+    color: #e7e9f0; padding: 40px 48px;
+  }
+  h1 { font-size: 30px; font-weight: 800; letter-spacing: -0.5px; }
+  h1 span { color: #22d3ee; }
+  .tag { font-size: 14px; color: #8b93a7; margin-top: 4px; letter-spacing: 0.4px; }
+  .box {
+    border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 16px;
+    background: rgba(255, 255, 255, 0.05); padding: 18px 20px; position: absolute;
+  }
+  .box .t { font-size: 15px; font-weight: 700; display: flex; align-items: center; gap: 10px; }
+  .box .s { font-size: 12.5px; color: #98a1b6; margin-top: 6px; line-height: 1.5; }
+  .chip {
+    display: inline-block; font-size: 12px; font-weight: 600; padding: 5px 11px;
+    border-radius: 999px; margin: 10px 6px 0 0; background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.12); color: #c9cfe0;
+  }
+  .accent { border-color: rgba(129, 140, 248, 0.55); box-shadow: 0 0 24px rgba(99,102,241,0.22); }
+  .acc { color: #818cf8; } .cy { color: #22d3ee; } .gr { color: #34d399; } .am { color: #fbbf24; }
+  .lbl {
+    position: absolute; font-size: 12.5px; font-weight: 600; color: #8b93a7;
+    background: #0e1226; padding: 3px 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1);
+    z-index: 2; white-space: nowrap;
+  }
+  svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+</style>
+</head>
+<body>
+  <h1>ApplyCanary — <span>architecture</span></h1>
+  <div class="tag">An agentic job-search assistant. CockroachDB is the memory layer; AWS runs the models and the voice.</div>
+
+  <!-- Browser -->
+  <div class="box" style="left:48px; top:150px; width:290px; height:190px;">
+    <div class="t"><span class="cy">▣</span> Browser</div>
+    <div class="s" style="font-weight:700; font-size:14px; margin-top:12px;">React dashboard</div>
+    <div class="s">Jobs, Match cards, Interview Studio, Memory</div>
+    <div class="chip">/api</div><div class="chip">guest mode</div>
+  </div>
+
+  <!-- Agent -->
+  <div class="box accent" style="left:470px; top:210px; width:340px; height:290px;">
+    <div class="t"><span class="acc">◆</span> FastAPI agent</div>
+    <div class="s" style="margin-top:10px;"><b>Amazon ECS · Fargate</b></div>
+    <div class="chip">Web API</div><div class="chip">Scheduler</div><div class="chip">LLM chain + circuit breakers</div>
+    <div class="chip">Role discovery</div><div class="chip">Truthcheck gate</div>
+    <div class="chip">Interview state machine</div>
+  </div>
+
+  <!-- AWS -->
+  <div class="box" style="left:940px; top:90px; width:610px; height:250px;">
+    <div class="t"><span class="am">◆</span> AWS</div>
+    <div class="chip" style="margin-top:12px;"><b>Amazon Bedrock</b> — Claude + Titan embeddings</div>
+    <div class="chip"><b>Amazon Polly</b> — spoken interviewer</div>
+    <div class="chip"><b>Amazon Transcribe</b> — hears answers</div>
+    <div class="chip"><b>Amazon S3</b> — interview audio</div>
+    <div class="chip"><b>CloudWatch</b> — logs &amp; metrics</div>
+  </div>
+
+  <!-- CockroachDB -->
+  <div class="box" style="left:940px; top:470px; width:610px; height:340px;">
+    <div class="t"><span class="gr">◆</span> CockroachDB Serverless — the memory layer</div>
+    <div class="s" style="margin-top:10px;"><b>Transactional state</b> — jobs · scores · sessions · turns · applications</div>
+    <div class="s" style="margin-top:8px;"><b>Distributed vector indexing</b> — native <span class="cy">VECTOR(1024)</span> columns on <span class="cy">job_embedding</span> &amp; <span class="cy">agent_memory</span>, backed by a <span class="cy">vec_cosine_ops</span> index</div>
+    <div class="s" style="margin-top:8px;"><b>Semantic recall is SQL</b> — <span class="gr">1 − vec_cosine_distance(embedding, :q::vector)</span></div>
+    <div class="chip" style="margin-top:14px;"><span class="gr">◈</span> MCP Server — read-only, audited agent access</div>
+    <div class="chip"><span class="gr">◈</span> ccloud CLI — provision · backups · audit</div>
+    <div class="chip"><span class="gr">◈</span> Agent Skills — cockroachlabs/cockroachdb-skills</div>
+  </div>
+
+  <svg viewBox="0 0 1600 1040">
+    <defs>
+      <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0 0L10 5L0 10z" fill="#5b6478" />
+      </marker>
+      <marker id="arrc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0 0L10 5L0 10z" fill="#22d3ee" />
+      </marker>
+      <marker id="arrd" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0 0L10 5L0 10z" fill="#34d399" />
+      </marker>
+    </defs>
+    <!-- Browser -> Agent -->
+    <line x1="338" y1="245" x2="462" y2="285" stroke="#5b6478" stroke-width="2" marker-end="url(#arr)" />
+    <rect x="352" y="212" width="112" height="26" rx="8" fill="#0e1226" stroke="rgba(255,255,255,0.1)"/>
+    <text x="408" y="229" text-anchor="middle" font-size="13" font-weight="600" fill="#8b93a7">HTTP /api</text>
+
+    <!-- Agent -> AWS -->
+    <line x1="810" y1="300" x2="932" y2="250" stroke="#fbbf24" stroke-width="2" marker-end="url(#arr)" />
+    <rect x="808" y="222" width="116" height="26" rx="8" fill="#0e1226" stroke="rgba(255,255,255,0.1)"/>
+    <text x="866" y="239" text-anchor="middle" font-size="12.5" font-weight="600" fill="#fbbf24">Claude · Titan · TTS · STT</text>
+
+    <!-- Agent -> CockroachDB -->
+    <line x1="810" y1="380" x2="932" y2="600" stroke="#22d3ee" stroke-width="2.5" marker-end="url(#arrc)" />
+    <line x1="932" y1="590" x2="810" y2="392" stroke="#22d3ee" stroke-width="2.5" marker-end="url(#arrc)" />
+    <rect x="806" y="462" width="150" height="26" rx="8" fill="#0e1226" stroke="rgba(34,211,238,0.35)"/>
+    <text x="881" y="479" text-anchor="middle" font-size="13" font-weight="600" fill="#22d3ee">postgres wire (transactions · vectors)</text>
+
+    <!-- Browser -> Guest/agent note -->
+    <text x="193" y="380" text-anchor="middle" font-size="12.5" fill="#8b93a7" font-weight="600">Serves from Vercel (frontend/)</text>
+
+    <!-- MCP + ccloud dashed links to cluster -->
+    <line x1="1180" y1="812" x2="1180" y2="852" stroke="#34d399" stroke-width="2" stroke-dasharray="5 4" marker-end="url(#arrd)" />
+    <text x="1190" y="842" font-size="12" font-weight="600" fill="#34d399">read-only · audited</text>
+  </svg>
+</body>
+</html>
