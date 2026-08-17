@@ -36,6 +36,12 @@ class InviteOut(BaseModel):
     link: str
 
 
+class SignupInfoOut(BaseModel):
+    # Hackathon open-signup: prefilled into the register form so new users can
+    # sign up without hunting for a single-use invite code.
+    default_invite_code: str = ""
+
+
 def _set_session(response: Response, user: User) -> None:
     from app.auth import create_session_token
 
@@ -64,21 +70,36 @@ def login(payload: Credentials, response: Response, session: Session = Depends(g
 @router.post("/register", response_model=CurrentUser, status_code=status.HTTP_201_CREATED)
 def register(payload: Registration, response: Response, session: Session = Depends(get_session)) -> CurrentUser:
     email = payload.email.strip().lower()
-    invite = session.exec(select(InviteCode).where(InviteCode.code == payload.invite_code.strip())).first()
-    if invite is None or not invite.is_redeemable():
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "That invite code is not valid")
+    code = payload.invite_code.strip()
+    settings = get_settings()
+    # Hackathon open-signup: the shared default code is accepted without
+    # consuming an InviteCode row, so every new user can register with the same
+    # prefilled referral code.
+    if settings.default_invite_code and code == settings.default_invite_code:
+        invite = None
+    else:
+        invite = session.exec(select(InviteCode).where(InviteCode.code == code)).first()
+        if invite is None or not invite.is_redeemable():
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "That invite code is not valid")
     if session.exec(select(User).where(User.email == email)).first() is not None:
         raise HTTPException(status.HTTP_409_CONFLICT, "That email is already registered")
     user = User(email=email, password_hash=hash_password(payload.password))
     session.add(user)
     session.commit()
     session.refresh(user)
-    invite.used_by_id, invite.used_at = user.id, utcnow()
-    session.add(invite)
+    if invite is not None:
+        invite.used_by_id, invite.used_at = user.id, utcnow()
+        session.add(invite)
     session.add(Profile(user_id=user.id, email=email))
     session.commit()
     _set_session(response, user)
     return _out(user)
+
+
+@router.get("/signup-info", response_model=SignupInfoOut)
+def signup_info() -> SignupInfoOut:
+    """Public signup defaults so the register form can prefill the invite code."""
+    return SignupInfoOut(default_invite_code=get_settings().default_invite_code)
 
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)

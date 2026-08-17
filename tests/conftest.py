@@ -41,5 +41,8 @@ for _k in (
     "OLLAMA_HOST",
     "ANTHROPIC_API_KEY",
     "AWS_ACCESS_KEY_ID",
+    # Hackathon open-signup code: blank it so registration tests exercise the
+    # strict invite-gated path unless a test explicitly sets it.
+    "DEFAULT_INVITE_CODE",
 ):
     os.environ[_k] = ""

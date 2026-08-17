@@ -115,7 +115,7 @@ def create_app() -> FastAPI:
                 return JSONResponse(status_code=429, content={"detail": "Too many requests; please try again later."}, headers={"Retry-After": str(retry_after)})
         if (
             path == "/health"
-            or path in ("/login", "/register", "/api/auth/login", "/api/auth/register")
+            or path in ("/login", "/register", "/api/auth/login", "/api/auth/register", "/api/auth/signup-info")
             or path.startswith("/assets/")
             or path == "/guest"
             or path.startswith("/guest/")

@@ -141,6 +141,11 @@ class Settings(BaseSettings):
     # Registration requires an invite code, because the operator's API keys pay
     # for every user's scoring and tailoring.
     allow_registration: bool = True
+    # Hackathon open-signup: while set, this exact code is accepted at
+    # registration without consuming an InviteCode row, so every new user can
+    # sign up with the same prefilled referral code. Clear it after the
+    # hackathon to restore strict single-use invite gating.
+    default_invite_code: str = ""
 
     # --- server ---
     host: str = "127.0.0.1"
