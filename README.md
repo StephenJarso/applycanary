@@ -11,6 +11,7 @@ long-term recall), and AWS powers the models and the voice (Bedrock, Polly,
 Transcribe, S3, ECS).
 
 > **Hackathon submission details:** [docs/HACKATHON.md](docs/HACKATHON.md) ·
+> submission-form notes: [docs/SUBMISSION.md](docs/SUBMISSION.md) ·
 > demo video script: [docs/DEMO.md](docs/DEMO.md) · MIT licensed.
 
 ---
