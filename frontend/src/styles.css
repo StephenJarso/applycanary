@@ -500,10 +500,13 @@ details > summary:hover { color: var(--text); }
 .guest-toolbar input {
   min-width: 0;
   flex: 1;
-  background: var(--bg-raised);
+  /* Raised surface so the box reads as an input against the page background
+     in both themes (--bg-raised is too close to the page in light mode). */
+  background: var(--bg-active);
   border-color: var(--border-strong);
+  border-width: 1.5px;
   padding: 8px 10px;
-  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.25);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.35);
 }
 .guest-note { padding: 12px 14px; margin-bottom: 18px; border-left: 3px solid var(--accent); background: var(--panel); color: var(--text-dim); }
 .auth-page {
