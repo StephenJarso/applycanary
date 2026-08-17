@@ -287,17 +287,18 @@ class Settings(BaseSettings):
         if self.host not in ("127.0.0.1", "localhost", "::1"):
             if in_container():
                 # A container must bind 0.0.0.0 to be reachable at all, so the
-                # bind address says nothing about exposure here. Point at the
-                # thing that does decide it rather than crying wolf every boot.
+                # bind address says nothing about exposure here. Multi-user auth
+                # gates the dashboard; just remind operators to front it with
+                # HTTPS (Railway/Vercel terminate TLS automatically).
                 warnings.append(
-                    "Running in a container. The dashboard has no authentication, "
-                    "so publish it to the host loopback only "
-                    '("127.0.0.1:8000:8000", as docker-compose.yml does).'
+                    f"Running in a container bound to {self.host}. The dashboard "
+                    "is behind login; ensure the public ingress terminates HTTPS."
                 )
             else:
                 warnings.append(
-                    f"HOST is {self.host}, not loopback. The dashboard has no "
-                    "authentication and exposes your resume and application history."
+                    f"HOST is {self.host}, not loopback. The dashboard is behind "
+                    "login but exposes your resume and application history; keep "
+                    "it on a trusted network."
                 )
         return warnings
 
