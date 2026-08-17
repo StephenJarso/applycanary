@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>ApplyCanary cover</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    width: 1600px; height: 900px; overflow: hidden;
+    font-family: "Inter", -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  .cover {
+    width: 100%; height: 100%; position: relative; color: #e7e9f0;
+    background:
+      radial-gradient(1100px 620px at 88% -12%, rgba(99, 102, 241, 0.42), transparent 62%),
+      radial-gradient(900px 560px at -8% 112%, rgba(34, 211, 238, 0.22), transparent 60%),
+      linear-gradient(160deg, #0a0b0e 0%, #0e1226 52%, #0c1b2e 100%);
+    padding: 70px 84px 64px;
+    display: flex; flex-direction: column;
+  }
+  .cover::before {
+    content: ""; position: absolute; inset: 0;
+    background-image:
+      linear-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+    background-size: 56px 56px;
+    -webkit-mask-image: radial-gradient(1150px 720px at 50% 32%, #000, transparent 78%);
+    mask-image: radial-gradient(1150px 720px at 50% 32%, #000, transparent 78%);
+  }
+  .glow {
+    position: absolute; width: 520px; height: 520px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(99, 102, 241, 0.35), transparent 65%);
+    top: -180px; right: 60px; filter: blur(20px); z-index: 0;
+  }
+  .z1 { position: relative; z-index: 1; }
+
+  .top { display: flex; align-items: center; gap: 18px; }
+  .logo {
+    width: 68px; height: 68px; border-radius: 18px;
+    background: linear-gradient(135deg, #6366f1, #22d3ee);
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 10px 34px rgba(99, 102, 241, 0.45);
+  }
+  .logo svg { width: 40px; height: 40px; }
+  .brand {
+    font-size: 32px; font-weight: 800; letter-spacing: -0.5px;
+  }
+  .brand span { color: #22d3ee; }
+  .brand-sub {
+    font-size: 14px; color: #8b93a7; letter-spacing: 3px; text-transform: uppercase; margin-top: 2px;
+  }
+  .pill-row { display: flex; gap: 12px; margin-left: auto; }
+  .pill {
+    font-size: 15px; font-weight: 600; color: #c9cfe0;
+    border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 999px;
+    padding: 9px 18px; background: rgba(255, 255, 255, 0.05);
+    display: flex; align-items: center; gap: 9px;
+  }
+  .dot { width: 9px; height: 9px; border-radius: 50%; }
+  .dot-1 { background: #22d3ee; } .dot-2 { background: #a78bfa; } .dot-3 { background: #34d399; }
+
+  .tagline {
+    font-size: 62px; font-weight: 800; line-height: 1.06; letter-spacing: -1.5px;
+    margin-top: 64px; max-width: 1050px;
+  }
+  .tagline .grad {
+    background: linear-gradient(90deg, #818cf8, #22d3ee);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .sub {
+    font-size: 22px; color: #9aa3b8; margin-top: 22px; max-width: 900px; line-height: 1.5;
+  }
+
+  .features { display: flex; gap: 20px; margin-top: 54px; }
+  .feat {
+    flex: 1; border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 18px;
+    background: rgba(255, 255, 255, 0.045); padding: 22px 24px;
+  }
+  .feat .n { font-size: 13px; font-weight: 700; color: #22d3ee; letter-spacing: 2px; text-transform: uppercase; }
+  .feat h3 { font-size: 21px; font-weight: 700; margin-top: 8px; }
+  .feat p { font-size: 14.5px; color: #98a1b6; margin-top: 8px; line-height: 1.5; }
+
+  .foot {
+    margin-top: auto; display: flex; align-items: center; gap: 26px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1); padding-top: 26px;
+  }
+  .badge {
+    display: flex; align-items: center; gap: 12px; font-size: 15.5px; font-weight: 600; color: #c9cfe0;
+  }
+  .badge .ic {
+    width: 38px; height: 38px; border-radius: 10px; display: flex; align-items: center; justify-content: center;
+    font-size: 18px; font-weight: 800; color: #0b0c0e; background: linear-gradient(135deg, #f59e0b, #f43f5e);
+  }
+  .badge .ic.b { background: linear-gradient(135deg, #22d3ee, #6366f1); }
+  .badge .ic.g { background: linear-gradient(135deg, #34d399, #22d3ee); }
+  .badge small { display: block; font-weight: 500; font-size: 12.5px; color: #8b93a7; margin-top: 1px; }
+</style>
+</head>
+<body>
+  <div class="cover">
+    <div class="glow"></div>
+    <div class="top z1">
+      <div class="logo">
+        <svg viewBox="0 0 24 24" fill="none">
+          <path d="M5 12.5l4.2 4.2L19 7" stroke="#0b0c0e" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M4 21h16" stroke="#0b0c0e" stroke-width="2.4" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <div>
+        <div class="brand">Apply<span>Canary</span></div>
+        <div class="brand-sub">Agentic job search</div>
+      </div>
+      <div class="pill-row">
+        <div class="pill"><span class="dot dot-1"></span>Finds jobs</div>
+        <div class="pill"><span class="dot dot-2"></span>Scores your fit</div>
+        <div class="pill"><span class="dot dot-3"></span>Practises interviews</div>
+      </div>
+    </div>
+
+    <div class="tagline z1">Your job search,<br /><span class="grad">remembered.</span></div>
+    <div class="sub z1">
+      An agent that hunts roles made for you, scores them against your real resume,
+      tailors honest applications — then trains for the interview out loud, remembering you across sessions.
+    </div>
+
+    <div class="features z1">
+      <div class="feat">
+        <div class="n">01 · Discover</div>
+        <h3>Roles built around you</h3>
+        <p>Ten job boards polled around the clock, deduped, and searched by your titles, skills &amp; GitHub activity.</p>
+      </div>
+      <div class="feat">
+        <div class="n">02 · Decide</div>
+        <h3>Scored against your resume</h3>
+        <p>Every posting is scored by an LLM grounded in your actual experience — not generic keywords.</p>
+      </div>
+      <div class="feat">
+        <div class="n">03 · Interview</div>
+        <h3>A spoken AI coach</h3>
+        <p>Practice interviews for real postings, out loud, with coaching that recalls your past feedback.</p>
+      </div>
+    </div>
+
+    <div class="foot z1">
+      <div class="badge">
+        <div class="ic">C</div>
+        <div>CockroachDB<small>Distributed vector memory layer</small></div>
+      </div>
+      <div class="badge">
+        <div class="ic b">A</div>
+        <div>AWS<small>Bedrock · Polly · Transcribe · S3 · ECS</small></div>
+      </div>
+      <div class="badge">
+        <div class="ic g">✓</div>
+        <div>Truthful by design<small>Anti-fabrication CV gate</small></div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
