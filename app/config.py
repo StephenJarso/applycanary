@@ -311,10 +311,10 @@ class Settings(BaseSettings):
         if self.host not in ("127.0.0.1", "localhost", "::1"):
             if in_container():
                 # A container must bind 0.0.0.0 to be reachable at all, so the
-                # bind address says nothing about exposure here.  When auth is
-                # enabled and a non-default SECRET_KEY is in place the risk is
-                # minimal and the warning is noise for operators — skip it.
-                if not self.is_auth_required or self.secret_key == DEFAULT_SECRET_KEY:
+                # bind address says nothing about exposure here.  When a proper
+                # SECRET_KEY is in place the session is signed and the warning
+                # is noise for operators (Railway/Vercel always terminate TLS).
+                if self.secret_key == DEFAULT_SECRET_KEY:
                     warnings.append(
                         f"Running in a container bound to {self.host}. "
                         "The dashboard is behind login; ensure the public "
