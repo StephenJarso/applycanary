@@ -49,6 +49,7 @@ anthropic>=0.40,<1.0
 
 # --- email ---
 aiosmtplib>=3.0,<4.0
+resend>=2.0,<4.0
 
 # --- dev ---
 pytest>=8.3,<9.0

@@ -51,12 +51,16 @@ async def lifespan(app: FastAPI):  # noqa: ANN201, ARG001
 
     if not settings.llm_enabled:
         log.warning(
-            "no LLM API key configured (GEMINI_API_KEY or ANTHROPIC_API_KEY) — "
+            "no LLM API key configured (XAI_API_KEY, GEMINI_API_KEY, "
+            "OPENROUTER_API_KEY, GROQ_API_KEY or ANTHROPIC_API_KEY) — "
             "scoring falls back to keyword-only "
             "and tailoring/interview prep are disabled"
         )
     if not settings.email_enabled:
-        log.warning("SMTP is not configured — digests will be logged, not emailed")
+        log.warning(
+            "no email backend configured (set RESEND_API_KEY or SMTP_HOST) — "
+            "digests will be logged, not emailed"
+        )
     if settings.enable_auto_submit:
         log.warning(
             "AUTO-SUBMIT IS ON: applications scoring >= %s may be sent without review",

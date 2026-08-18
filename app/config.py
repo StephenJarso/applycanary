@@ -93,6 +93,12 @@ class Settings(BaseSettings):
     github_token: str = ""
 
     # --- email ---
+    # Preferred: Resend (resend_api_key + email_from). Falls back to SMTP
+    # when RESEND_API_KEY is empty. EMAIL_FROM defaults to Resend's sandbox
+    # domain; switch to a verified domain (or set a custom FROM in Railway)
+    # for production.
+    resend_api_key: str = ""
+    email_from: str = "onboarding@resend.dev"
     smtp_host: str = ""
     smtp_port: int = 587
     smtp_user: str = ""
@@ -180,9 +186,17 @@ class Settings(BaseSettings):
 
     @property
     def llm_enabled(self) -> bool:
+        """True when at least one real LLM provider is configured.
+
+        Mirrors the provider chain in app.llm.client._build_provider_order,
+        minus Ollama: a defaulted OLLAMA_HOST points at nothing until the
+        operator actually runs a local server, so it must not count here.
+        """
         return bool(
             self.xai_api_key
             or self.gemini_api_key
+            or self.openrouter_api_key
+            or self.groq_api_key
             or self.anthropic_api_key
             or self.aws_access_key_id
         )
@@ -205,7 +219,13 @@ class Settings(BaseSettings):
 
     @property
     def email_enabled(self) -> bool:
-        return bool(self.smtp_host and self.smtp_user and self.digest_to)
+        """True when a send backend is configured.
+
+        Resend is preferred; SMTP is the legacy fallback. A recipient is not
+        checked here — per-user routing resolves profile.email → user.email →
+        profile.digest_to → settings.digest_to at send time.
+        """
+        return bool(self.resend_api_key or (self.smtp_host and self.smtp_user))
 
     @property
     def resume_dir(self) -> Path:
@@ -268,12 +288,16 @@ class Settings(BaseSettings):
         warnings: list[str] = []
         if not self.llm_enabled:
             warnings.append(
-                "No LLM API key configured (GEMINI_API_KEY or ANTHROPIC_API_KEY): "
+                "No LLM API key configured (XAI_API_KEY, GEMINI_API_KEY, "
+                "OPENROUTER_API_KEY, GROQ_API_KEY or ANTHROPIC_API_KEY): "
                 "tier-2 scoring, CV tailoring and interview prep are disabled. "
                 "Local filtering still runs."
             )
         if not self.email_enabled:
-            warnings.append("SMTP is not configured: digests will be logged, not sent.")
+            warnings.append(
+                "No email backend configured (set RESEND_API_KEY or SMTP_HOST): "
+                "digests will be logged, not sent."
+            )
         if not self.github_username:
             warnings.append(
                 "GITHUB_USERNAME is unset: CV tailoring has no GitHub evidence to draw on."
