@@ -139,3 +139,91 @@ Polly/Transcribe, Gemini/OpenRouter/local Ollama for Bedrock, local embedder
 for Titan), and vector search falls back to Python distance on SQLite — so the
 215+ tests run hermetically while production uses the real distributed index.
 The integration is deep where it matters and honest about its dependencies.
+
+---
+
+## Pre-existing code & work disclosure
+
+Per the submission rules, we disclose everything incorporated into the
+project beyond standard development tools (frameworks, libraries, and AI
+coding assistants).
+
+**Project timeline (from git history, 143 commits):** development has been
+continuous since **July 1, 2026**. The work submitted here — the CockroachDB
+memory layer, distributed vector indexing, the AWS integration, the spoken
+interview coach, role discovery, and per-user email alerts — was built during
+the submission period (Aug 13–18, 2026, all present in the commit history).
+
+**Pre-existing work incorporated (built before the submission window):** the
+core job-search pipeline that the hackathon features extend — ten job-source
+connectors, three-layer deduplication, LLM scoring/tailoring behind the
+anti-fabrication truthcheck gate, interview-prep generation, and the
+multi-user retrofit (session auth + per-user scoping + scheduler fan-out).
+These components existed in the repository before the submission period and
+were retained as the foundation.
+
+**Third-party components (standard tools, allowed by the rules, disclosed for
+completeness):**
+
+- **Frameworks/libraries:** FastAPI, SQLModel/SQLAlchemy, psycopg, APScheduler,
+  httpx, boto3, pydantic (Python); React, Vite, TypeScript, TanStack Query,
+  react-router (frontend); pytest, ruff, Playwright (dev/test).
+- **CockroachDB Cloud Managed MCP Server** — configuration snippet from the
+  Cloud Console, used read-only (also one of the required tools).
+- **ccloud CLI** — Cockroach Labs' official CLI (also a required tool).
+- **CockroachDB Agent Skills** (`cockroachlabs/cockroachdb-skills`, open
+  source) — the one third-party codebase wired into the repo (via
+  `AGENTS.md`); also a required tool.
+- **Job data sources:** Adzuna API and the public job boards of Greenhouse,
+  Lever, Ashby, SmartRecruiters, Workable, and RemoteOK — third-party data,
+  not code.
+- **AWS SDK and services** (Bedrock, Polly, Transcribe, S3, ECS) — standard
+  cloud tooling.
+- **AI coding assistants** (Codebuff, Claude Code via MCP) used during development.
+
+No starter templates, vendored code, or other open-source projects were
+incorporated beyond the items above. All application code was written in this
+repository.
+
+---
+
+## Feedback on the CockroachDB AI tools
+
+Honest notes from building a real agent on these tools:
+
+**Distributed Vector Indexing — the standout.** A native `VECTOR(n)` column
+with a `vec_cosine_ops` index and `vec_cosine_distance` in SQL genuinely
+removes the whole class of "separate vector store" problems: no sync job, no
+consistency gap, and similarity search that is just a query. `EXPLAIN (VECTOR)`
+proving the planner uses the index is a great touch. Two friction points: (1)
+the index is not implied by the column type — you must remember to `CREATE
+INDEX ... USING vec_cosine_ops`, and a missing index silently degrades to a
+sequential scan at scale, so it deserves a startup-time check (we added one);
+(2) `VECTOR` is CockroachDB/Postgres-only, which forced us to build a Python-
+distance fallback for our SQLite test suite — understandable, but a documented
+"vector type on SQLite" story or a compatibility shim would save every
+hackathon team the same work.
+
+**MCP Server — the right safety model.** Read-only by default with full audit
+logging is exactly how agents should touch a database. The one-config snippet
+from the Cloud Console genuinely works. The limitation is the read-only
+ceiling: schema evolution and writes still had to go through the application
+or ccloud, so the MCP server is a great inspection layer but not a control
+plane. A clearly-marked opt-in write mode (scoped by table/service account)
+would extend its usefulness for agents that need to act, not just look.
+
+**ccloud CLI — built for agents, almost.** JSON on every command, consistent
+noun-verb patterns, and service-account RBAC are exactly the right design for
+AI-driven operation — provisioning, backups, and audit-log inspection were
+scriptable in minutes. Friction: the auth story has a gap we hit directly — a
+desktop-app session token is not a CLI token, so agent setups still require
+manually minting a service-account key (fine for humans, one extra hop for
+agents); and provision latency means agents need generous timeouts and
+idempotent "wait until ready" loops.
+
+**Agent Skills — promising but thin.** Wiring the official skills repo via
+`AGENTS.md` is a great pattern for keeping agent knowledge current. What would
+make it 10× more useful: more hands-on *operational* recipes (vector-index
+health checks, backup/restore drills, `EXPLAIN (VECTOR)` gotchas) rather than
+reference-style guidance, and per-skill install/version metadata so projects
+can pin the exact skills they depend on.
