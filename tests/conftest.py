@@ -41,6 +41,11 @@ for _k in (
     "OLLAMA_HOST",
     "ANTHROPIC_API_KEY",
     "AWS_ACCESS_KEY_ID",
+    # Email: same rationale as LLM keys — a developer .env with SMTP or
+    # Resend creds would make the suite attempt real sends.
+    "RESEND_API_KEY",
+    "SMTP_HOST",
+    "SMTP_USER",
     # Hackathon open-signup code: blank it so registration tests exercise the
     # strict invite-gated path unless a test explicitly sets it.
     "DEFAULT_INVITE_CODE",
