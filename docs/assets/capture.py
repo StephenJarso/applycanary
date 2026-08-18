@@ -60,6 +60,30 @@ async def main():
             margin={"top": "0", "bottom": "0", "left": "0", "right": "0"},
         )
         print("  ✓ architecture.pdf")
+
+        # A4-landscape variant for submission forms expecting standard paper.
+        # The 1600×1040 design is scaled to fit; the letterbox matches the
+        # diagram's dark background so it disappears on the page.
+        a4 = await arch.new_page()
+        await a4.goto(f"file://{SRC}/architecture.html")
+        await a4.wait_for_timeout(800)
+        scale = min(1123 / 1600, 794 / 1040)  # A4 landscape @96dpi
+        await a4.evaluate(
+            f"document.documentElement.style.background='#0d1226';"
+            f"document.body.style.transform='scale({scale:.4f})';"
+            f"document.body.style.transformOrigin='top left';"
+            f"document.body.style.width='{1600 * scale:.0f}px';"
+            f"document.body.style.height='{1040 * scale:.0f}px';"
+            f"document.body.style.overflow='visible';"
+        )
+        await a4.pdf(
+            path=os.path.join(OUT, "architecture-a4.pdf"),
+            format="A4",
+            landscape=True,
+            print_background=True,
+            margin={"top": "0", "bottom": "0", "left": "0", "right": "0"},
+        )
+        print("  ✓ architecture-a4.pdf")
         await art.close()
         await arch.close()
 
