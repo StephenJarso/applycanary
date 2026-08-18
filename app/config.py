@@ -98,7 +98,7 @@ class Settings(BaseSettings):
     # domain; switch to a verified domain (or set a custom FROM in Railway)
     # for production.
     resend_api_key: str = ""
-    email_from: str = "onboarding@resend.dev"
+    email_from: str = "ApplyCanary@resend.dev"
     smtp_host: str = ""
     smtp_port: int = 587
     smtp_user: str = ""
