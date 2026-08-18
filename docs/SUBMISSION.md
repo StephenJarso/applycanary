@@ -179,7 +179,27 @@ completeness):**
   not code.
 - **AWS SDK and services** (Bedrock, Polly, Transcribe, S3, ECS) — standard
   cloud tooling.
-- **AI coding assistants** (Codebuff, Claude Code via MCP) used during development.
+- **AI coding assistants** — see the dedicated section below.
+
+**AI tools leveraged on this project:**
+
+- *Coding assistants (dev-time):* **Codebuff** (primary assistant: feature
+  implementation, debugging, deployments, 226 passing tests, documentation)
+  and **Claude Code** (earlier phases, e.g. the Railway deployment branch —
+  see the `.claude/worktrees/` history).
+- *CockroachDB agent tooling (also the required tools):* the **Cloud Managed
+  MCP Server** (read-only agent access for Claude Code / Cursor / VS Code),
+  the **ccloud CLI** (provisioning, backups, audit), and the **Agent Skills
+  repo** (`cockroachlabs/cockroachdb-skills`) loaded via `AGENTS.md`.
+- *Runtime LLM providers powering the app:* **Amazon Bedrock** (Claude +
+  Titan embeddings), **xAI Grok** (`grok-4.6`), **Google Gemini** (free tier),
+  **OpenRouter** (`gpt-4o-mini`, `:free`), **Anthropic Claude**, **Groq** free
+  tier, and **local Ollama** (`llama3.1:8b`) — in a multi-provider chain with
+  circuit breakers.
+- *Voice AI:* **Amazon Polly** (neural TTS) and **Amazon Transcribe** (streaming
+  STT), with browser-speech fallback.
+- *Automation (not AI, for completeness):* **Playwright** drove the demo-video
+  capture, screenshot verification, and the UI regression checks.
 
 No starter templates, vendored code, or other open-source projects were
 incorporated beyond the items above. All application code was written in this
