@@ -311,13 +311,15 @@ class Settings(BaseSettings):
         if self.host not in ("127.0.0.1", "localhost", "::1"):
             if in_container():
                 # A container must bind 0.0.0.0 to be reachable at all, so the
-                # bind address says nothing about exposure here. Multi-user auth
-                # gates the dashboard; just remind operators to front it with
-                # HTTPS (Railway/Vercel terminate TLS automatically).
-                warnings.append(
-                    f"Running in a container bound to {self.host}. The dashboard "
-                    "is behind login; ensure the public ingress terminates HTTPS."
-                )
+                # bind address says nothing about exposure here.  When auth is
+                # enabled and a non-default SECRET_KEY is in place the risk is
+                # minimal and the warning is noise for operators — skip it.
+                if not self.is_auth_required or self.secret_key == DEFAULT_SECRET_KEY:
+                    warnings.append(
+                        f"Running in a container bound to {self.host}. "
+                        "The dashboard is behind login; ensure the public "
+                        "ingress terminates HTTPS."
+                    )
             else:
                 warnings.append(
                     f"HOST is {self.host}, not loopback. The dashboard is behind "

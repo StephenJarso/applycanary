@@ -432,6 +432,12 @@ tbody tr:hover { background: var(--bg-hover); }
 .toolbar input[type="search"] { max-width: 240px; }
 .toolbar select { width: auto; min-width: 100px; }
 
+/* ------------------------------------------------------------ pagination */
+.pagination { display: flex; justify-content: space-between; align-items: center; margin-top: 16px; padding: 12px 0; border-top: 1px solid var(--border); }
+.pagination-info { font-size: 12px; color: var(--text-dim); }
+.pagination-controls { display: flex; gap: 6px; align-items: center; }
+.pagination-page { font-size: 12px; color: var(--text-dim); margin: 0 8px; }
+
 .seg { display: inline-flex; border: 1px solid var(--border-strong); border-radius: var(--radius); overflow: hidden; }
 .seg button { border: none; border-radius: 0; background: var(--bg-raised); padding: 5px 10px; font-size: 12px; }
 .seg button + button { border-left: 1px solid var(--border); }

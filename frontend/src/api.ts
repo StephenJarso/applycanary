@@ -117,6 +117,11 @@ export interface JobList {
   sources: string[];
 }
 
+export interface ReviewList {
+  jobs: Job[];
+  total: number;
+}
+
 export interface PublicJob {
   id: number;
   company: string;
@@ -215,6 +220,8 @@ export interface JobFilters {
   min_score?: number;
   remote_only?: boolean;
   sort?: "score" | "newest" | "oldest";
+  limit?: number;
+  offset?: number;
 }
 
 export interface VoiceConfig {
@@ -348,7 +355,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return (await res.json()) as T;
 }
 
-const qs = (filters: JobFilters): string => {
+const qs = (filters: object): string => {
   const params = new URLSearchParams();
   for (const [key, value] of Object.entries(filters)) {
     if (value !== undefined && value !== "" && value !== false && value !== 0) {
@@ -374,7 +381,7 @@ export const api = {
   jobs: (filters: JobFilters = {}) => request<JobList>(`/jobs${qs(filters)}`),
   publicJobs: (filters: { q?: string; source?: string; remote_only?: boolean; sort?: "newest" | "oldest" } = {}) => request<PublicJobList>(`/public/jobs${qs(filters as JobFilters)}`),
   job: (id: number) => request<JobDetail>(`/jobs/${id}`),
-  review: () => request<Job[]>("/review"),
+  review: (params: { limit?: number; offset?: number } = {}) => request<ReviewList>(`/review${qs(params)}`),
   applications: () => request<Job[]>("/applications"),
   sources: () => request<SourceHealth[]>("/sources"),
   profile: () => request<Profile>("/profile"),

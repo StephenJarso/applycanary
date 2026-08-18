@@ -1,11 +1,21 @@
+import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { api } from "../api";
 import { Chips, Empty, ErrorBox, ScoreBadge, TableSkeleton, relTime } from "../components";
 
+const PAGE_SIZE = 50;
+
 export default function Review() {
+  const [page, setPage] = useState(0);
   const qc = useQueryClient();
-  const { data, isPending, error } = useQuery({ queryKey: ["review"], queryFn: api.review });
+
+  const offset = page * PAGE_SIZE;
+
+  const { data, isPending, error } = useQuery({
+    queryKey: ["review", offset],
+    queryFn: () => api.review({ limit: PAGE_SIZE, offset }),
+  });
 
   const refresh = () => {
     void qc.invalidateQueries({ queryKey: ["review"] });
@@ -13,6 +23,11 @@ export default function Review() {
   };
   const submit = useMutation({ mutationFn: (id: number) => api.submit(id), onSuccess: refresh });
   const skip = useMutation({ mutationFn: (id: number) => api.skip(id), onSuccess: refresh });
+
+  const totalPages = useMemo(
+    () => Math.max(1, Math.ceil((data?.total ?? 0) / PAGE_SIZE)),
+    [data?.total],
+  );
 
   if (isPending) return <TableSkeleton cols={5} />;
   if (error) return <ErrorBox error={error} />;
@@ -30,14 +45,14 @@ export default function Review() {
         </div>
       )}
 
-      {data && data.length === 0 && (
+      {data && data.jobs.length === 0 && (
         <Empty
           title="Nothing awaiting review"
           hint={<>Tailor a CV from a <Link to="/">job</Link> to queue an application.</>}
         />
       )}
 
-      {data && data.length > 0 && (
+      {data && data.jobs.length > 0 && (
         <div className="table-wrap">
           <table>
             <thead>
@@ -50,7 +65,7 @@ export default function Review() {
               </tr>
             </thead>
             <tbody>
-              {data.map((job) => (
+              {data.jobs.map((job) => (
                 <tr key={job.id}>
                   <td><ScoreBadge score={job.score} /></td>
                   <td>
@@ -86,6 +101,71 @@ export default function Review() {
           </table>
         </div>
       )}
+
+      {data && data.total > PAGE_SIZE && (
+        <Pagination
+          page={page}
+          totalPages={totalPages}
+          total={data.total}
+          showing={data.jobs.length}
+          onPageChange={setPage}
+        />
+      )}
     </>
+  );
+}
+
+function Pagination({
+  page,
+  totalPages,
+  total,
+  showing,
+  onPageChange,
+}: {
+  page: number;
+  totalPages: number;
+  total: number;
+  showing: number;
+  onPageChange: (p: number) => void;
+}) {
+  return (
+    <div className="pagination">
+      <span className="pagination-info">
+        Showing {showing} of {total}
+      </span>
+      <div className="pagination-controls">
+        <button
+          className="btn-sm"
+          disabled={page === 0}
+          onClick={() => onPageChange(0)}
+        >
+          « First
+        </button>
+        <button
+          className="btn-sm"
+          disabled={page === 0}
+          onClick={() => onPageChange(page - 1)}
+        >
+          ‹ Prev
+        </button>
+        <span className="pagination-page">
+          Page {page + 1} of {totalPages}
+        </span>
+        <button
+          className="btn-sm"
+          disabled={page >= totalPages - 1}
+          onClick={() => onPageChange(page + 1)}
+        >
+          Next ›
+        </button>
+        <button
+          className="btn-sm"
+          disabled={page >= totalPages - 1}
+          onClick={() => onPageChange(totalPages - 1)}
+        >
+          Last »
+        </button>
+      </div>
+    </div>
   );
 }

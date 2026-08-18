@@ -102,6 +102,11 @@ class JobListOut(BaseModel):
     sources: list[str]
 
 
+class ReviewListOut(BaseModel):
+    jobs: list[JobOut]
+    total: int
+
+
 class ProfileOut(BaseModel):
     full_name: str = ""
     email: str = ""
@@ -435,6 +440,15 @@ def list_jobs(
     else:
         stmt = stmt.order_by(JobScore.total.desc().nullslast(), Job.first_seen_at.desc())
 
+    # Total count before LIMIT/OFFSET — the dashboard needs this for pagination.
+    from sqlalchemy import func as sa_func
+
+    count_stmt = (
+        select(sa_func.count())
+        .select_from(stmt.subquery())
+    )
+    total = session.exec(count_stmt).one()
+
     rows = session.exec(stmt.offset(offset).limit(limit)).all()
     from app.sources import all_sources
 
@@ -444,7 +458,7 @@ def list_jobs(
 
     return JobListOut(
         jobs=[_job_out(job, score, uj) for job, score, uj in rows],
-        total=len(rows),
+        total=total,
         counts=_counts(session, user),
         sources=sources,
     )
@@ -546,13 +560,15 @@ def job_detail(
     )
 
 
-@router.get("/review", response_model=list[JobOut])
+@router.get("/review", response_model=ReviewListOut)
 def review_queue(
     session: Session = Depends(get_session),
     user: User = Depends(current_user),
-) -> list[JobOut]:
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+) -> ReviewListOut:
     """Applications prepared but not yet submitted."""
-    rows = session.exec(
+    stmt = (
         select(Job, JobScore, UserJob)
         .join(
             Application,
@@ -570,8 +586,15 @@ def review_queue(
         )
         .where(Application.submitted_at.is_(None))
         .order_by(JobScore.total.desc().nullslast())
-    ).all()
-    return [_job_out(job, score, uj) for job, score, uj in rows]
+    )
+    from sqlalchemy import func as sa_func
+
+    total = session.exec(select(sa_func.count()).select_from(stmt.subquery())).one()
+    rows = session.exec(stmt.offset(offset).limit(limit)).all()
+    return ReviewListOut(
+        jobs=[_job_out(job, score, uj) for job, score, uj in rows],
+        total=total,
+    )
 
 
 @router.get("/applications", response_model=list[JobOut])
