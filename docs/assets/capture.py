@@ -50,6 +50,16 @@ async def main():
         page = await arch.new_page()
         await page.goto(f"file://{SRC}/architecture.html")
         await shot(page, "architecture.png", wait_ms=1200)
+        # Same source, vector-crisp PDF for the submission (print_background so
+        # the dark theme renders; no margins so the diagram fills the page).
+        await page.pdf(
+            path=os.path.join(OUT, "architecture.pdf"),
+            width="1600px",
+            height="1040px",
+            print_background=True,
+            margin={"top": "0", "bottom": "0", "left": "0", "right": "0"},
+        )
+        print("  ✓ architecture.pdf")
         await art.close()
         await arch.close()
 
