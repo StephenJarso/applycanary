@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { api, type JobFilters } from "../api";
@@ -11,18 +11,30 @@ const SORTS = [
   { key: "newest", label: "Newest" },
 ] as const;
 
+const PAGE_SIZE = 50;
+
 export default function Jobs() {
+  const [page, setPage] = useState(0);
   const [filters, setFilters] = useState<JobFilters>({ sort: "score" });
   const [search, setSearch] = useState("");
   const navigate = useNavigate();
 
+  const offset = page * PAGE_SIZE;
+
   const { data, isPending, error } = useQuery({
-    queryKey: ["jobs", filters],
-    queryFn: () => api.jobs(filters),
+    queryKey: ["jobs", filters, offset],
+    queryFn: () => api.jobs({ ...filters, limit: PAGE_SIZE, offset }),
   });
 
-  const set = <K extends keyof JobFilters>(key: K, value: JobFilters[K]) =>
+  const set = <K extends keyof JobFilters>(key: K, value: JobFilters[K]) => {
     setFilters((f) => ({ ...f, [key]: value }));
+    setPage(0);
+  };
+
+  const totalPages = useMemo(
+    () => Math.max(1, Math.ceil((data?.total ?? 0) / PAGE_SIZE)),
+    [data?.total],
+  );
 
   return (
     <>
@@ -109,7 +121,7 @@ export default function Jobs() {
       {data && data.jobs.length === 0 && (
         <Empty
           title="No jobs match"
-          hint="Try clearing filters, or use “Poll sources” above to fetch new postings."
+          hint='Try clearing filters, or use "Poll sources" above to fetch new postings.'
         />
       )}
 
@@ -117,7 +129,7 @@ export default function Jobs() {
         <div className="table-wrap">
           <table>
             <caption className="sr-only">
-              Job postings, {data.jobs.length} shown
+              Job postings, {data.jobs.length} shown of {data.total}
             </caption>
             <thead>
               <tr>
@@ -168,6 +180,16 @@ export default function Jobs() {
           </table>
         </div>
       )}
+
+      {data && data.total > PAGE_SIZE && (
+        <Pagination
+          page={page}
+          totalPages={totalPages}
+          total={data.total}
+          showing={data.jobs.length}
+          onPageChange={setPage}
+        />
+      )}
     </>
   );
 }
@@ -177,6 +199,61 @@ function Stat({ label, value }: { label: string; value: number }) {
     <div className="stat">
       <div className="stat-value">{value}</div>
       <div className="stat-label">{label}</div>
+    </div>
+  );
+}
+
+function Pagination({
+  page,
+  totalPages,
+  total,
+  showing,
+  onPageChange,
+}: {
+  page: number;
+  totalPages: number;
+  total: number;
+  showing: number;
+  onPageChange: (p: number) => void;
+}) {
+  return (
+    <div className="pagination">
+      <span className="pagination-info">
+        Showing {showing} of {total}
+      </span>
+      <div className="pagination-controls">
+        <button
+          className="btn-sm"
+          disabled={page === 0}
+          onClick={() => onPageChange(0)}
+        >
+          « First
+        </button>
+        <button
+          className="btn-sm"
+          disabled={page === 0}
+          onClick={() => onPageChange(page - 1)}
+        >
+          ‹ Prev
+        </button>
+        <span className="pagination-page">
+          Page {page + 1} of {totalPages}
+        </span>
+        <button
+          className="btn-sm"
+          disabled={page >= totalPages - 1}
+          onClick={() => onPageChange(page + 1)}
+        >
+          Next ›
+        </button>
+        <button
+          className="btn-sm"
+          disabled={page >= totalPages - 1}
+          onClick={() => onPageChange(totalPages - 1)}
+        >
+          Last »
+        </button>
+      </div>
     </div>
   );
 }
