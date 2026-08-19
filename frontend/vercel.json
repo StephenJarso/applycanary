@@ -11,7 +11,7 @@
       "destination": "https://applycanary-production.up.railway.app/health"
     },
     {
-      "source": "/((?!assets/|favicon.ico).*)",
+      "source": "/((?!assets/|_vercel/|favicon.ico).*)",
       "destination": "/index.html"
     }
   ]
