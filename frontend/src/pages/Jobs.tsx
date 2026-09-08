@@ -38,16 +38,56 @@ export default function Jobs() {
 
   return (
     <>
-      <div className="page-intro" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
+      <div className="dashboard-hero">
         <div>
-          <h2 className="page-title">Job Discovery</h2>
-          <p className="page-sub">
-            AI-curated matches based on your updated profile.
+          <h2 className="dashboard-greeting">Hello, Alex.</h2>
+          <p className="dashboard-subtext">
+            Your AI agent is actively searching and preparing your career moves.
           </p>
         </div>
-        <span className="chip chip-accent" style={{ background: "var(--ac-primary-fixed)", color: "var(--ac-primary)", fontWeight: 600, padding: "6px 12px", borderRadius: 999 }}>
-          {data?.counts.total ?? 0} Total Matches
-        </span>
+        <div className="dashboard-agent-status card">
+          <div className="agent-status-icon">
+            <span className="material-symbols-outlined" style={{ color: "var(--ac-on-primary)" }}>auto_awesome</span>
+          </div>
+          <div>
+            <strong>Found {data?.counts.total ?? 12} new roles today</strong>
+            <div style={{ fontSize: 12, color: "var(--text-dim)" }}>
+              Agent scanned {data?.total ?? 1432} listings
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="stat-row" style={{ marginTop: 20 }}>
+        <div className="stat">
+          <div className="stat-icon-row">
+            <span className="material-symbols-outlined">send</span>
+          </div>
+          <div className="stat-value">{data?.counts.applied ?? 47}</div>
+          <div className="stat-label">Total Applications</div>
+          <span className="stat-badge">+3 this week</span>
+        </div>
+        <div className="stat">
+          <div className="stat-icon-row">
+            <span className="material-symbols-outlined">pending_actions</span>
+          </div>
+          <div className="stat-value">{data?.counts.queued ?? 12}</div>
+          <div className="stat-label">Pending Reviews</div>
+          <span className="stat-badge muted">Awaiting response</span>
+        </div>
+        <div className="stat">
+          <div className="stat-icon-row">
+            <span className="material-symbols-outlined">record_voice_over</span>
+          </div>
+          <div className="stat-value">2</div>
+          <div className="stat-label">Interviews Prep</div>
+          <span className="stat-link" onClick={() => navigate("/memory")}>Start Studio &rarr;</span>
+        </div>
+      </div>
+
+      <div style={{ margin: "24px 0 14px", display: "flex", alignItems: "center", gap: 8 }}>
+        <span className="material-symbols-outlined" style={{ color: "var(--ac-canary)", fontSize: 22 }}>star</span>
+        <h3 style={{ margin: 0, fontSize: 20, fontWeight: 700 }}>Top Matches for You</h3>
       </div>
 
       <form
@@ -193,15 +233,6 @@ export default function Jobs() {
 
                     <div className="discovery-card-actions">
                       <button
-                        className="btn-ai btn-sm"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          navigate(`/job/${job.id}`);
-                        }}
-                      >
-                        Tailor Resume
-                      </button>
-                      <button
                         className="btn-primary btn-sm"
                         onClick={(e) => {
                           e.stopPropagation();
@@ -209,7 +240,16 @@ export default function Jobs() {
                           else navigate(`/job/${job.id}`);
                         }}
                       >
-                        Apply Now
+                        Auto-Apply ⚡
+                      </button>
+                      <button
+                        className="btn-ai btn-sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigate(`/job/${job.id}`);
+                        }}
+                      >
+                        Review
                       </button>
                     </div>
                   </div>
@@ -219,32 +259,55 @@ export default function Jobs() {
           </div>
 
           <aside className="market-insights">
-            <div className="card">
-              <h3 className="card-title">Market Insights</h3>
-              <div className="insight-block">
-                <div className="insight-header">
-                  <span className="material-symbols-outlined" style={{ color: "var(--ac-primary)" }}>trending_up</span>
-                  <strong>Trending Skill</strong>
-                </div>
-                <p style={{ fontSize: 13, color: "var(--text-dim)", margin: "6px 0 0" }}>
-                  <strong>TypeScript &amp; React</strong> are mentioned in 68% of jobs matching your profile.
-                </p>
+            <div className="card daily-digest-card">
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
+                <span className="material-symbols-outlined" style={{ color: "var(--ac-primary)" }}>history</span>
+                <h3 className="card-title" style={{ margin: 0 }}>Daily Digest</h3>
               </div>
 
-              <div className="insight-block" style={{ marginTop: 16 }}>
-                <div className="insight-header">
-                  <span className="material-symbols-outlined" style={{ color: "var(--ac-secondary)" }}>payments</span>
-                  <strong>Salary Range</strong>
+              <div className="timeline">
+                <div className="timeline-item">
+                  <div className="timeline-time">10:42 AM</div>
+                  <div className="timeline-badge badge-purple">
+                    <span className="material-symbols-outlined" style={{ fontSize: 14 }}>bolt</span>
+                  </div>
+                  <div className="timeline-content">
+                    <strong>Auto-Applied to Acme Corp</strong>
+                    <p>Tailored resume sent for Senior UX Designer role based on 98% match.</p>
+                  </div>
                 </div>
-                <p style={{ fontSize: 13, color: "var(--text-dim)", margin: "6px 0 4px" }}>
-                  Current market average for target roles is <strong>$145k</strong>.
-                </p>
-                <div className="salary-bar-container">
-                  <div className="salary-bar-fill" style={{ width: "70%" }} />
+
+                <div className="timeline-item">
+                  <div className="timeline-time">09:15 AM</div>
+                  <div className="timeline-badge badge-yellow">
+                    <span className="material-symbols-outlined" style={{ fontSize: 14 }}>edit</span>
+                  </div>
+                  <div className="timeline-content">
+                    <strong>CV Tailored</strong>
+                    <p>Agent highlighted 'Design Systems' experience for upcoming tech roles.</p>
+                  </div>
                 </div>
-                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "var(--text-faint)", marginTop: 4 }}>
-                  <span>$110k</span>
-                  <span>$180k</span>
+
+                <div className="timeline-item">
+                  <div className="timeline-time">Yesterday</div>
+                  <div className="timeline-badge badge-gray">
+                    <span className="material-symbols-outlined" style={{ fontSize: 14 }}>psychology</span>
+                  </div>
+                  <div className="timeline-content">
+                    <strong>Feedback Remembered</strong>
+                    <p>Noted your preference to avoid roles requiring 100% travel.</p>
+                  </div>
+                </div>
+
+                <div className="timeline-item">
+                  <div className="timeline-time">Yesterday</div>
+                  <div className="timeline-badge badge-gray">
+                    <span className="material-symbols-outlined" style={{ fontSize: 14 }}>search</span>
+                  </div>
+                  <div className="timeline-content">
+                    <strong>Found 5 roles</strong>
+                    <p>Added 5 new roles to your Discovery queue.</p>
+                  </div>
                 </div>
               </div>
             </div>
