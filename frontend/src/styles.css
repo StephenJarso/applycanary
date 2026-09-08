@@ -668,10 +668,46 @@ tbody tr:hover { background: var(--bg-hover); }
 
 /* ------------------------------------------------------------ detail */
 
-.detail-head { display: flex; gap: 14px; align-items: flex-start; margin-bottom: 16px; flex-wrap: wrap; }
-.detail-title { margin: 0 0 3px; font-size: 19px; font-weight: 650; letter-spacing: -0.02em; }
-.detail-meta { color: var(--text-dim); font-size: 12.5px; display: flex; gap: 7px; flex-wrap: wrap; align-items: center; }
-.detail-actions { margin-left: auto; display: flex; gap: 7px; flex-wrap: wrap; }
+.detail-head {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  background: var(--ac-surface-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 18px 20px;
+  box-shadow: var(--shadow);
+}
+.detail-head > .job-score-band { width: 60px; height: 60px; font-size: 17px; }
+.detail-title { margin: 0 0 4px; font-size: 21px; font-weight: 700; letter-spacing: -0.02em; }
+.detail-meta { color: var(--text-dim); font-size: 13px; display: flex; gap: 7px; flex-wrap: wrap; align-items: center; }
+.detail-actions { margin-left: auto; display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* The discovery mockup's "AI Reasoning" callout: canary edge, soft surface. */
+.ai-reasoning {
+  position: relative;
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  background: var(--ac-surface-container-low);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px 12px 10px 16px;
+  margin-bottom: 14px;
+  overflow: hidden;
+}
+.ai-reasoning::before {
+  content: "";
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 4px;
+  background: var(--ac-canary);
+}
+.ai-reasoning .material-symbols-outlined { color: var(--ac-secondary); font-size: 20px; margin-top: 2px; }
+.ai-reasoning p { margin: 0; font-size: 13px; line-height: 1.55; color: var(--text-dim); }
+.ai-reasoning strong { color: var(--text); }
 
 .prose { white-space: pre-wrap; word-wrap: break-word; font-size: 12.5px; line-height: 1.6; color: var(--text-dim); }
 
@@ -974,6 +1010,8 @@ details > summary:hover { color: var(--text); }
   margin-bottom: 16px;
   flex-wrap: wrap;
 }
+
+.detail-head .btn-primary.btn-sm { align-self: center; }
 
 .studio-card {
   background: var(--bg-raised);
