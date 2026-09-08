@@ -12,9 +12,13 @@ export default function Sources() {
 
   return (
     <>
-      <div className="banner" role="note">
-        Connector health. A source returning zero for a long stretch usually means its
-        API changed, not that hiring stopped.
+      <div className="page-intro">
+        <h2 className="page-title">Sources</h2>
+        <p className="page-sub">
+          <span className="material-symbols-outlined" aria-hidden="true">cable</span>
+          Connector health — a source returning zero for a long stretch usually
+          means its API changed, not that hiring stopped.
+        </p>
       </div>
 
       {broken.length > 0 && (

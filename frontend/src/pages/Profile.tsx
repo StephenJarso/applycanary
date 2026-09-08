@@ -60,6 +60,14 @@ export default function ProfilePage() {
 
   return (
     <>
+      <div className="page-intro">
+        <h2 className="page-title">Profile</h2>
+        <p className="page-sub">
+          <span className="material-symbols-outlined" aria-hidden="true">person</span>
+          Your resume, targets and agent preferences
+        </p>
+      </div>
+
       <div className="card">
         <h3 className="card-title">Account email</h3>
         <p className="cell-dim">

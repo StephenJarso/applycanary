@@ -25,6 +25,14 @@ export default function GuestJobs() {
         </div>
       </header>
 
+      <div className="page-intro">
+        <h2 className="page-title">Discover roles</h2>
+        <p className="page-sub">
+          <span className="material-symbols-outlined" aria-hidden="true">search</span>
+          Live postings, scored against real resumes once you sign in
+        </p>
+      </div>
+
       <section className="guest-toolbar" aria-label="Job filters">
         <form onSubmit={(event) => { event.preventDefault(); setFilters((old) => ({ ...old, q: query || undefined })); }}>
           <input
