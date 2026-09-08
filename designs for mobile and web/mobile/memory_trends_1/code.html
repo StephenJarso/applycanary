@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Memory &amp; Trends - ApplyCanary</title>
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Google Fonts: Inter -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Tailwind Config -->
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "secondary": "#705d00",
+                      "surface-container-high": "#e7e8e9",
+                      "outline": "#797488",
+                      "on-tertiary-container": "#ffd9ca",
+                      "surface-variant": "#e1e3e4",
+                      "surface-container-low": "#f3f4f5",
+                      "surface-tint": "#642afa",
+                      "on-primary-fixed-variant": "#4b00d4",
+                      "tertiary-container": "#ac4200",
+                      "inverse-on-surface": "#f0f1f2",
+                      "primary-fixed": "#e7deff",
+                      "on-error": "#ffffff",
+                      "surface-container-highest": "#e1e3e4",
+                      "secondary-fixed": "#ffe16d",
+                      "on-secondary-fixed-variant": "#544600",
+                      "surface": "#f8f9fa",
+                      "on-background": "#191c1d",
+                      "error-container": "#ffdad6",
+                      "on-primary-fixed": "#1e0061",
+                      "inverse-primary": "#cbbeff",
+                      "error": "#ba1a1a",
+                      "on-tertiary-fixed-variant": "#7c2e00",
+                      "inverse-surface": "#2e3132",
+                      "on-tertiary": "#ffffff",
+                      "tertiary": "#853100",
+                      "surface-dim": "#d9dadb",
+                      "background": "#f8f9fa",
+                      "tertiary-fixed-dim": "#ffb596",
+                      "primary-container": "#6933ff",
+                      "outline-variant": "#cac3d9",
+                      "on-secondary-container": "#6e5c00",
+                      "on-error-container": "#93000a",
+                      "on-primary-container": "#e5dcff",
+                      "on-surface": "#191c1d",
+                      "secondary-fixed-dim": "#e9c400",
+                      "tertiary-fixed": "#ffdbcd",
+                      "on-secondary-fixed": "#221b00",
+                      "primary": "#5000e1",
+                      "secondary-container": "#fcd400",
+                      "on-secondary": "#ffffff",
+                      "surface-bright": "#f8f9fa",
+                      "on-surface-variant": "#484456",
+                      "surface-container": "#edeeef",
+                      "primary-fixed-dim": "#cbbeff",
+                      "on-tertiary-fixed": "#360f00",
+                      "on-primary": "#ffffff",
+                      "surface-container-lowest": "#ffffff"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.25rem",
+                      "lg": "0.5rem",
+                      "xl": "0.75rem",
+                      "full": "9999px"
+              },
+              "spacing": {
+                      "base": "4px",
+                      "lg": "24px",
+                      "gutter": "12px",
+                      "xs": "4px",
+                      "xl": "32px",
+                      "md": "16px",
+                      "container-padding": "16px",
+                      "sm": "8px"
+              },
+              "fontFamily": {
+                      "display-lg": [
+                              "Inter"
+                      ],
+                      "headline-lg": [
+                              "Inter"
+                      ],
+                      "headline-md": [
+                              "Inter"
+                      ],
+                      "label-md": [
+                              "Inter"
+                      ],
+                      "body-lg": [
+                              "Inter"
+                      ],
+                      "body-md": [
+                              "Inter"
+                      ]
+              },
+              "fontSize": {
+                      "display-lg": [
+                              "32px",
+                              {
+                                      "lineHeight": "40px",
+                                      "letterSpacing": "-0.02em",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "headline-lg": [
+                              "24px",
+                              {
+                                      "lineHeight": "32px",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "headline-md": [
+                              "20px",
+                              {
+                                      "lineHeight": "28px",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "label-md": [
+                              "12px",
+                              {
+                                      "lineHeight": "16px",
+                                      "letterSpacing": "0.05em",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "body-lg": [
+                              "16px",
+                              {
+                                      "lineHeight": "24px",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "body-md": [
+                              "14px",
+                              {
+                                      "lineHeight": "20px",
+                                      "fontWeight": "400"
+                              }
+                      ]
+              }
+            },
+          },
+        }
+    </script>
+<style>
+        /* Custom Input Range Styling */
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 20px;
+            width: 20px;
+            border-radius: 50%;
+            background: #5000e1; /* primary */
+            cursor: pointer;
+            margin-top: -8px; 
+            box-shadow: 0 0 0 4px #e5dcff; /* on-primary-container */
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 4px;
+            cursor: pointer;
+            background: #cac3d9; /* outline-variant */
+            border-radius: 2px;
+        }
+        input[type=range]:focus::-webkit-slider-thumb {
+            box-shadow: 0 0 0 6px #cbbeff; /* inverse-primary */
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-background font-body-md text-body-md antialiased min-h-screen flex flex-col">
+<!-- TopAppBar -->
+<header class="fixed top-0 z-40 bg-surface dark:bg-background shadow-sm dark:shadow-none flex justify-between items-center w-full px-container-padding py-sm h-16 w-full">
+<!-- Leading: Avatar -->
+<div class="flex items-center gap-sm cursor-pointer hover:bg-surface-container dark:hover:bg-surface-container-high transition-colors rounded-full p-1">
+<img class="w-10 h-10 rounded-full object-cover border border-outline-variant" data-alt="A professional headshot avatar of a young, diverse job seeker with a confident smile, set against a clean, neutral grey background in a corporate modern style." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDz8ApfPBzFth7MuIUt9YaherQPT8qRoAfRvNu1XXdlhgLTqqEI1YewMLe-jE81q5dUUjAWaSoYzzKpiJIfIhpTJdT2Lfa_9H0tTQ2G_V6AvPqtH8aNKDD7hVQv27a1ELalNin7Egbyj9C3Wh42m0Dk-rPCYV5u3ddJTuDQk2a4pMGsfe9v6-olTbDXc8CBLYtrxzAk1KZ9y42bxnExkjdUbEYw_bLHfiQpTzS-q-19jMUy91-j8omP3w"/>
+</div>
+<!-- Headline / Brand -->
+<div class="flex-1 text-center md:text-left md:ml-4">
+<h1 class="text-headline-md font-headline-md font-bold text-primary dark:text-primary-fixed">ApplyCanary</h1>
+</div>
+<!-- Desktop Nav Cluster (Injected per instructions: hidden on mobile, flex on md) -->
+<nav class="hidden md:flex flex-1 justify-center gap-lg items-center">
+<a class="text-on-surface-variant dark:text-outline hover:bg-surface-container transition-colors px-3 py-2 rounded-lg flex items-center gap-2" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">dashboard</span>
+<span class="text-label-md font-label-md">Home</span>
+</a>
+<a class="text-on-surface-variant dark:text-outline hover:bg-surface-container transition-colors px-3 py-2 rounded-lg flex items-center gap-2" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">search</span>
+<span class="text-label-md font-label-md">Discovery</span>
+</a>
+<a class="text-on-surface-variant dark:text-outline hover:bg-surface-container transition-colors px-3 py-2 rounded-lg flex items-center gap-2" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">record_voice_over</span>
+<span class="text-label-md font-label-md">Interview</span>
+</a>
+<!-- Active Desktop Nav -->
+<a class="text-primary dark:text-primary-fixed font-bold hover:bg-surface-container transition-colors px-3 py-2 rounded-lg flex items-center gap-2 scale-95 duration-150" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">psychology</span>
+<span class="text-label-md font-label-md">Memory</span>
+</a>
+<a class="text-on-surface-variant dark:text-outline hover:bg-surface-container transition-colors px-3 py-2 rounded-lg flex items-center gap-2" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">person</span>
+<span class="text-label-md font-label-md">Profile</span>
+</a>
+</nav>
+<!-- Trailing Action -->
+<div class="flex justify-end flex-1 md:flex-none">
+<button class="text-primary dark:text-primary-fixed font-label-md text-label-md px-4 py-2 rounded-lg hover:bg-surface-container dark:hover:bg-surface-container-high transition-colors scale-95 duration-150">
+                Discover
+            </button>
+</div>
+</header>
+<!-- Main Canvas -->
+<main class="flex-grow pt-20 pb-24 md:pb-12 px-container-padding max-w-7xl mx-auto w-full">
+<!-- Page Title Area -->
+<div class="mb-lg">
+<h2 class="text-display-lg font-display-lg text-on-background mb-xs">Memory &amp; Trends</h2>
+<p class="text-body-lg font-body-lg text-on-surface-variant flex items-center gap-xs">
+<span class="material-symbols-outlined text-secondary text-sm">memory</span>
+                AI-powered career insights indexed over time
+            </p>
+</div>
+<!-- Bento Grid Layout -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-md">
+<!-- Improvement Trend Chart (Span 2) -->
+<div class="md:col-span-2 bg-surface-container-lowest rounded-2xl p-md shadow-[0px_4px_20px_rgba(0,0,0,0.05)] border border-surface-variant flex flex-col relative overflow-hidden group">
+<div class="flex justify-between items-start mb-lg relative z-10">
+<div>
+<h3 class="text-headline-md font-headline-md text-on-surface">Improvement Trend</h3>
+<p class="text-body-md font-body-md text-outline">Mock Interview Scores</p>
+</div>
+<div class="bg-primary-container text-on-primary-container px-3 py-1 rounded-full flex items-center gap-xs">
+<span class="material-symbols-outlined text-sm" style="font-variation-settings: 'FILL' 1;">trending_up</span>
+<span class="text-label-md font-label-md">+14% MoM</span>
+</div>
+</div>
+<!-- Chart Visualization (CSS/SVG Hybrid) -->
+<div class="relative flex-grow h-48 w-full mt-auto z-10 flex items-end justify-between px-2">
+<!-- Grid Lines -->
+<div class="absolute inset-0 flex flex-col justify-between pointer-events-none opacity-20">
+<div class="w-full h-px bg-outline"></div>
+<div class="w-full h-px bg-outline"></div>
+<div class="w-full h-px bg-outline"></div>
+<div class="w-full h-px bg-outline"></div>
+</div>
+<!-- SVG Path for Line -->
+<svg class="absolute inset-0 h-full w-full pointer-events-none" preserveaspectratio="none" viewbox="0 0 100 100">
+<defs>
+<lineargradient id="lineGrad" x1="0%" x2="0%" y1="0%" y2="100%">
+<stop offset="0%" stop-color="#5000e1" stop-opacity="0.2"></stop>
+<stop offset="100%" stop-color="#5000e1" stop-opacity="0"></stop>
+</lineargradient>
+</defs>
+<!-- Area Fill -->
+<path d="M0,100 L0,70 L20,65 L40,80 L60,40 L80,50 L100,20 L100,100 Z" fill="url(#lineGrad)"></path>
+<!-- Stroke Line -->
+<path class="drop-shadow-sm" d="M0,70 L20,65 L40,80 L60,40 L80,50 L100,20" fill="none" stroke="#5000e1" stroke-linecap="round" stroke-linejoin="round" stroke-width="3"></path>
+</svg>
+<!-- Data Points (Overlay) -->
+<div class="absolute inset-0 flex justify-between items-end px-1 pb-[3px]">
+<div class="w-2 h-2 rounded-full bg-primary ring-2 ring-surface-container-lowest relative bottom-[30%]"></div>
+<div class="w-2 h-2 rounded-full bg-primary ring-2 ring-surface-container-lowest relative bottom-[35%]"></div>
+<div class="w-2 h-2 rounded-full bg-primary ring-2 ring-surface-container-lowest relative bottom-[20%]"></div>
+<div class="w-2 h-2 rounded-full bg-primary ring-2 ring-surface-container-lowest relative bottom-[60%]"></div>
+<div class="w-2 h-2 rounded-full bg-primary ring-2 ring-surface-container-lowest relative bottom-[50%]"></div>
+<div class="w-2 h-2 rounded-full bg-surface-container-lowest border-2 border-primary relative bottom-[80%] shadow-lg">
+<!-- Tooltip for current -->
+<div class="absolute -top-10 -left-6 bg-inverse-surface text-inverse-on-surface text-label-md font-label-md px-2 py-1 rounded shadow-md whitespace-nowrap">
+                                Score: 92
+                            </div>
+</div>
+</div>
+</div>
+<!-- X Axis Labels -->
+<div class="flex justify-between text-label-md font-label-md text-outline mt-sm relative z-10 px-2">
+<span>Jan</span>
+<span>Feb</span>
+<span>Mar</span>
+<span>Apr</span>
+<span>May</span>
+<span class="text-primary font-bold">Now</span>
+</div>
+</div>
+<!-- Profile Threshold (Span 1) -->
+<div class="bg-surface-container-lowest rounded-2xl p-md shadow-[0px_4px_20px_rgba(0,0,0,0.05)] border border-surface-variant flex flex-col justify-between">
+<div>
+<div class="flex items-center gap-xs mb-sm">
+<span class="material-symbols-outlined text-primary">notifications_active</span>
+<h3 class="text-headline-md font-headline-md text-on-surface">Match Threshold</h3>
+</div>
+<p class="text-body-md font-body-md text-on-surface-variant mb-lg">
+                        Alert me when a job matches my profile above this confidence score.
+                    </p>
+</div>
+<div class="bg-surface-container-low rounded-xl p-4 flex flex-col items-center">
+<div class="text-display-lg font-display-lg text-primary mb-2" id="thresholdValue">90%</div>
+<input class="w-full appearance-none bg-transparent" max="100" min="50" oninput="document.getElementById('thresholdValue').innerText = this.value + '%'" type="range" value="90"/>
+<div class="w-full flex justify-between text-label-md font-label-md text-outline mt-2">
+<span>Loose (50%)</span>
+<span>Strict (100%)</span>
+</div>
+</div>
+</div>
+<!-- Long-term Recall (Span 1) -->
+<div class="bg-surface-container-lowest rounded-2xl p-md shadow-[0px_4px_20px_rgba(0,0,0,0.05)] border border-surface-variant flex flex-col">
+<div class="flex items-center gap-xs mb-md pb-sm border-b border-surface-variant">
+<span class="material-symbols-outlined text-secondary" style="font-variation-settings: 'FILL' 1;">tips_and_updates</span>
+<h3 class="text-headline-md font-headline-md text-on-surface">Long-term Recall</h3>
+</div>
+<div class="flex flex-col gap-gutter">
+<!-- Insight Item -->
+<div class="flex gap-sm p-3 rounded-lg hover:bg-surface-container transition-colors group">
+<div class="w-8 h-8 rounded-full bg-secondary-container text-on-secondary-container flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-sm">code</span>
+</div>
+<div>
+<p class="text-label-md font-label-md text-outline mb-1 uppercase tracking-wider">Strongest Skill</p>
+<p class="text-body-md font-body-md text-on-surface font-semibold group-hover:text-primary transition-colors">Go / System Design</p>
+</div>
+</div>
+<!-- Insight Item -->
+<div class="flex gap-sm p-3 rounded-lg hover:bg-surface-container transition-colors group">
+<div class="w-8 h-8 rounded-full bg-error-container text-on-error-container flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-sm">communication</span>
+</div>
+<div>
+<p class="text-label-md font-label-md text-outline mb-1 uppercase tracking-wider">Improvement Area</p>
+<p class="text-body-md font-body-md text-on-surface font-semibold">Behavioral STAR examples</p>
+</div>
+</div>
+<!-- Insight Item -->
+<div class="flex gap-sm p-3 rounded-lg hover:bg-surface-container transition-colors group">
+<div class="w-8 h-8 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-sm">speed</span>
+</div>
+<div>
+<p class="text-label-md font-label-md text-outline mb-1 uppercase tracking-wider">Ideal Pace</p>
+<p class="text-body-md font-body-md text-on-surface font-semibold">Fast-growing Series B/C</p>
+</div>
+</div>
+</div>
+</div>
+<!-- Remembered Feedback Feed (Span 2) -->
+<div class="md:col-span-2 bg-surface-container-lowest rounded-2xl p-md shadow-[0px_4px_20px_rgba(0,0,0,0.05)] border border-surface-variant flex flex-col">
+<div class="flex items-center justify-between mb-md pb-sm border-b border-surface-variant">
+<div class="flex items-center gap-xs">
+<span class="material-symbols-outlined text-primary">history_edu</span>
+<h3 class="text-headline-md font-headline-md text-on-surface">Remembered Feedback</h3>
+</div>
+<span class="bg-surface-container px-2 py-1 rounded text-label-md font-label-md text-outline flex items-center gap-1">
+<span class="material-symbols-outlined text-[10px]">database</span>
+                        Vector Indexed
+                    </span>
+</div>
+<!-- Timeline Container -->
+<div class="relative pl-6 border-l-2 border-surface-variant ml-3 space-y-lg my-sm">
+<!-- Timeline Item 1 -->
+<div class="relative">
+<!-- Node -->
+<div class="absolute -left-[31px] w-4 h-4 rounded-full bg-primary ring-4 ring-surface-container-lowest"></div>
+<!-- Content Card -->
+<div class="bg-surface rounded-xl p-4 border border-outline-variant hover:shadow-md transition-shadow">
+<div class="flex justify-between items-start mb-2">
+<span class="text-label-md font-label-md text-primary bg-primary-fixed px-2 py-0.5 rounded-full">Interview Prep: Stripe</span>
+<span class="text-label-md font-label-md text-outline">Yesterday</span>
+</div>
+<p class="text-body-lg font-body-lg text-on-surface">
+                                "You explained the caching mechanism well, but remember to explicitly state the trade-offs between Redis and Memcached before deciding. They look for that proactive analysis."
+                            </p>
+<div class="mt-3 flex gap-2">
+<span class="text-label-md font-label-md text-on-surface-variant bg-surface-container-high px-2 py-1 rounded">System Design</span>
+<span class="text-label-md font-label-md text-on-surface-variant bg-surface-container-high px-2 py-1 rounded">Trade-offs</span>
+</div>
+</div>
+</div>
+<!-- Timeline Item 2 -->
+<div class="relative">
+<!-- Node -->
+<div class="absolute -left-[31px] w-4 h-4 rounded-full bg-surface-variant border-2 border-outline ring-4 ring-surface-container-lowest"></div>
+<!-- Content Card -->
+<div class="bg-surface rounded-xl p-4 border border-outline-variant hover:shadow-md transition-shadow opacity-90">
+<div class="flex justify-between items-start mb-2">
+<span class="text-label-md font-label-md text-secondary bg-secondary-fixed px-2 py-0.5 rounded-full text-on-secondary-fixed">Resume Review</span>
+<span class="text-label-md font-label-md text-outline">Oct 12</span>
+</div>
+<p class="text-body-lg font-body-lg text-on-surface">
+                                "We agreed to highlight your leadership in the Kubernetes migration. Make sure that bullet point stays at the top of your most recent role across all generated variations."
+                            </p>
+</div>
+</div>
+</div>
+<button class="mt-auto pt-sm w-full text-center text-primary font-label-md text-label-md hover:underline decoration-primary underline-offset-4">
+                    Load Older Insights
+                </button>
+</div>
+</div>
+</main>
+<!-- BottomNavBar (Mobile Only) -->
+<nav class="md:hidden bg-surface dark:bg-background shadow-[0px_-4px_20px_rgba(0,0,0,0.05)] shadow-lg fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-base pb-safe pt-sm rounded-t-xl pb-4">
+<!-- Home -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-outline px-4 py-1 hover:text-primary dark:hover:text-primary-fixed" href="#">
+<span class="material-symbols-outlined mb-1" style="font-variation-settings: 'FILL' 0;">dashboard</span>
+<span class="text-label-md font-label-md">Home</span>
+</a>
+<!-- Discovery -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-outline px-4 py-1 hover:text-primary dark:hover:text-primary-fixed" href="#">
+<span class="material-symbols-outlined mb-1" style="font-variation-settings: 'FILL' 0;">search</span>
+<span class="text-label-md font-label-md">Discovery</span>
+</a>
+<!-- Interview -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-outline px-4 py-1 hover:text-primary dark:hover:text-primary-fixed" href="#">
+<span class="material-symbols-outlined mb-1" style="font-variation-settings: 'FILL' 0;">record_voice_over</span>
+<span class="text-label-md font-label-md">Interview</span>
+</a>
+<!-- Memory (ACTIVE) -->
+<a class="flex flex-col items-center justify-center bg-primary-container dark:bg-primary text-on-primary-container dark:text-on-primary rounded-2xl px-4 py-1 scale-90 duration-200" href="#">
+<span class="material-symbols-outlined mb-1" style="font-variation-settings: 'FILL' 1;">psychology</span>
+<span class="text-label-md font-label-md">Memory</span>
+</a>
+<!-- Profile -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-outline px-4 py-1 hover:text-primary dark:hover:text-primary-fixed" href="#">
+<span class="material-symbols-outlined mb-1" style="font-variation-settings: 'FILL' 0;">person</span>
+<span class="text-label-md font-label-md">Profile</span>
+</a>
+</nav>
+</body></html>

@@ -232,6 +232,20 @@ def sync_schema() -> None:
                 conn.execute(text(ddl))
                 added.append(f"{table.name}.{column.name}")
 
+        # Accounts that predate email verification have already proven
+        # themselves by other means, and the operator never had a chance to ask
+        # them to confirm. Leaving them at the column default would nag every
+        # existing user, and would lock them all out the moment
+        # REQUIRE_EMAIL_VERIFICATION is switched on. Grandfather them in — but
+        # only on the migration that introduces the column, so this never
+        # re-verifies someone who is legitimately pending.
+        if "user.email_verified" in added:
+            result = conn.execute(text("UPDATE \"user\" SET email_verified = TRUE"))
+            log.info(
+                "schema: grandfathered %s pre-existing account(s) as email-verified",
+                result.rowcount,
+            )
+
     if added:
         log.info("schema: added %d missing column(s): %s", len(added), ", ".join(added))
 

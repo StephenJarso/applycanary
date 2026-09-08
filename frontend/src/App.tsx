@@ -11,6 +11,9 @@ import Sources from "./pages/Sources";
 import ProfilePage from "./pages/Profile";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
+import VerifyEmail from "./pages/VerifyEmail";
 import GuestJobs from "./pages/GuestJobs";
 import { useAuth } from "./context/AuthContext";
 
@@ -24,7 +27,7 @@ const NAV = [
 ] as const;
 
 function Dashboard() {
-  const { logout } = useAuth();
+  const { user, logout } = useAuth();
   const qc = useQueryClient();
   const status = useQuery({ queryKey: ["status"], queryFn: api.status });
 
@@ -102,6 +105,11 @@ function Dashboard() {
         </header>
 
         <main id="main" className="content">
+          {user && !user.email_verified && (
+            <div className="banner banner-warn" role="status">
+              Confirm your email address to secure your account — check your inbox for the link.
+            </div>
+          )}
           {poll.isSuccess && (
             <div className="banner banner-ok" role="status">{poll.data.message}</div>
           )}
@@ -143,6 +151,13 @@ export default function App() {
     <Route path="/login" element={user ? <Navigate to="/" replace /> : <Login />} />
     <Route path="/guest" element={<GuestJobs />} />
     <Route path="/register" element={user ? <Navigate to="/" replace /> : <Register />} />
+    {/* Public regardless of session: these are opened from an email, and the
+        link must not be swallowed by a redirect to /login. Confirming an
+        address is also something a signed-in user does. */}
+    <Route path="/forgot-password" element={<ForgotPassword />} />
+    <Route path="/reset-password" element={<ResetPassword />} />
+    <Route path="/verify-email" element={<VerifyEmail />} />
+    <Route path="/verify-email-change" element={<VerifyEmail />} />
     <Route path="/*" element={user ? <Dashboard /> : <Navigate to="/login" replace />} />
   </Routes>;
 }

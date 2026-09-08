@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import timedelta
+
 import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import Session, select
@@ -46,10 +48,10 @@ def isolated_db():
     get_settings.cache_clear()
 
 
-def _make_user(*, email: str = "user@example.com", admin: bool = False) -> User:
+def _make_user(*, email: str = "user@example.com", admin: bool = False, verified: bool = True) -> User:
     with Session(engine) as session:
         user = User(
-            email=email, password_hash=hash_password(PASSWORD), is_admin=admin
+            email=email, password_hash=hash_password(PASSWORD), is_admin=admin, email_verified=verified
         )
         session.add(user)
         session.commit()
@@ -277,14 +279,20 @@ def test_signup_info_exposes_default_invite_code(isolated_db, monkeypatch):
     client = TestClient(create_app(), follow_redirects=False)
     res = client.get("/api/auth/signup-info")
     assert res.status_code == 200
-    assert res.json() == {"default_invite_code": "HACKATHON2026"}
+    assert res.json() == {
+        "default_invite_code": "HACKATHON2026",
+        "require_email_verification": False,
+    }
 
 
 def test_signup_info_empty_when_no_default(isolated_db):
     client = TestClient(create_app(), follow_redirects=False)
     res = client.get("/api/auth/signup-info")
     assert res.status_code == 200
-    assert res.json() == {"default_invite_code": ""}
+    assert res.json() == {
+        "default_invite_code": "",
+        "require_email_verification": False,
+    }
 
 
 def test_expired_invite_is_refused(isolated_db):
@@ -335,3 +343,273 @@ def test_register_rejects_duplicate_email_and_short_password(isolated_db):
     # Neither failure may burn the invite.
     with Session(engine) as session:
         assert session.exec(select(InviteCode)).one().is_redeemable()
+
+
+# --------------------------------------------------- emailed-token flows
+
+
+@pytest.fixture
+def outbox(monkeypatch):
+    """Capture auth emails instead of sending them.
+
+    The raw token only ever exists in the email — the database stores an HMAC of
+    it — so intercepting the send is the only way a test can follow a link the
+    way a user would.
+    """
+    sent: list[tuple[str, tuple]] = []
+
+    def make(kind: str):
+        async def fake(*args):
+            sent.append((kind, args))
+            return True
+        return fake
+
+    for name in (
+        "send_verification_email", "send_password_reset_email",
+        "send_email_change_email", "send_password_changed_email",
+        "send_email_changed_email",
+    ):
+        monkeypatch.setattr(f"app.api.auth.{name}", make(name))
+    return sent
+
+
+def _token(outbox: list[tuple[str, tuple]], kind: str) -> str:
+    """The token argument of the last email of `kind`."""
+    matches = [args for sent_kind, args in outbox if sent_kind == kind]
+    assert matches, f"no {kind} was sent; outbox held {[k for k, _ in outbox]}"
+    return matches[-1][1]
+
+
+def _register(client: TestClient, email: str = "new@example.com") -> object:
+    _make_invite()
+    return client.post(
+        "/api/auth/register",
+        json={"email": email, "password": "a-long-enough-pw", "invite_code": "GOODCODE"},
+    )
+
+
+def test_registration_sends_a_confirmation_link_that_verifies_once(isolated_db, outbox):
+    client = TestClient(create_app(), follow_redirects=False)
+    assert _register(client).status_code == 201
+
+    with Session(engine) as session:
+        assert session.exec(select(User)).one().email_verified is False
+
+    token = _token(outbox, "send_verification_email")
+    assert client.post("/api/auth/verify-email", json={"token": token}).status_code == 204
+
+    with Session(engine) as session:
+        assert session.exec(select(User)).one().email_verified is True
+
+    # Single use: the token is cleared, so replaying the link cannot re-verify.
+    replay = client.post("/api/auth/verify-email", json={"token": token})
+    assert replay.status_code == 400
+
+
+def test_verify_email_rejects_a_password_reset_token(isolated_db, outbox):
+    """The two token kinds must not be interchangeable.
+
+    They shared one column at first, which let a reset token — obtainable by
+    anyone who knows an address — satisfy the verification endpoint.
+    """
+    user = _make_user(email="me@example.com", verified=False)
+    client = TestClient(create_app(), follow_redirects=False)
+
+    assert client.post("/api/auth/forgot-password", json={"email": "me@example.com"}).status_code == 204
+    reset_token = _token(outbox, "send_password_reset_email")
+
+    assert client.post("/api/auth/verify-email", json={"token": reset_token}).status_code == 400
+    with Session(engine) as session:
+        assert session.get(User, user.id).email_verified is False
+
+
+def test_password_reset_sets_the_new_password_and_logs_sessions_out(isolated_db, outbox):
+    user = _make_user(email="me@example.com")
+    stale_cookie = create_session_token(user)
+
+    client = TestClient(create_app(), follow_redirects=False)
+    assert client.post("/api/auth/forgot-password", json={"email": "me@example.com"}).status_code == 204
+    token = _token(outbox, "send_password_reset_email")
+
+    new_password = "a-brand-new-password"
+    assert client.post(
+        "/api/auth/reset-password", json={"token": token, "password": new_password}
+    ).status_code == 204
+
+    # A cookie minted before the reset must stop working.
+    client.cookies.set(SESSION_COOKIE_NAME, stale_cookie)
+    assert client.get("/api/jobs").status_code == 401
+    client.cookies.clear()
+
+    assert client.post(
+        "/api/auth/login", json={"email": "me@example.com", "password": PASSWORD}
+    ).status_code == 401
+    assert client.post(
+        "/api/auth/login", json={"email": "me@example.com", "password": new_password}
+    ).status_code == 200
+
+    # The owner is told, so an unwanted reset is noticed.
+    assert any(kind == "send_password_changed_email" for kind, _ in outbox)
+
+
+def test_reset_token_is_single_use(isolated_db, outbox):
+    _make_user(email="me@example.com")
+    client = TestClient(create_app(), follow_redirects=False)
+    client.post("/api/auth/forgot-password", json={"email": "me@example.com"})
+    token = _token(outbox, "send_password_reset_email")
+
+    first = client.post("/api/auth/reset-password", json={"token": token, "password": "first-new-password"})
+    assert first.status_code == 204
+    second = client.post("/api/auth/reset-password", json={"token": token, "password": "second-new-password"})
+    assert second.status_code == 400
+
+
+def test_expired_reset_token_is_rejected(isolated_db, outbox):
+    user = _make_user(email="me@example.com")
+    client = TestClient(create_app(), follow_redirects=False)
+    client.post("/api/auth/forgot-password", json={"email": "me@example.com"})
+    token = _token(outbox, "send_password_reset_email")
+
+    with Session(engine) as session:
+        row = session.get(User, user.id)
+        row.password_reset_expires_at = utcnow() - timedelta(minutes=1)
+        session.add(row)
+        session.commit()
+
+    res = client.post("/api/auth/reset-password", json={"token": token, "password": "a-long-enough-pw"})
+    assert res.status_code == 400
+    with Session(engine) as session:
+        assert verify_password(PASSWORD, session.get(User, user.id).password_hash)
+
+
+def test_forgot_password_does_not_disclose_whether_an_email_exists(isolated_db, outbox):
+    """Same 204 either way — a 404 here would be an account-enumeration oracle."""
+    _make_user(email="real@example.com")
+    client = TestClient(create_app(), follow_redirects=False)
+
+    known = client.post("/api/auth/forgot-password", json={"email": "real@example.com"})
+    unknown = client.post("/api/auth/forgot-password", json={"email": "ghost@example.com"})
+    assert known.status_code == unknown.status_code == 204
+
+    # Only the real address is actually mailed.
+    recipients = [args[0] for kind, args in outbox if kind == "send_password_reset_email"]
+    assert recipients == ["real@example.com"]
+
+
+def test_unverified_login_is_allowed_by_default(isolated_db):
+    """Out of the box an unconfirmed account may still sign in.
+
+    The frontend nudges instead, so switching the feature on cannot lock out
+    accounts that were created before it existed.
+    """
+    _make_user(email="pending@example.com", verified=False)
+    client = TestClient(create_app(), follow_redirects=False)
+    res = client.post("/api/auth/login", json={"email": "pending@example.com", "password": PASSWORD})
+    assert res.status_code == 200
+    assert res.json()["email_verified"] is False
+
+
+def test_enforced_verification_blocks_login_with_403(isolated_db, monkeypatch):
+    monkeypatch.setenv("REQUIRE_EMAIL_VERIFICATION", "true")
+    get_settings.cache_clear()
+    _make_user(email="pending@example.com", verified=False)
+    _make_user(email="ok@example.com", verified=True)
+    client = TestClient(create_app(), follow_redirects=False)
+
+    blocked = client.post("/api/auth/login", json={"email": "pending@example.com", "password": PASSWORD})
+    assert blocked.status_code == 403
+    assert SESSION_COOKIE_NAME not in blocked.cookies
+
+    allowed = client.post("/api/auth/login", json={"email": "ok@example.com", "password": PASSWORD})
+    assert allowed.status_code == 200
+
+
+def test_enforced_verification_withholds_the_session_at_registration(isolated_db, outbox, monkeypatch):
+    monkeypatch.setenv("REQUIRE_EMAIL_VERIFICATION", "true")
+    get_settings.cache_clear()
+    client = TestClient(create_app(), follow_redirects=False)
+
+    res = _register(client)
+    assert res.status_code == 201
+    # Auto-login here would make the gate meaningless.
+    assert res.json()["session_started"] is False
+    assert SESSION_COOKIE_NAME not in res.cookies
+
+    # Confirming the address then lets the account in.
+    token = _token(outbox, "send_verification_email")
+    assert client.post("/api/auth/verify-email", json={"token": token}).status_code == 204
+    assert client.post(
+        "/api/auth/login", json={"email": "new@example.com", "password": "a-long-enough-pw"}
+    ).status_code == 200
+
+
+def test_email_change_moves_the_address_only_after_the_new_one_confirms(isolated_db, outbox):
+    _make_user(email="old@example.com")
+    client = TestClient(create_app(), follow_redirects=False)
+    assert client.post(
+        "/api/auth/login", json={"email": "old@example.com", "password": PASSWORD}
+    ).status_code == 200
+
+    assert client.post(
+        "/api/auth/change-email", json={"new_email": "new@example.com", "password": PASSWORD}
+    ).status_code == 204
+
+    # Staged, not applied.
+    with Session(engine) as session:
+        row = session.exec(select(User)).one()
+        assert row.email == "old@example.com"
+        assert row.pending_email == "new@example.com"
+
+    # The link goes to the address being claimed, not the current one.
+    change_recipients = [args[0] for kind, args in outbox if kind == "send_email_change_email"]
+    assert change_recipients == ["new@example.com"]
+
+    token = _token(outbox, "send_email_change_email")
+    assert client.post("/api/auth/verify-email-change", json={"token": token}).status_code == 204
+
+    with Session(engine) as session:
+        row = session.exec(select(User)).one()
+        assert row.email == "new@example.com"
+        assert row.pending_email == ""
+        assert row.email_verified is True
+
+    # Both the old and the new address are notified.
+    notified = {args[0] for kind, args in outbox if kind == "send_email_changed_email"}
+    assert notified == {"old@example.com", "new@example.com"}
+
+
+def test_change_email_requires_the_current_password(isolated_db, outbox):
+    _make_user(email="me@example.com")
+    client = TestClient(create_app(), follow_redirects=False)
+    client.post("/api/auth/login", json={"email": "me@example.com", "password": PASSWORD})
+
+    res = client.post(
+        "/api/auth/change-email", json={"new_email": "new@example.com", "password": "wrong"}
+    )
+    assert res.status_code == 401
+    with Session(engine) as session:
+        assert session.exec(select(User)).one().pending_email == ""
+
+
+def test_change_email_refuses_an_address_already_registered(isolated_db, outbox):
+    _make_user(email="me@example.com")
+    _make_user(email="taken@example.com")
+    client = TestClient(create_app(), follow_redirects=False)
+    client.post("/api/auth/login", json={"email": "me@example.com", "password": PASSWORD})
+
+    res = client.post(
+        "/api/auth/change-email", json={"new_email": "taken@example.com", "password": PASSWORD}
+    )
+    assert res.status_code == 409
+
+
+def test_emailed_token_endpoints_need_no_session(isolated_db, outbox):
+    """These links are opened from a mail client, which carries no cookie."""
+    client = TestClient(create_app(), follow_redirects=False)
+    for path in ("/api/auth/verify-email", "/api/auth/verify-email-change", "/api/auth/reset-password"):
+        body = {"token": "not-a-real-token"}
+        if path.endswith("reset-password"):
+            body["password"] = "a-long-enough-pw"
+        res = client.post(path, json=body)
+        # 400 (bad token) rather than 401 (no session) is the point here.
+        assert res.status_code == 400, f"{path} returned {res.status_code}"

@@ -119,7 +119,20 @@ def create_app() -> FastAPI:
                 return JSONResponse(status_code=429, content={"detail": "Too many requests; please try again later."}, headers={"Retry-After": str(retry_after)})
         if (
             path == "/health"
-            or path in ("/login", "/register", "/api/auth/login", "/api/auth/register", "/api/auth/signup-info")
+            or path in (
+                "/login", "/register",
+                # SPA routes for the emailed links. Without these the catch-all
+                # bounces the user to /login and the token in the URL is lost.
+                "/forgot-password", "/reset-password",
+                "/verify-email", "/verify-email-change",
+                "/api/auth/login", "/api/auth/register", "/api/auth/signup-info",
+                # Emailed links carry their own proof (a one-time token) and are
+                # opened from whatever browser the mail client picks, so they
+                # cannot depend on an existing session.
+                "/api/auth/verify-email", "/api/auth/resend-verification",
+                "/api/auth/forgot-password", "/api/auth/reset-password",
+                "/api/auth/verify-email-change",
+            )
             or path.startswith("/assets/")
             or path == "/guest"
             or path.startswith("/guest/")

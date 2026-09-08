@@ -49,5 +49,14 @@ for _k in (
     # Hackathon open-signup code: blank it so registration tests exercise the
     # strict invite-gated path unless a test explicitly sets it.
     "DEFAULT_INVITE_CODE",
+    # Origin used for links in email. Left blank so no test depends on a
+    # developer's deployment URL.
+    "PUBLIC_BASE_URL",
 ):
     os.environ[_k] = ""
+
+# Same rationale, but this one is a bool and pydantic rejects "" for that, so it
+# is pinned rather than blanked. A developer .env that enforced confirmation
+# would invert what the login tests assert; the tests covering enforcement set
+# it explicitly with monkeypatch.
+os.environ["REQUIRE_EMAIL_VERIFICATION"] = "false"

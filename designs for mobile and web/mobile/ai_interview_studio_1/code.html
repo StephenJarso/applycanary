@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>ApplyCanary - AI Interview Studio</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "secondary": "#705d00",
+                        "surface-container-high": "#e7e8e9",
+                        "outline": "#797488",
+                        "on-tertiary-container": "#ffd9ca",
+                        "surface-variant": "#e1e3e4",
+                        "surface-container-low": "#f3f4f5",
+                        "surface-tint": "#642afa",
+                        "on-primary-fixed-variant": "#4b00d4",
+                        "tertiary-container": "#ac4200",
+                        "inverse-on-surface": "#f0f1f2",
+                        "primary-fixed": "#e7deff",
+                        "on-error": "#ffffff",
+                        "surface-container-highest": "#e1e3e4",
+                        "secondary-fixed": "#ffe16d",
+                        "on-secondary-fixed-variant": "#544600",
+                        "surface": "#f8f9fa",
+                        "on-background": "#191c1d",
+                        "error-container": "#ffdad6",
+                        "on-primary-fixed": "#1e0061",
+                        "inverse-primary": "#cbbeff",
+                        "error": "#ba1a1a",
+                        "on-tertiary-fixed-variant": "#7c2e00",
+                        "inverse-surface": "#2e3132",
+                        "on-tertiary": "#ffffff",
+                        "tertiary": "#853100",
+                        "surface-dim": "#d9dadb",
+                        "background": "#f8f9fa",
+                        "tertiary-fixed-dim": "#ffb596",
+                        "primary-container": "#6933ff",
+                        "outline-variant": "#cac3d9",
+                        "on-secondary-container": "#6e5c00",
+                        "on-error-container": "#93000a",
+                        "on-primary-container": "#e5dcff",
+                        "on-surface": "#191c1d",
+                        "secondary-fixed-dim": "#e9c400",
+                        "tertiary-fixed": "#ffdbcd",
+                        "on-secondary-fixed": "#221b00",
+                        "primary": "#5000e1",
+                        "secondary-container": "#fcd400",
+                        "on-secondary": "#ffffff",
+                        "surface-bright": "#f8f9fa",
+                        "on-surface-variant": "#484456",
+                        "surface-container": "#edeeef",
+                        "primary-fixed-dim": "#cbbeff",
+                        "on-tertiary-fixed": "#360f00",
+                        "on-primary": "#ffffff",
+                        "surface-container-lowest": "#ffffff"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "base": "4px",
+                        "lg": "24px",
+                        "gutter": "12px",
+                        "xs": "4px",
+                        "xl": "32px",
+                        "md": "16px",
+                        "container-padding": "16px",
+                        "sm": "8px"
+                    },
+                    "fontFamily": {
+                        "display-lg": ["Inter", "sans-serif"],
+                        "headline-lg": ["Inter", "sans-serif"],
+                        "headline-md": ["Inter", "sans-serif"],
+                        "label-md": ["Inter", "sans-serif"],
+                        "body-lg": ["Inter", "sans-serif"],
+                        "body-md": ["Inter", "sans-serif"]
+                    },
+                    "fontSize": {
+                        "display-lg": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "headline-lg": ["24px", { "lineHeight": "32px", "fontWeight": "700" }],
+                        "headline-md": ["20px", { "lineHeight": "28px", "fontWeight": "600" }],
+                        "label-md": ["12px", { "lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "600" }],
+                        "body-lg": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                        "body-md": ["14px", { "lineHeight": "20px", "fontWeight": "400" }]
+                    }
+                }
+            }
+        }
+    </script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        body { font-family: 'Inter', sans-serif; }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .material-symbols-outlined[data-weight="fill"] {
+            font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+
+        /* Voice Wave Animation Styles */
+        .voice-bar {
+            width: 8px;
+            background-color: theme('colors.primary');
+            border-radius: theme('borderRadius.full');
+            margin: 0 4px;
+            animation: pulse 1.2s infinite ease-in-out;
+            transform-origin: bottom;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scaleY(0.3); opacity: 0.7; }
+            50% { transform: scaleY(1); opacity: 1; }
+        }
+
+        .voice-bar:nth-child(1) { animation-delay: 0.0s; height: 40px; }
+        .voice-bar:nth-child(2) { animation-delay: 0.1s; height: 70px; }
+        .voice-bar:nth-child(3) { animation-delay: 0.2s; height: 100px; }
+        .voice-bar:nth-child(4) { animation-delay: 0.3s; height: 120px; }
+        .voice-bar:nth-child(5) { animation-delay: 0.4s; height: 90px; }
+        .voice-bar:nth-child(6) { animation-delay: 0.5s; height: 60px; }
+        .voice-bar:nth-child(7) { animation-delay: 0.6s; height: 30px; }
+
+        /* Muted state animation override */
+        .muted .voice-bar {
+            animation: none;
+            transform: scaleY(0.2);
+            background-color: theme('colors.outline');
+        }
+
+        /* Subtle gradient text */
+        .text-gradient {
+            background-image: linear-gradient(to right, theme('colors.primary'), theme('colors.primary-container'));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-background min-h-screen flex flex-col antialiased">
+<!-- Top Navigation (Shell suppressed for this focused transactional view, replaced with simplified header) -->
+<header class="w-full px-container-padding py-sm flex justify-between items-center bg-surface shadow-sm z-10 sticky top-0">
+<div class="flex items-center gap-sm">
+<button class="p-2 text-on-surface-variant hover:bg-surface-container rounded-full transition-colors flex items-center justify-center">
+<span class="material-symbols-outlined" data-icon="arrow_back">arrow_back</span>
+</button>
+<h1 class="text-headline-md font-headline-md font-bold text-primary">ApplyCanary</h1>
+</div>
+<div class="flex items-center gap-md">
+<span class="text-label-md font-label-md bg-secondary-container text-on-secondary-container px-3 py-1 rounded-full flex items-center gap-xs">
+<span class="material-symbols-outlined text-[16px]" data-icon="radio_button_checked" data-weight="fill">radio_button_checked</span>
+                Live
+            </span>
+</div>
+</header>
+<!-- Main Content Canvas -->
+<main class="flex-1 flex flex-col md:flex-row relative overflow-hidden">
+<!-- Left Panel: Context & Memory (Bento Grid Style) -->
+<div class="w-full md:w-1/3 p-container-padding flex flex-col gap-md bg-surface-container-lowest z-10 overflow-y-auto border-r border-surface-variant hidden md:flex">
+<!-- Context Card -->
+<div class="bg-surface rounded-xl p-md shadow-[0px_4px_20px_rgba(0,0,0,0.05)] border border-surface-variant">
+<h2 class="text-label-md font-label-md text-outline mb-sm uppercase tracking-wider">Now Interviewing For</h2>
+<div class="flex flex-col gap-xs">
+<span class="text-headline-md font-headline-md text-on-surface">Senior Software Engineer</span>
+<div class="flex items-center gap-xs text-body-md font-body-md text-on-surface-variant">
+<span class="material-symbols-outlined text-[18px]" data-icon="business">business</span>
+<span>Cockroach Labs</span>
+</div>
+</div>
+</div>
+<!-- Real-time Feedback Card -->
+<div class="bg-surface rounded-xl p-md shadow-[0px_4px_20px_rgba(0,0,0,0.05)] border border-surface-variant">
+<h2 class="text-label-md font-label-md text-outline mb-sm uppercase tracking-wider">Real-time Metrics</h2>
+<div class="space-y-sm">
+<div class="flex justify-between items-center border-b border-surface-variant pb-xs">
+<span class="text-body-md font-body-md text-on-surface">Clarity</span>
+<span class="bg-[#d4edda] text-[#155724] text-label-md font-label-md px-2 py-0.5 rounded-full">High</span>
+</div>
+<div class="flex justify-between items-center border-b border-surface-variant pb-xs">
+<span class="text-body-md font-body-md text-on-surface">Pace</span>
+<span class="bg-[#fff3cd] text-[#856404] text-label-md font-label-md px-2 py-0.5 rounded-full">Good</span>
+</div>
+<div class="flex justify-between items-center">
+<span class="text-body-md font-body-md text-on-surface">Confidence</span>
+<span class="text-gradient font-bold text-label-md font-label-md">88%</span>
+</div>
+</div>
+</div>
+<!-- Memory Insight Alert -->
+<div class="bg-secondary-fixed text-on-secondary-fixed p-md rounded-xl shadow-sm border border-[#f0d665] flex items-start gap-sm">
+<span class="material-symbols-outlined text-tertiary-container mt-0.5" data-icon="lightbulb" data-weight="fill">lightbulb</span>
+<div>
+<h3 class="text-label-md font-label-md font-bold mb-xs text-tertiary-container">Memory Insight</h3>
+<p class="text-body-md font-body-md">The coach remembers you rushed your last behavioral answer regarding conflict resolution. Take a deep breath and slow down your delivery.</p>
+</div>
+</div>
+</div>
+<!-- Center Stage: Voice Interface -->
+<div class="flex-1 flex flex-col items-center justify-center p-container-padding relative bg-surface-container-low">
+<!-- Mobile Context Header (Visible only on small screens) -->
+<div class="w-full md:hidden mb-lg bg-surface rounded-xl p-sm shadow-sm border border-surface-variant flex flex-col items-center text-center">
+<span class="text-label-md font-label-md text-outline">Interviewing For</span>
+<span class="text-body-lg font-body-lg font-bold text-on-surface">Senior Software Engineer</span>
+<span class="text-body-md font-body-md text-on-surface-variant">Cockroach Labs</span>
+</div>
+<!-- Abstract Background Element -->
+<div class="absolute inset-0 z-0 opacity-20 pointer-events-none flex items-center justify-center">
+<div class="w-96 h-96 bg-primary rounded-full blur-[100px]"></div>
+</div>
+<!-- Voice Wave Visualizer -->
+<div class="z-10 flex flex-col items-center gap-xl">
+<div class="flex items-end justify-center h-40" id="voice-visualizer">
+<div class="voice-bar"></div>
+<div class="voice-bar"></div>
+<div class="voice-bar"></div>
+<div class="voice-bar"></div>
+<div class="voice-bar"></div>
+<div class="voice-bar"></div>
+<div class="voice-bar"></div>
+</div>
+<!-- Live Transcript Area -->
+<div class="max-w-2xl text-center bg-surface/80 backdrop-blur-md p-lg rounded-2xl shadow-lg border border-surface-variant relative">
+<span class="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary text-on-primary text-label-md font-label-md px-3 py-1 rounded-full uppercase tracking-widest shadow-sm">AI Coach</span>
+<p class="text-headline-lg font-headline-lg text-on-surface leading-tight mt-sm">
+                        "Tell me about a time you solved a complex concurrency issue in a high-throughput system."
+                    </p>
+</div>
+</div>
+<!-- Controls (Bottom Anchored) -->
+<div class="absolute bottom-xl left-0 w-full flex justify-center z-20">
+<div class="bg-surface p-sm rounded-full shadow-lg border border-surface-variant flex gap-sm items-center">
+<button class="w-12 h-12 rounded-full bg-surface-container-high text-on-surface hover:bg-surface-variant transition-colors flex items-center justify-center" id="mute-btn" title="Mute Microphone">
+<span class="material-symbols-outlined" data-icon="mic" id="mic-icon">mic</span>
+</button>
+<button class="w-14 h-14 rounded-full bg-error text-on-error hover:bg-[#a01616] transition-colors flex items-center justify-center shadow-md" title="End Session">
+<span class="material-symbols-outlined text-[28px]" data-icon="call_end" data-weight="fill">call_end</span>
+</button>
+<button class="px-md h-12 rounded-full bg-primary-container text-on-primary-container hover:bg-[#5b2ce0] transition-colors flex items-center gap-xs font-label-md text-label-md shadow-sm">
+<span class="material-symbols-outlined" data-icon="analytics">analytics</span>
+                        View Coaching
+                    </button>
+</div>
+</div>
+</div>
+</main>
+<script>
+        // Simple toggle for mute visual feedback
+        const muteBtn = document.getElementById('mute-btn');
+        const micIcon = document.getElementById('mic-icon');
+        const visualizer = document.getElementById('voice-visualizer');
+
+        muteBtn.addEventListener('click', () => {
+            const isMuted = visualizer.classList.toggle('muted');
+            
+            if (isMuted) {
+                micIcon.textContent = 'mic_off';
+                micIcon.setAttribute('data-icon', 'mic_off');
+                muteBtn.classList.replace('bg-surface-container-high', 'bg-error-container');
+                muteBtn.classList.replace('text-on-surface', 'text-on-error-container');
+            } else {
+                micIcon.textContent = 'mic';
+                micIcon.setAttribute('data-icon', 'mic');
+                muteBtn.classList.replace('bg-error-container', 'bg-surface-container-high');
+                muteBtn.classList.replace('text-on-error-container', 'text-on-surface');
+            }
+        });
+    </script>
+</body></html>

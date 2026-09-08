@@ -401,6 +401,19 @@ tbody tr:hover { background: var(--bg-hover); }
 .banner-warn { border-color: color-mix(in srgb, var(--warn) 35%, transparent); background: var(--warn-bg); color: var(--warn); }
 .banner-bad { border-color: color-mix(in srgb, var(--bad) 35%, transparent); background: var(--bad-bg); color: var(--bad); }
 
+/* A link-like action sitting inside a banner, e.g. "Resend confirmation". */
+.banner-action {
+  padding: 0;
+  font: inherit;
+  font-weight: 600;
+  color: inherit;
+  background: none;
+  border: 0;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.banner-action:hover { opacity: 0.85; }
+
 .empty { text-align: center; padding: 56px 20px; color: var(--text-dim); }
 .empty-title { font-weight: 560; color: var(--text); margin-bottom: 4px; }
 
@@ -515,54 +528,253 @@ details > summary:hover { color: var(--text); }
   box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.35);
 }
 .guest-note { padding: 12px 14px; margin-bottom: 18px; border-left: 3px solid var(--accent); background: var(--panel); color: var(--text-dim); }
+/* ------------------------------------------------------------ auth screens
+ *
+ * These follow "designs for mobile and web/desktop/authentication/screen.png"
+ * and the tokens in that folder's DESIGN.md, which is a light, indigo-led
+ * system — whereas the app shell above is dark-first. So the auth screens
+ * carry their own scoped palette rather than inheriting the shell's.
+ *
+ * The --ac-* tokens are the DESIGN.md values verbatim. Only the auth rules
+ * consume them today; the remaining desktop screens can adopt them as they are
+ * redesigned, without anything here having to move.
+ */
+
+:root {
+  --ac-primary: #5000e1;
+  --ac-primary-hover: #6933ff;
+  --ac-on-primary: #ffffff;
+  --ac-primary-fixed: #e7deff;
+
+  --ac-surface: #f8f9fa;
+  --ac-surface-card: #ffffff;
+  --ac-surface-container: #edeeef;
+  --ac-on-surface: #191c1d;
+  --ac-on-surface-variant: #484456;
+  --ac-outline-variant: #cac3d9;
+
+  --ac-error: #ba1a1a;
+  --ac-error-container: #ffdad6;
+  --ac-on-error-container: #93000a;
+
+  --ac-radius-control: 0.5rem;
+  --ac-radius-card: 1rem;
+  --ac-shadow-card: 0 4px 20px rgba(0, 0, 0, 0.05);
+  --ac-font: Inter, ui-sans-serif, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
 .auth-page {
-  min-height: 100%;
+  min-height: 100vh;
   display: grid;
   place-items: center;
-  padding: 28px 18px;
+  padding: 40px 18px;
+  font-family: var(--ac-font);
+  color: var(--ac-on-surface);
+  /* Dotted field under two soft brand glows, per the mockup. */
   background:
-    radial-gradient(circle at 18% 12%, var(--accent-bg), transparent 31rem),
-    radial-gradient(circle at 82% 88%, color-mix(in srgb, #8b5cf6 10%, transparent), transparent 28rem),
-    var(--bg);
+    radial-gradient(circle at 12% 6%, rgba(80, 0, 225, 0.10), transparent 34rem),
+    radial-gradient(circle at 88% 92%, rgba(252, 212, 0, 0.16), transparent 32rem),
+    radial-gradient(circle at 1px 1px, rgba(25, 28, 29, 0.07) 1px, transparent 0) 0 0 / 22px 22px,
+    var(--ac-surface);
 }
 
 .auth-card {
-  width: min(100%, 410px);
+  width: min(100%, 440px);
   display: flex;
   flex-direction: column;
   gap: 16px;
-  padding: 30px;
-  border: 1px solid var(--border-strong);
-  border-radius: 14px;
-  background: color-mix(in srgb, var(--bg-raised) 94%, transparent);
-  box-shadow: var(--shadow), 0 22px 54px rgba(0, 0, 0, 0.2);
+  padding: 36px 40px 32px;
+  border: 1px solid rgba(25, 28, 29, 0.06);
+  border-radius: var(--ac-radius-card);
+  background: var(--ac-surface-card);
+  box-shadow: var(--ac-shadow-card);
 }
+
+/* Icon tile above the heading: the brand mark on forms, a status glyph on
+ * outcome screens. */
+.auth-mark {
+  width: 48px;
+  height: 48px;
+  margin: 0 auto;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  background: var(--ac-primary-fixed);
+  color: var(--ac-primary);
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1;
+}
+.auth-mark svg { width: 24px; height: 24px; display: block; }
+.auth-mark.is-bad { background: var(--ac-error-container); color: var(--ac-on-error-container); }
 
 .auth-card h1 {
   margin: 0;
-  font-size: 22px;
-  line-height: 1.2;
-  letter-spacing: -0.025em;
+  text-align: center;
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  color: var(--ac-on-surface);
 }
 
-.auth-card > p:first-of-type {
-  margin: -10px 0 4px;
-  color: var(--text-dim);
+.auth-sub {
+  margin: -8px 0 6px;
+  text-align: center;
+  color: var(--ac-on-surface-variant);
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+/* The in-card spinner (confirming-email state) sits on a light card, so the
+ * handful of dark-theme colors the dashboard spinner carries do not apply. */
+.auth-card .spinner {
+  border-color: var(--ac-primary-fixed);
+  border-top-color: var(--ac-primary);
+}
+
+/* One field = one flex item, so the card's 16px gap separates fields rather
+ * than a label from its own input. */
+.auth-field { display: block; }
+
+.auth-card label {
+  display: block;
+  margin: 0;
   font-size: 13px;
+  font-weight: 600;
+  color: var(--ac-on-surface);
 }
 
-.auth-card label { margin: 0; }
-.auth-card label + label { margin-top: 2px; }
-.auth-card label input { min-height: 38px; margin-top: 6px; }
-.auth-card button { width: 100%; justify-content: center; min-height: 38px; margin-top: 4px; }
-.auth-card .banner { margin: 0; }
-.auth-card .cell-dim { margin: 3px 0 0; text-align: center; font-size: 12.5px; }
-.auth-card .cell-dim a { color: var(--accent); font-weight: 550; }
-.auth-card .cell-dim a:hover { text-decoration: underline; }
+.auth-card input {
+  width: 100%;
+  min-height: 44px;
+  margin-top: 6px;
+  padding: 10px 14px;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 400;
+  color: var(--ac-on-surface);
+  background: var(--ac-surface-card);
+  border: 1px solid var(--ac-outline-variant);
+  border-radius: var(--ac-radius-control);
+  box-shadow: none;
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+.auth-card input::placeholder { color: color-mix(in srgb, var(--ac-on-surface-variant) 60%, transparent); }
+.auth-card input:focus {
+  outline: none;
+  border-color: var(--ac-primary);
+  box-shadow: 0 0 0 3px rgba(80, 0, 225, 0.14);
+}
 
-@media (max-width: 440px) {
-  .auth-page { padding: 16px; }
-  .auth-card { padding: 24px 20px; }
+/* Label row that carries a trailing link, e.g. Password / Forgot password? */
+.auth-label-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+.auth-label-row a {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ac-primary);
+  text-decoration: none;
+}
+.auth-label-row a:hover { text-decoration: underline; }
+
+/* Quieter companion to the primary action, e.g. "Resend confirmation email". */
+.auth-secondary {
+  width: 100%;
+  min-height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 16px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ac-primary);
+  background: var(--ac-surface-card);
+  border: 1px solid var(--ac-outline-variant);
+  border-radius: var(--ac-radius-control);
+  cursor: pointer;
+}
+.auth-secondary:hover:not(:disabled) { background: var(--ac-primary-fixed); border-color: var(--ac-primary); }
+.auth-secondary:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.auth-card button[type="submit"],
+.auth-card .auth-submit {
+  width: 100%;
+  min-height: 44px;
+  margin-top: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 20px;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ac-on-primary);
+  background: linear-gradient(180deg, var(--ac-primary-hover), var(--ac-primary));
+  border: 0;
+  border-radius: var(--ac-radius-control);
+  text-decoration: none;
+  cursor: pointer;
+  transition: filter 120ms ease;
+}
+.auth-card button[type="submit"]:hover:not(:disabled),
+.auth-card .auth-submit:hover { filter: brightness(1.08); }
+.auth-card button[type="submit"]:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.auth-card .banner { margin: 0; border-radius: var(--ac-radius-control); font-size: 14px; }
+.auth-card .banner-bad {
+  color: var(--ac-on-error-container);
+  background: var(--ac-error-container);
+  border: 1px solid color-mix(in srgb, var(--ac-error) 24%, transparent);
+}
+.auth-card .banner-ok {
+  color: var(--ac-on-surface-variant);
+  background: var(--ac-primary-fixed);
+  border: 1px solid color-mix(in srgb, var(--ac-primary) 24%, transparent);
+}
+
+.auth-foot {
+  margin: 4px 0 0;
+  text-align: center;
+  font-size: 14px;
+  color: var(--ac-on-surface-variant);
+}
+.auth-foot a { color: var(--ac-primary); font-weight: 600; text-decoration: none; }
+.auth-foot a:hover { text-decoration: underline; }
+
+/* The mockup is a light design; keep it recognisable for dark-scheme users
+ * rather than flashing a white card at them. */
+@media (prefers-color-scheme: dark) {
+  .auth-page {
+    --ac-surface: #101014;
+    --ac-surface-card: #17171d;
+    --ac-on-surface: #ecebf0;
+    --ac-on-surface-variant: #a9a4b8;
+    --ac-outline-variant: #383247;
+    --ac-primary: #8b5cf6;
+    --ac-primary-hover: #a78bfa;
+    --ac-primary-fixed: #241a3d;
+    --ac-error-container: #3a0d0d;
+    --ac-on-error-container: #ffb4ab;
+    background:
+      radial-gradient(circle at 12% 6%, rgba(139, 92, 246, 0.16), transparent 34rem),
+      radial-gradient(circle at 88% 92%, rgba(252, 212, 0, 0.07), transparent 32rem),
+      radial-gradient(circle at 1px 1px, rgba(255, 255, 255, 0.05) 1px, transparent 0) 0 0 / 22px 22px,
+      var(--ac-surface);
+  }
+  .auth-card { border-color: rgba(255, 255, 255, 0.07); box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45); }
+}
+
+@media (max-width: 480px) {
+  .auth-page { padding: 20px 14px; }
+  .auth-card { padding: 28px 22px 24px; }
+  .auth-card h1 { font-size: 24px; }
 }
 
 /* ------------------------------------------------------------ interview studio */

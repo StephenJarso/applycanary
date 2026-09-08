@@ -69,6 +69,29 @@ class User(SQLModel, table=True):
     # obtained with, for the full 30-day token lifetime.
     token_version: int = 1
 
+    # Set once the address has been proven reachable. Whether an unverified
+    # account may still sign in is a deployment choice
+    # (settings.require_email_verification), enforced at the login endpoint.
+    email_verified: bool = False
+
+    # Emailed tokens, one column pair per purpose. They are deliberately not
+    # shared: a single column would let a password-reset token satisfy the
+    # email-verification endpoint, which is an escalation rather than just an
+    # untidiness. Each hash is indexed because lookup runs token -> user, never
+    # user -> token; see `hash_token` in app/auth.py for why these hold an HMAC
+    # rather than a scrypt digest.
+    email_verification_token_hash: str = Field(default="", index=True)
+    email_verification_expires_at: datetime | None = None
+
+    password_reset_token_hash: str = Field(default="", index=True)
+    password_reset_expires_at: datetime | None = None
+
+    # An email change is staged here and only copied over `email` once the link
+    # sent to the *new* address is opened, so a typo cannot orphan the account.
+    pending_email: str = ""
+    pending_email_token_hash: str = Field(default="", index=True)
+    pending_email_expires_at: datetime | None = None
+
     created_at: datetime = Field(default_factory=utcnow)
     last_login_at: datetime | None = None
 

@@ -1,6 +1,8 @@
 import { useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { ApiError, api } from "../api";
+import AuthShell from "./AuthShell";
 
 export default function Login() {
   const { login } = useAuth();
@@ -8,29 +10,83 @@ export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  // Login's only 403 is an unconfirmed address, so the status alone tells us to
+  // offer a resend rather than let the user retype correct credentials.
+  const [unverified, setUnverified] = useState(false);
+  const [resent, setResent] = useState(false);
   const [busy, setBusy] = useState(false);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
     setError("");
+    setUnverified(false);
+    setResent(false);
     setBusy(true);
     try {
       await login(email, password);
       navigate("/", { replace: true });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Invalid credentials");
+      if (err instanceof ApiError && err.status === 403) setUnverified(true);
+      else setError(err instanceof Error ? err.message : "Invalid credentials");
     } finally {
       setBusy(false);
     }
   }
 
-  return <main className="auth-page"><form className="auth-card" onSubmit={submit}>
-    <h1>ApplyCanary</h1><p>Sign in to your job dashboard.</p>
-    {error && <div className="banner banner-bad" role="alert">{error}</div>}
-    <label>Email or username<input type="text" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="username" required autoFocus /></label>
-    <label>Password<input type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" required /></label>
-    <button disabled={busy}>{busy ? "Signing in…" : "Sign in"}</button>
-    <p className="cell-dim">Have an invite? <Link to="/register">Create an account</Link> · <Link to="/guest">Browse as guest</Link></p>
-  </form></main>;
-}
+  async function resend() {
+    setBusy(true);
+    try {
+      await api.auth.resendVerification(email, password);
+      setResent(true);
+    } catch {
+      /* Deliberately 204 for unknown accounts; nothing useful to report. */
+      setResent(true);
+    } finally {
+      setBusy(false);
+    }
+  }
 
+  return (
+    <AuthShell title="Welcome back" subtitle="Log in to your job dashboard to continue." onSubmit={submit}>
+      {unverified && !resent && (
+        <div className="banner banner-bad" role="status">
+          Confirm your email address before signing in.{" "}
+          <button type="button" className="banner-action" onClick={() => void resend()} disabled={busy}>
+            Resend confirmation
+          </button>
+        </div>
+      )}
+      {unverified && resent && (
+        <div className="banner banner-ok" role="status">Confirmation link sent — check your inbox.</div>
+      )}
+      {error && <div className="banner banner-bad" role="alert">{error}</div>}
+
+      <div className="auth-field">
+        <label htmlFor="login-email">Email Address</label>
+        <input
+          id="login-email" type="text" value={email} onChange={(e) => setEmail(e.target.value)}
+          placeholder="name@company.com" autoComplete="username" required autoFocus
+        />
+      </div>
+
+      <div className="auth-field">
+        {/* The link is a sibling of the label rather than inside it: a nested
+            anchor makes the label's click target ambiguous. */}
+        <div className="auth-label-row">
+          <label htmlFor="login-password">Password</label>
+          <Link to="/forgot-password">Forgot password?</Link>
+        </div>
+        <input
+          id="login-password" type="password" value={password} onChange={(e) => setPassword(e.target.value)}
+          autoComplete="current-password" required
+        />
+      </div>
+
+      <button type="submit" disabled={busy}>{busy ? "Signing in…" : "Log In"}</button>
+
+      <p className="auth-foot">
+        Don't have an account? <Link to="/register">Sign up</Link> · <Link to="/guest">Browse as guest</Link>
+      </p>
+    </AuthShell>
+  );
+}

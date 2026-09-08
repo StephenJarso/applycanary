@@ -11,11 +11,19 @@ export interface AuthUser {
   id: number;
   email: string;
   is_admin: boolean;
+  email_verified: boolean;
+  /** False from /register when verification is enforced: account made, no session yet. */
+  session_started: boolean;
 }
 
 export interface Invite {
   code: string;
   link: string;
+}
+
+export interface SignupInfo {
+  default_invite_code: string;
+  require_email_verification: boolean;
 }
 
 export interface Score {
@@ -375,7 +383,22 @@ export const api = {
       request<AuthUser>("/auth/register", { method: "POST", body: JSON.stringify({ email, password, invite_code }) }),
     logout: () => request<void>("/auth/logout", { method: "POST" }),
     invite: () => request<Invite>("/auth/invite"),
-    signupInfo: () => request<{ default_invite_code: string }>("/auth/signup-info"),
+    signupInfo: () => request<SignupInfo>("/auth/signup-info"),
+
+    // Emailed-link flows. All return 204, so there is no body to read; failures
+    // surface as a thrown ApiError carrying the backend's `detail` message.
+    forgotPassword: (email: string) =>
+      request<void>("/auth/forgot-password", { method: "POST", body: JSON.stringify({ email }) }),
+    resetPassword: (token: string, password: string) =>
+      request<void>("/auth/reset-password", { method: "POST", body: JSON.stringify({ token, password }) }),
+    verifyEmail: (token: string) =>
+      request<void>("/auth/verify-email", { method: "POST", body: JSON.stringify({ token }) }),
+    resendVerification: (email: string, password: string) =>
+      request<void>("/auth/resend-verification", { method: "POST", body: JSON.stringify({ email, password }) }),
+    changeEmail: (new_email: string, password: string) =>
+      request<void>("/auth/change-email", { method: "POST", body: JSON.stringify({ new_email, password }) }),
+    verifyEmailChange: (token: string) =>
+      request<void>("/auth/verify-email-change", { method: "POST", body: JSON.stringify({ token }) }),
   },
   status: () => request<Status>("/status"),
   jobs: (filters: JobFilters = {}) => request<JobList>(`/jobs${qs(filters)}`),
