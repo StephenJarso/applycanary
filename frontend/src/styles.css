@@ -450,9 +450,104 @@ tbody tr { transition: background 0.07s; }
 tbody tr:hover { background: var(--bg-hover); }
 
 .row-link { cursor: pointer; }
-.cell-title { font-weight: 520; }
+.cell-title { font-weight: 600; }
 .cell-dim { color: var(--text-dim); }
 .num { font-variant-numeric: tabular-nums; }
+
+/* ------------------------------------------------------------ job feed
+ *
+ * The discovery mockup's card list: circular match badge top-right, source
+ * eyebrow, headline title, company/location row, meta chips, accent action.
+ */
+
+.job-feed { display: flex; flex-direction: column; gap: 14px; }
+
+.job-card {
+  position: relative;
+  display: flex;
+  gap: 16px;
+  background: var(--ac-surface-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 18px 20px;
+  cursor: pointer;
+  transition: box-shadow 0.15s, border-color 0.15s, transform 0.15s;
+}
+.job-card:hover { box-shadow: 0 6px 24px rgba(25, 28, 29, 0.08); border-color: var(--ac-outline-variant); }
+
+.job-score-band {
+  width: 52px;
+  height: 52px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 15px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  border: 1px solid transparent;
+}
+.job-score-pct { font-size: 10px; margin-left: 1px; font-weight: 600; }
+.job-score-band.band-strong { background: linear-gradient(135deg, var(--ac-canary-fixed), var(--ac-canary)); color: var(--ac-on-canary); border-color: rgba(112, 93, 0, 0.25); }
+.job-score-band.band-mid { background: var(--ac-primary-fixed); color: var(--ac-primary); border-color: rgba(80, 0, 225, 0.18); }
+.job-score-band.band-weak { background: var(--bad-bg); color: var(--bad); }
+.job-score-band.band-none { background: var(--bg-active); color: var(--text-faint); }
+
+.job-card-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+
+.job-card-source {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--text-faint);
+}
+.job-card-source .material-symbols-outlined { font-size: 14px; }
+
+.job-card-title {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--text);
+  line-height: 1.3;
+}
+
+.job-card-company {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13.5px;
+  color: var(--text-dim);
+  flex-wrap: wrap;
+}
+.job-card-company .material-symbols-outlined { font-size: 15px; }
+
+.job-card-meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 2px; }
+.job-card-age {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--text-faint);
+}
+.job-card-age .material-symbols-outlined { font-size: 14px; }
+
+.job-card-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+@media (max-width: 640px) {
+  .job-card { flex-direction: column; }
+  .job-card-actions { flex-direction: row; align-items: center; width: 100%; }
+}
 
 /* ------------------------------------------------------------ score */
 

@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { api, type JobFilters } from "../api";
 import {
-  Chips, Empty, ErrorBox, ScoreBadge, TableSkeleton, formatSalary, relTime,
+  Chips, Empty, ErrorBox, TableSkeleton, formatSalary, relTime,
 } from "../components";
 
 const SORTS = [
@@ -126,58 +126,77 @@ export default function Jobs() {
       )}
 
       {data && data.jobs.length > 0 && (
-        <div className="table-wrap">
-          <table>
-            <caption className="sr-only">
-              Job postings, {data.jobs.length} shown of {data.total}
-            </caption>
-            <thead>
-              <tr>
-                <th scope="col" style={{ width: 52 }}>Score</th>
-                <th scope="col">Role</th>
-                <th scope="col" style={{ width: 150 }}>Company</th>
-                <th scope="col" style={{ width: 130 }}>Location</th>
-                <th scope="col" style={{ width: 105 }}>Salary</th>
-                <th scope="col" style={{ width: 90 }}>Source</th>
-                <th scope="col" style={{ width: 56 }}>Age</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.jobs.map((job) => {
-                const salary = formatSalary(
-                  job.salary_min, job.salary_max, job.salary_currency, job.salary_is_estimate,
-                );
-                return (
-                  <tr
-                    key={job.id}
-                    className="row-link"
-                    onClick={() => navigate(`/job/${job.id}`)}
-                    tabIndex={0}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") navigate(`/job/${job.id}`);
+        <div className="job-feed">
+          {data.jobs.map((job) => {
+            const salary = formatSalary(
+              job.salary_min, job.salary_max, job.salary_currency, job.salary_is_estimate,
+            );
+            const total = job.score ? Math.round(job.score.total) : null;
+            const band =
+              total === null ? "none" : total >= 75 ? "strong" : total >= 55 ? "mid" : "weak";
+            return (
+              <article
+                key={job.id}
+                className="job-card"
+                onClick={() => navigate(`/job/${job.id}`)}
+                tabIndex={0}
+                role="link"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") navigate(`/job/${job.id}`);
+                }}
+              >
+                <div className="job-score-band band-strong" aria-hidden="true">
+                  {total !== null ? (
+                    <>
+                      {total}
+                      <span className="job-score-pct">%</span>
+                    </>
+                  ) : (
+                    <span className="material-symbols-outlined">help</span>
+                  )}
+                </div>
+                <div className="job-card-body">
+                  <div className="job-card-source">
+                    <span className="material-symbols-outlined" aria-hidden="true">rss_feed</span>
+                    {job.source}
+                  </div>
+                  <h3 className="job-card-title">{job.title}</h3>
+                  <div className="job-card-company">
+                    <strong>{job.company}</strong>
+                    <span aria-hidden="true">•</span>
+                    <span className="material-symbols-outlined" aria-hidden="true">location_on</span>
+                    {job.is_remote ? "Remote" : job.location || "Location not stated"}
+                  </div>
+                  <div className="job-card-meta">
+                    {salary && <span className="chip">{salary}</span>}
+                    {job.status !== "new" && <span className="chip">{job.status}</span>}
+                    <span className="job-card-age" title={job.posted_at ?? job.first_seen_at}>
+                      <span className="material-symbols-outlined" aria-hidden="true">schedule</span>
+                      {relTime(job.posted_at ?? job.first_seen_at)} ago
+                    </span>
+                  </div>
+                  {job.score?.missing_keywords.length ? (
+                    <Chips items={job.score.missing_keywords} variant="miss" max={4} />
+                  ) : null}
+                </div>
+                <div className="job-card-actions">
+                  <span className={`score score-${band}`} title={job.score?.verdict || undefined}>
+                    {total !== null ? total : "—"}
+                  </span>
+                  <button
+                    className="btn-ai btn-sm"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      navigate(`/job/${job.id}`);
                     }}
                   >
-                    <td><ScoreBadge score={job.score} /></td>
-                    <td>
-                      <div className="cell-title">{job.title}</div>
-                      {job.score?.missing_keywords.length ? (
-                        <Chips items={job.score.missing_keywords} variant="miss" max={4} />
-                      ) : null}
-                    </td>
-                    <td>{job.company}</td>
-                    <td className="cell-dim">
-                      {job.is_remote ? <span className="chip chip-accent">remote</span> : job.location || "—"}
-                    </td>
-                    <td className="cell-dim num">{salary ?? "—"}</td>
-                    <td className="cell-dim">{job.source}</td>
-                    <td className="cell-dim num" title={job.posted_at ?? job.first_seen_at}>
-                      {relTime(job.posted_at ?? job.first_seen_at)}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                    <span className="material-symbols-outlined" aria-hidden="true">edit_document</span>
+                    View
+                  </button>
+                </div>
+              </article>
+            );
+          })}
         </div>
       )}
 
