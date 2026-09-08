@@ -1311,6 +1311,19 @@ details > summary:hover { color: var(--text); }
 
 /* ------------------------------------------------------------ interview studio */
 
+.studio-layout {
+  display: grid;
+  grid-template-columns: 1fr 340px;
+  gap: 20px;
+  align-items: start;
+}
+
+@media (max-width: 960px) {
+  .studio-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
 .studio-head {
   display: flex;
   gap: 14px;
@@ -1318,6 +1331,194 @@ details > summary:hover { color: var(--text); }
   justify-content: space-between;
   margin-bottom: 16px;
   flex-wrap: wrap;
+}
+
+.studio-stage-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 48px 32px 32px;
+  background: var(--ac-surface-card);
+  border-radius: var(--radius-lg);
+  position: relative;
+  overflow: hidden;
+}
+
+.coach-avatar-wrapper {
+  position: relative;
+  margin-bottom: 12px;
+}
+
+.coach-avatar {
+  width: 72px; height: 72px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--ac-primary), var(--ac-primary-hover));
+  color: var(--ac-on-primary);
+  display: grid;
+  place-items: center;
+  box-shadow: 0 4px 20px rgba(80, 0, 225, 0.35);
+}
+
+.coach-status-dot {
+  position: absolute;
+  bottom: 2px;
+  right: 2px;
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  background: #22c55e;
+  border: 2px solid var(--ac-surface-card);
+}
+
+.coach-status-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--ac-primary);
+  margin-bottom: 16px;
+}
+
+.coach-question-text {
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 1.35;
+  letter-spacing: -0.02em;
+  max-width: 680px;
+  margin: 0 0 32px;
+  color: var(--text);
+}
+
+.floating-control-bar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 8px 16px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+}
+
+.control-btn {
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  border: none;
+  transition: transform 0.1s;
+}
+.control-btn:hover { transform: scale(1.05); }
+
+.control-btn-main {
+  width: 52px; height: 52px;
+  background: var(--ac-primary);
+  color: var(--ac-on-primary);
+}
+.control-btn-active {
+  background: var(--ac-error);
+}
+
+.control-btn-secondary {
+  width: 42px; height: 42px;
+  background: var(--ac-surface-container);
+  color: var(--text);
+}
+
+.control-btn-danger {
+  width: 42px; height: 42px;
+  background: var(--ac-error-container);
+  color: var(--ac-error);
+}
+
+/* Sidebar Live Details */
+.studio-details-card { padding: 18px; }
+.studio-details-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 14px;
+}
+
+.studio-tab-row {
+  display: flex;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 16px;
+}
+
+.studio-tab {
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+.studio-tab.active {
+  color: var(--ac-primary);
+  border-bottom: 2px solid var(--ac-primary);
+}
+
+.studio-details-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.studio-insight-card {
+  padding: 14px;
+  border-radius: var(--radius);
+}
+
+.canary-card {
+  background: var(--ac-canary-fixed);
+  border: 1px solid rgba(112, 93, 0, 0.2);
+}
+
+.insight-badge-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: var(--ac-on-canary);
+}
+
+.white-card {
+  background: var(--bg);
+  border: 1px solid var(--border);
+}
+
+.purple-card {
+  background: var(--ac-primary-fixed);
+  border: 1px solid rgba(80, 0, 225, 0.15);
+}
+
+.insight-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.pacing-bar-track {
+  height: 6px;
+  background: var(--ac-surface-container-high);
+  border-radius: 3px;
+  overflow: hidden;
+  margin-top: 10px;
+}
+.pacing-bar-fill {
+  height: 100%;
+  background: var(--ac-primary);
+}
+
+.pacing-labels {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 11px;
+  color: var(--text-faint);
+  margin-top: 6px;
 }
 
 .detail-head .btn-primary.btn-sm { align-self: center; }

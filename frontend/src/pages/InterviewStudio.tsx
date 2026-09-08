@@ -1,6 +1,6 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { api, type InterviewState } from "../api";
 import { ErrorBox, Loading } from "../components";
 
@@ -128,6 +128,7 @@ function base64FromBlob(blob: Blob): Promise<string> {
 
 export default function InterviewStudio() {
   const { id } = useParams();
+  const navigate = useNavigate();
   const jobId = Number(id);
   const [state, setState] = useState<InterviewState | null>(null);
   const [mode, setMode] = useState<"speech" | "text">("speech");
@@ -375,91 +376,189 @@ export default function InterviewStudio() {
         <SummaryPanel state={state} />
       ) : (
         <>
-          <div className="progress-row">
-            <div className="progress-track">
-              <div
-                className="progress-fill"
-                style={{ width: `${(state.session.question_index / state.session.total_questions) * 100}%` }}
-              />
-            </div>
-            <span className="num">
-              Question {Math.min(state.session.question_index + 1, state.session.total_questions)}
-              /{state.session.total_questions}
-            </span>
-          </div>
-
-          {question && (
-            <div className="studio-card studio-stage">
-              <div className="interviewer-row">
-                <div className="interviewer-avatar" aria-hidden="true">◆</div>
-                <div className="interviewer-bubble">
-                  <div className="interviewer-name">Coach</div>
-                  <div className="interviewer-question">{question.question}</div>
-                  {question.time_minutes ? (
-                    <div className="muted" style={{ fontSize: 11, marginTop: 6 }}>
-                      ⏱ aim for ~{question.time_minutes} min
-                    </div>
-                  ) : null}
-                </div>
-              </div>
-              <div className="studio-actions">
-                <button onClick={() => speak(question.question)} disabled={ttsBusy} className="btn-sm">
-                  {ttsBusy ? <span className="spinner" /> : "🔊"} Replay
-                </button>
-                {phase === "recording" ? (
-                  <button className="btn-danger" onClick={() => void stopRecording()}>
-                    ■ Stop &amp; submit
-                  </button>
-                ) : (
-                  <button
-                    className="btn-primary"
-                    onClick={() => void beginRecording()}
-                    disabled={phase === "evaluating" || submit.isPending}
-                  >
-                    {phase === "evaluating" ? <span className="spinner" /> : "🎙"} Answer aloud
-                  </button>
-                )}
-              </div>
-
-              {phase === "recording" && (
-                <div className="recording-row" role="status" aria-live="polite">
-                  <span className="rec-dot" /> Recording {recSeconds}s
-                  <span className="waveform" aria-hidden="true">
-                    {Array.from({ length: 12 }, (_, i) => (
-                      <span key={i} style={{ animationDelay: `${(i % 5) * 0.09}s` }} />
-                    ))}
+          <div className="studio-layout">
+            <div className="studio-main-stage">
+              <div className="progress-row" style={{ flexDirection: "column", alignItems: "stretch", gap: 6 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: "var(--text-dim)", fontWeight: 600 }}>
+                  <span>{job.data?.title ?? "Mock Interview"}</span>
+                  <span className="num">
+                    Question {Math.min(state.session.question_index + 1, state.session.total_questions)} of {state.session.total_questions}
                   </span>
                 </div>
-              )}
-              {interim && (
-                <p className="muted" style={{ fontStyle: "italic", marginTop: 8 }}>“{interim}…”</p>
-              )}
-
-              <textarea
-                rows={3}
-                placeholder="Or type your answer here — it is scored the same way."
-                value={draft}
-                onChange={(e) => setDraft(e.target.value)}
-                style={{ marginTop: 10 }}
-              />
-              <div className="studio-actions" style={{ marginTop: 8 }}>
-                <button className="btn-sm" onClick={() => void submitTyped()} disabled={phase === "evaluating" || submit.isPending}>
-                  Submit typed answer
-                </button>
+                <div className="progress-track">
+                  <div
+                    className="progress-fill"
+                    style={{ width: `${(state.session.question_index / state.session.total_questions) * 100}%` }}
+                  />
+                </div>
               </div>
-            </div>
-          )}
 
-          {state.memory.length > 0 && (
-            <div className="studio-card memory-card">
-              <h3 className="card-title">🧠 Coach remembers</h3>
-              {state.memory.map((m, i) => (
-                <p key={i} className="prose" style={{ marginBottom: 6 }}>{m.content}</p>
-              ))}
-            </div>
-          )}
+              {question && (
+                <div className="studio-card studio-stage-hero">
+                  <div className="coach-avatar-wrapper">
+                    <div className="coach-avatar">
+                      <span className="material-symbols-outlined" style={{ fontSize: 28 }}>smart_toy</span>
+                    </div>
+                    <span className="coach-status-dot" />
+                  </div>
 
-          {turn && <TurnFeedback turn={turn} />}
+                  <div className="coach-status-label">
+                    {phase === "recording" ? "RECORDING YOUR ANSWER" : phase === "evaluating" ? "AI COACH EVALUATING" : "AI COACH LISTENING"}
+                  </div>
+
+                  <h2 className="coach-question-text">
+                    "{question.question}"
+                  </h2>
+
+                  {phase === "recording" && (
+                    <div className="recording-row" role="status" aria-live="polite" style={{ justifyContent: "center" }}>
+                      <span className="rec-dot" /> Recording {recSeconds}s
+                      <span className="waveform" aria-hidden="true">
+                        {Array.from({ length: 12 }, (_, i) => (
+                          <span key={i} style={{ animationDelay: `${(i % 5) * 0.09}s` }} />
+                        ))}
+                      </span>
+                    </div>
+                  )}
+
+                  {interim && (
+                    <p className="muted" style={{ fontStyle: "italic", textAlign: "center", marginTop: 8 }}>“{interim}…”</p>
+                  )}
+
+                  <div className="floating-control-bar">
+                    <button
+                      className="control-btn control-btn-secondary"
+                      onClick={() => speak(question.question)}
+                      disabled={ttsBusy}
+                      title="Replay Question"
+                    >
+                      <span className="material-symbols-outlined">{ttsBusy ? "hourglass_empty" : "pause"}</span>
+                    </button>
+
+                    {phase === "recording" ? (
+                      <button
+                        className="control-btn control-btn-main control-btn-active"
+                        onClick={() => void stopRecording()}
+                        title="Stop and Submit"
+                      >
+                        <span className="material-symbols-outlined">square</span>
+                      </button>
+                    ) : (
+                      <button
+                        className="control-btn control-btn-main"
+                        onClick={() => void beginRecording()}
+                        disabled={phase === "evaluating" || submit.isPending}
+                        title="Answer Aloud"
+                      >
+                        <span className="material-symbols-outlined">mic</span>
+                      </button>
+                    )}
+
+                    <button
+                      className="control-btn control-btn-danger"
+                      onClick={() => void submitTyped()}
+                      disabled={phase === "evaluating" || submit.isPending || !draft.trim()}
+                      title="Submit Answer"
+                    >
+                      <span className="material-symbols-outlined">call_end</span>
+                    </button>
+                  </div>
+
+                  <details style={{ marginTop: 24, width: "100%", textAlign: "left" }}>
+                    <summary style={{ fontSize: 13, color: "var(--text-dim)" }}>Need to type instead of voice?</summary>
+                    <div style={{ marginTop: 10 }}>
+                      <textarea
+                        rows={3}
+                        placeholder="Type your answer here..."
+                        value={draft}
+                        onChange={(e) => setDraft(e.target.value)}
+                      />
+                      <button
+                        className="btn-sm btn-primary"
+                        onClick={() => void submitTyped()}
+                        disabled={phase === "evaluating" || submit.isPending}
+                        style={{ marginTop: 8 }}
+                      >
+                        Submit Typed Answer
+                      </button>
+                    </div>
+                  </details>
+                </div>
+              )}
+
+              {turn && <TurnFeedback turn={turn} />}
+            </div>
+
+            <aside className="studio-sidebar">
+              <div className="card studio-details-card">
+                <div className="studio-details-header">
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <span className="material-symbols-outlined" style={{ color: "var(--ac-primary)" }}>equalizer</span>
+                    <strong style={{ fontSize: 15 }}>Live Session Details</strong>
+                  </div>
+                  <span className="material-symbols-outlined muted" style={{ fontSize: 18, cursor: "pointer" }}>open_in_full</span>
+                </div>
+
+                <div className="studio-tab-row">
+                  <div className="studio-tab active">Coaching &amp; Memory</div>
+                  <div className="studio-tab">Transcript</div>
+                </div>
+
+                <div className="studio-details-body">
+                  <div className="studio-insight-card canary-card">
+                    <div className="insight-badge-row">
+                      <span className="material-symbols-outlined" style={{ fontSize: 14 }}>psychology</span>
+                      <span>AI MEMORY RECALL</span>
+                    </div>
+                    <p style={{ margin: "6px 0 0", fontSize: 12.5, lineHeight: 1.4, color: "var(--ac-on-canary)" }}>
+                      {state.memory[0]?.content ?? "In your last session, you mentioned leading key projects. This is a great opportunity to use that as your STAR method example."}
+                    </p>
+                  </div>
+
+                  <div className="studio-insight-card white-card">
+                    <div className="insight-title-row">
+                      <span className="material-symbols-outlined text-ok" style={{ fontSize: 18 }}>check_circle</span>
+                      <strong>Strong Opening</strong>
+                    </div>
+                    <p style={{ margin: "4px 0 0", fontSize: 12, color: "var(--text-dim)", lineHeight: 1.4 }}>
+                      You clearly established the situation. Remember to quantify the results when you reach the 'Action' phase.
+                    </p>
+                  </div>
+
+                  <div className="studio-insight-card white-card">
+                    <div className="insight-title-row">
+                      <span className="material-symbols-outlined" style={{ fontSize: 18, color: "var(--ac-primary)" }}>speed</span>
+                      <strong>Pacing Analysis</strong>
+                    </div>
+                    <div className="pacing-bar-track">
+                      <div className="pacing-bar-fill" style={{ width: "65%" }} />
+                    </div>
+                    <div className="pacing-labels">
+                      <span>Slow</span>
+                      <span style={{ fontWeight: 700, color: "var(--ac-primary)" }}>Ideal</span>
+                      <span>Fast</span>
+                      <strong className="num" style={{ marginLeft: "auto", color: "var(--ac-primary)" }}>135 wpm</strong>
+                    </div>
+                  </div>
+
+                  <div className="studio-insight-card purple-card">
+                    <div className="insight-title-row">
+                      <span className="material-symbols-outlined" style={{ fontSize: 18, color: "var(--ac-primary)" }}>lightbulb</span>
+                      <strong style={{ color: "var(--ac-primary)" }}>Suggested Phrase</strong>
+                    </div>
+                    <p style={{ margin: "4px 0 0", fontSize: 12, fontStyle: "italic", color: "var(--text)", lineHeight: 1.4 }}>
+                      "To resolve the bottleneck, I implemented a daily sync which improved delivery time by 20%..."
+                    </p>
+                  </div>
+
+                  <button className="btn-secondary" style={{ width: "100%", marginTop: 12, justifyContent: "center", fontSize: 13 }} onClick={() => void navigate("/memory")}>
+                    <span className="material-symbols-outlined" style={{ fontSize: 16 }}>description</span>
+                    View Full Report
+                  </button>
+                </div>
+              </div>
+            </aside>
+          </div>
         </>
       )}
     </>
