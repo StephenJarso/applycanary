@@ -25,6 +25,14 @@ export default function Memory() {
 
   return (
     <>
+      <div className="page-intro">
+        <h2 className="page-title">Memory &amp; Trends</h2>
+        <p className="page-sub">
+          <span className="material-symbols-outlined" aria-hidden="true">memory</span>
+          AI-powered career insights indexed over time
+        </p>
+      </div>
+
       <div className="stat-row">
         <Stat label="Interviews" value={data.counts.sessions} />
         <Stat label="Memories stored" value={data.counts.memories} />
@@ -40,7 +48,10 @@ export default function Memory() {
 
       {data.trend.length >= 2 && (
         <div className="card">
-          <h3 className="card-title">Improvement trend</h3>
+          <h3 className="card-title">
+            Improvement trend
+            <span className="chip chip-accent">mock interview scores</span>
+          </h3>
           <div className="trend">
             {data.trend.map((point, i) => (
               <div key={i} className="trend-col" title={`${Math.round(point.score)} on ${point.date ?? ""}`}>
@@ -57,7 +68,13 @@ export default function Memory() {
       )}
 
       <div className="card">
-        <h3 className="card-title">Agent memory — what the coach knows</h3>
+        <h3 className="card-title">
+          Agent memory — what the coach knows
+          <span className="chip" title="Stored with embeddings in CockroachDB for semantic recall">
+            <span className="material-symbols-outlined" aria-hidden="true">database</span>
+            Vector indexed
+          </span>
+        </h3>
         {data.entries.length === 0 ? (
           <Empty
             title="No memories yet"
