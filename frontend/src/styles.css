@@ -1709,6 +1709,87 @@ details > summary:hover { color: var(--text); }
 .trend-value { font-size: 11px; color: var(--text-dim); }
 .trend-label { font-size: 10px; color: var(--text-faint); }
 
+.sensitivity-card {
+  padding: 14px;
+  background: var(--ac-surface-container-low);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+}
+
+.sensitivity-slider-track {
+  position: relative;
+  height: 8px;
+  background: var(--ac-surface-container-high);
+  border-radius: 999px;
+  margin: 12px 0 6px;
+}
+
+.sensitivity-slider-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--ac-canary), var(--ac-primary));
+  border-radius: 999px;
+}
+
+.sensitivity-slider-handle {
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 18px; height: 18px;
+  border-radius: 50%;
+  background: var(--ac-primary);
+  border: 2px solid #fff;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+}
+
+/* Semantic Recall Log Timeline */
+.semantic-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 12px;
+}
+
+.semantic-item {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.semantic-dot-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  align-self: stretch;
+  position: relative;
+}
+
+.semantic-dot {
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  border: 2px solid var(--ac-primary);
+  background: var(--ac-surface-card);
+  z-index: 1;
+}
+.semantic-dot.active {
+  background: var(--ac-primary);
+  box-shadow: 0 0 0 3px var(--ac-primary-fixed);
+}
+
+.semantic-line {
+  flex: 1;
+  width: 2px;
+  background: var(--border);
+  margin-top: 4px;
+}
+
+.semantic-content-card {
+  flex: 1;
+  padding: 14px 16px;
+  background: var(--ac-surface-container-low);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
 .memory-entry {
   padding: 9px 0;
   border-bottom: 1px solid var(--border);
