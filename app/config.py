@@ -106,6 +106,11 @@ class Settings(BaseSettings):
     digest_to: str = ""
     alert_min_score: int = 90
 
+    # Refuse a session for an account that has not confirmed its address. Off by
+    # default: turning it on before email delivery is known-good locks out every
+    # new signup, so it is opt-in once the operator has verified a real send.
+    require_email_verification: bool = False
+
     # --- amazon web services (Bedrock, Polly, Transcribe, S3) ---
     # All optional. Bedrock adds a Claude + Titan-embedding provider to the LLM
     # chain; Polly/Transcribe power the voice interview; S3 stores interview
@@ -163,6 +168,12 @@ class Settings(BaseSettings):
     # In production: "/" (same origin, React frontend served by FastAPI).
     # In development: "http://localhost:5173" (Vite dev server).
     frontend_base_url: str = "/"
+    # Absolute origin ("https://apply.example.com") for links that leave the
+    # app — currently the confirm/reset links in email. frontend_base_url is
+    # allowed to be the relative "/" because a browser resolves it against the
+    # current page; an inbox has no such context, so a relative link there is
+    # simply broken. Falls back to frontend_base_url when that is absolute.
+    public_base_url: str = ""
     # Marks the session cookie Secure. Defaults on for any non-loopback bind,
     # since that means the app is reachable off-box and the cookie must not
     # travel in clear text.
@@ -226,6 +237,20 @@ class Settings(BaseSettings):
         profile.digest_to → settings.digest_to at send time.
         """
         return bool(self.resend_api_key or (self.smtp_host and self.smtp_user))
+
+    @property
+    def email_link_base(self) -> str:
+        """Absolute origin for links inside an email, or "" if none is usable.
+
+        Callers must treat "" as "cannot build a working link" and skip the send
+        rather than mail a relative URL that resolves against the recipient's
+        webmail domain.
+        """
+        for candidate in (self.public_base_url, self.frontend_base_url):
+            candidate = candidate.strip().rstrip("/")
+            if candidate.startswith(("http://", "https://")):
+                return candidate
+        return ""
 
     @property
     def resume_dir(self) -> Path:

@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>ApplyCanary - Job Discovery</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "secondary": "#705d00",
+                      "surface-container-high": "#e7e8e9",
+                      "outline": "#797488",
+                      "on-tertiary-container": "#ffd9ca",
+                      "surface-variant": "#e1e3e4",
+                      "surface-container-low": "#f3f4f5",
+                      "surface-tint": "#642afa",
+                      "on-primary-fixed-variant": "#4b00d4",
+                      "tertiary-container": "#ac4200",
+                      "inverse-on-surface": "#f0f1f2",
+                      "primary-fixed": "#e7deff",
+                      "on-error": "#ffffff",
+                      "surface-container-highest": "#e1e3e4",
+                      "secondary-fixed": "#ffe16d",
+                      "on-secondary-fixed-variant": "#544600",
+                      "surface": "#f8f9fa",
+                      "on-background": "#191c1d",
+                      "error-container": "#ffdad6",
+                      "on-primary-fixed": "#1e0061",
+                      "inverse-primary": "#cbbeff",
+                      "error": "#ba1a1a",
+                      "on-tertiary-fixed-variant": "#7c2e00",
+                      "inverse-surface": "#2e3132",
+                      "on-tertiary": "#ffffff",
+                      "tertiary": "#853100",
+                      "surface-dim": "#d9dadb",
+                      "background": "#f8f9fa",
+                      "tertiary-fixed-dim": "#ffb596",
+                      "primary-container": "#6933ff",
+                      "outline-variant": "#cac3d9",
+                      "on-secondary-container": "#6e5c00",
+                      "on-error-container": "#93000a",
+                      "on-primary-container": "#e5dcff",
+                      "on-surface": "#191c1d",
+                      "secondary-fixed-dim": "#e9c400",
+                      "tertiary-fixed": "#ffdbcd",
+                      "on-secondary-fixed": "#221b00",
+                      "primary": "#5000e1",
+                      "secondary-container": "#fcd400",
+                      "on-secondary": "#ffffff",
+                      "surface-bright": "#f8f9fa",
+                      "on-surface-variant": "#484456",
+                      "surface-container": "#edeeef",
+                      "primary-fixed-dim": "#cbbeff",
+                      "on-tertiary-fixed": "#360f00",
+                      "on-primary": "#ffffff",
+                      "surface-container-lowest": "#ffffff"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.25rem",
+                      "lg": "0.5rem",
+                      "xl": "0.75rem",
+                      "full": "9999px"
+              },
+              "spacing": {
+                      "base": "4px",
+                      "lg": "24px",
+                      "gutter": "12px",
+                      "xs": "4px",
+                      "xl": "32px",
+                      "md": "16px",
+                      "container-padding": "16px",
+                      "sm": "8px"
+              },
+              "fontFamily": {
+                      "display-lg": [
+                              "Inter"
+                      ],
+                      "headline-lg": [
+                              "Inter"
+                      ],
+                      "headline-md": [
+                              "Inter"
+                      ],
+                      "label-md": [
+                              "Inter"
+                      ],
+                      "body-lg": [
+                              "Inter"
+                      ],
+                      "body-md": [
+                              "Inter"
+                      ]
+              },
+              "fontSize": {
+                      "display-lg": [
+                              "32px",
+                              {
+                                      "lineHeight": "40px",
+                                      "letterSpacing": "-0.02em",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "headline-lg": [
+                              "24px",
+                              {
+                                      "lineHeight": "32px",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "headline-md": [
+                              "20px",
+                              {
+                                      "lineHeight": "28px",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "label-md": [
+                              "12px",
+                              {
+                                      "lineHeight": "16px",
+                                      "letterSpacing": "0.05em",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "body-lg": [
+                              "16px",
+                              {
+                                      "lineHeight": "24px",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "body-md": [
+                              "14px",
+                              {
+                                      "lineHeight": "20px",
+                                      "fontWeight": "400"
+                              }
+                      ]
+              }
+            },
+          }
+        }
+      </script>
+<style>
+        body { font-family: 'Inter', sans-serif; }
+      </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-background min-h-screen flex flex-col pb-24 md:pb-0 pt-[64px]">
+<!-- TopAppBar -->
+<header class="fixed top-0 w-full z-40 bg-surface dark:bg-background shadow-sm dark:shadow-none transition-transform duration-300" id="top-app-bar">
+<div class="flex justify-between items-center w-full px-container-padding py-sm h-[64px]">
+<div class="flex items-center gap-sm">
+<img alt="User profile avatar" class="w-8 h-8 rounded-full object-cover border border-outline-variant" data-alt="A professional user profile avatar, clean studio lighting, corporate headshot style, set against a neutral grey background. The image should be sharp, high contrast, and perfectly framed in a circular crop. Soft, diffuse light highlighting the face with a modern, approachable professional aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBE8_xAByDtbYDzxcQbraUkcqwoXQPLsy7e-CuwsrHH-U52eK5l-g3InQHATg7ZUWoKcid9i8q9isO3n7u8H6tC2QBSgd17cdPNRqha513OuHjstgaDH3VzyjrKQ5DHg7ckH-ivROrdXnDGw-5qmWRm09QYnzNFFE4Jt26pjGXRuDSjvJH7osygZIqXau2sxOg0Obww22bT5KGZMCl-ZjuIVXSyv4ytFowLJMX0PWCv-brYTl7Ys3nVag"/>
+</div>
+<div class="text-headline-md font-headline-md font-bold text-primary dark:text-primary-fixed">
+                ApplyCanary
+            </div>
+<div class="flex items-center">
+<button class="text-primary dark:text-primary-fixed hover:bg-surface-container dark:hover:bg-surface-container-high transition-colors p-2 rounded-full flex items-center justify-center active:scale-95 duration-150">
+<span class="material-symbols-outlined font-label-md text-label-md font-bold">save_as</span>
+</button>
+</div>
+</div>
+</header>
+<!-- Main Content Canvas -->
+<main class="flex-1 w-full max-w-3xl mx-auto px-container-padding py-md flex flex-col gap-lg">
+<!-- Search and Filters Section -->
+<section class="flex flex-col gap-md sticky top-[64px] bg-background pt-sm pb-md z-30">
+<div class="relative w-full shadow-sm rounded-lg overflow-hidden group">
+<div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-outline group-focus-within:text-secondary-fixed-dim transition-colors">
+<span class="material-symbols-outlined">search</span>
+</div>
+<input class="w-full pl-10 pr-4 py-3 bg-surface border border-outline-variant rounded-lg text-body-lg font-body-lg focus:outline-none focus:border-secondary focus:ring-1 focus:ring-secondary transition-all placeholder:text-outline" placeholder="Search roles, skills, or companies..." type="text"/>
+</div>
+<div class="flex gap-sm overflow-x-auto no-scrollbar pb-1">
+<button class="flex items-center gap-xs px-3 py-1.5 rounded-full border border-outline-variant bg-surface text-on-surface text-label-md font-label-md whitespace-nowrap hover:bg-surface-container transition-colors focus:ring-2 focus:ring-primary">
+                    Go
+                </button>
+<button class="flex items-center gap-xs px-3 py-1.5 rounded-full border border-primary bg-primary-fixed text-on-primary-fixed text-label-md font-label-md whitespace-nowrap hover:bg-primary-fixed-dim transition-colors focus:ring-2 focus:ring-primary">
+<span class="material-symbols-outlined text-[16px]">check</span>
+                    Remote
+                </button>
+<button class="flex items-center gap-xs px-3 py-1.5 rounded-full border border-primary bg-primary-fixed text-on-primary-fixed text-label-md font-label-md whitespace-nowrap hover:bg-primary-fixed-dim transition-colors focus:ring-2 focus:ring-primary">
+<span class="material-symbols-outlined text-[16px]">check</span>
+                    90%+ Match
+                </button>
+<button class="flex items-center gap-xs px-3 py-1.5 rounded-full border border-outline-variant bg-surface text-on-surface text-label-md font-label-md whitespace-nowrap hover:bg-surface-container transition-colors focus:ring-2 focus:ring-primary">
+                    Engineering
+                </button>
+</div>
+</section>
+<!-- Feed Section -->
+<section class="flex flex-col gap-md" id="job-feed">
+<!-- Job Card 1 (High Match) -->
+<article class="bg-surface rounded-[16px] shadow-[0px_4px_20px_rgba(0,0,0,0.05)] border border-outline-variant flex flex-col overflow-hidden relative">
+<!-- Match Score Badge -->
+<div class="absolute top-md right-md flex items-center justify-center w-12 h-12 rounded-full bg-gradient-to-br from-secondary-fixed to-secondary text-on-secondary-fixed font-headline-md text-headline-md shadow-sm border border-secondary-container z-10">
+                    96<span class="text-[10px] ml-[1px]">%</span>
+</div>
+<div class="p-md flex flex-col gap-sm">
+<div class="pr-14">
+<div class="flex items-center gap-xs text-outline text-label-md font-label-md mb-1">
+<span class="material-symbols-outlined text-[14px]">captive_portal</span>
+                            Greenhouse
+                        </div>
+<h2 class="text-headline-md font-headline-md text-on-surface mb-1">Senior Backend Engineer, Distributed Systems</h2>
+<div class="text-body-md font-body-md text-on-surface-variant flex items-center gap-xs">
+<span class="font-semibold">Stripe</span> • <span class="material-symbols-outlined text-[14px]">location_on</span> Remote, US
+                        </div>
+</div>
+<!-- AI Reasoning -->
+<div class="mt-xs bg-surface-container-low border border-outline-variant rounded-lg p-sm flex gap-sm items-start relative overflow-hidden">
+<div class="absolute left-0 top-0 bottom-0 w-1 bg-secondary-fixed"></div>
+<span class="material-symbols-outlined text-secondary-fixed-dim mt-0.5">auto_awesome</span>
+<p class="text-body-md font-body-md text-on-surface-variant m-0">
+<strong>AI Reasoning:</strong> Matches your GitHub expertise in distributed systems and Go. Strong alignment with your recent microservices architecture work.
+                        </p>
+</div>
+<div class="flex flex-wrap gap-xs mt-xs">
+<span class="px-2 py-1 bg-surface-container text-on-surface-variant text-label-md font-label-md rounded border border-outline-variant/50">Golang</span>
+<span class="px-2 py-1 bg-surface-container text-on-surface-variant text-label-md font-label-md rounded border border-outline-variant/50">gRPC</span>
+<span class="px-2 py-1 bg-surface-container text-on-surface-variant text-label-md font-label-md rounded border border-outline-variant/50">AWS</span>
+</div>
+</div>
+<!-- Actions -->
+<div class="border-t border-outline-variant px-md py-sm bg-surface-bright flex items-center justify-between gap-sm">
+<div class="flex gap-sm">
+<button aria-label="Save" class="flex items-center justify-center p-2 rounded-full hover:bg-surface-container text-outline hover:text-primary transition-colors group">
+<span class="material-symbols-outlined group-hover:hidden">bookmark_border</span>
+<span class="material-symbols-outlined hidden group-hover:block" style="font-variation-settings: 'FILL' 1;">bookmark</span>
+</button>
+<button aria-label="Hide" class="flex items-center justify-center p-2 rounded-full hover:bg-surface-container text-outline hover:text-error transition-colors">
+<span class="material-symbols-outlined">visibility_off</span>
+</button>
+</div>
+<button class="flex items-center gap-xs px-4 py-2 bg-secondary-container text-on-secondary-container rounded-lg font-label-md text-label-md font-bold hover:bg-secondary-fixed transition-colors shadow-sm active:scale-95">
+<span class="material-symbols-outlined text-[18px]">edit_document</span>
+                        Tailor CV
+                    </button>
+</div>
+</article>
+<!-- Job Card 2 -->
+<article class="bg-surface rounded-[16px] shadow-[0px_4px_20px_rgba(0,0,0,0.05)] border border-outline-variant flex flex-col overflow-hidden relative">
+<!-- Match Score Badge -->
+<div class="absolute top-md right-md flex items-center justify-center w-12 h-12 rounded-full bg-surface-container-highest text-on-surface-variant font-headline-md text-headline-md shadow-sm border border-outline-variant z-10">
+                    92<span class="text-[10px] ml-[1px]">%</span>
+</div>
+<div class="p-md flex flex-col gap-sm">
+<div class="pr-14">
+<div class="flex items-center gap-xs text-outline text-label-md font-label-md mb-1">
+<span class="material-symbols-outlined text-[14px]">language</span>
+                            Web Search
+                        </div>
+<h2 class="text-headline-md font-headline-md text-on-surface mb-1">Staff Software Engineer, Platform</h2>
+<div class="text-body-md font-body-md text-on-surface-variant flex items-center gap-xs">
+<span class="font-semibold">Vercel</span> • <span class="material-symbols-outlined text-[14px]">location_on</span> Remote
+                        </div>
+</div>
+<div class="flex flex-wrap gap-xs mt-xs">
+<span class="px-2 py-1 bg-surface-container text-on-surface-variant text-label-md font-label-md rounded border border-outline-variant/50">TypeScript</span>
+<span class="px-2 py-1 bg-surface-container text-on-surface-variant text-label-md font-label-md rounded border border-outline-variant/50">Next.js</span>
+<span class="px-2 py-1 bg-surface-container text-on-surface-variant text-label-md font-label-md rounded border border-outline-variant/50">Infrastructure</span>
+</div>
+</div>
+<!-- Actions -->
+<div class="border-t border-outline-variant px-md py-sm bg-surface-bright flex items-center justify-between gap-sm">
+<div class="flex gap-sm">
+<button aria-label="Save" class="flex items-center justify-center p-2 rounded-full hover:bg-surface-container text-outline hover:text-primary transition-colors group">
+<span class="material-symbols-outlined group-hover:hidden">bookmark_border</span>
+<span class="material-symbols-outlined hidden group-hover:block" style="font-variation-settings: 'FILL' 1;">bookmark</span>
+</button>
+<button aria-label="Hide" class="flex items-center justify-center p-2 rounded-full hover:bg-surface-container text-outline hover:text-error transition-colors">
+<span class="material-symbols-outlined">visibility_off</span>
+</button>
+</div>
+<button class="flex items-center gap-xs px-4 py-2 bg-gradient-to-r from-primary to-primary-container text-on-primary rounded-lg font-label-md text-label-md font-bold hover:shadow-md transition-all active:scale-95">
+                         Apply Now
+                    </button>
+</div>
+</article>
+<!-- Job Card 3 (High Match) -->
+<article class="bg-surface rounded-[16px] shadow-[0px_4px_20px_rgba(0,0,0,0.05)] border border-outline-variant flex flex-col overflow-hidden relative">
+<!-- Match Score Badge -->
+<div class="absolute top-md right-md flex items-center justify-center w-12 h-12 rounded-full bg-gradient-to-br from-secondary-fixed to-secondary text-on-secondary-fixed font-headline-md text-headline-md shadow-sm border border-secondary-container z-10">
+                    95<span class="text-[10px] ml-[1px]">%</span>
+</div>
+<div class="p-md flex flex-col gap-sm">
+<div class="pr-14">
+<div class="flex items-center gap-xs text-outline text-label-md font-label-md mb-1">
+<span class="material-symbols-outlined text-[14px]">work</span>
+                            Lever
+                        </div>
+<h2 class="text-headline-md font-headline-md text-on-surface mb-1">Lead Backend Engineer</h2>
+<div class="text-body-md font-body-md text-on-surface-variant flex items-center gap-xs">
+<span class="font-semibold">Notion</span> • <span class="material-symbols-outlined text-[14px]">location_on</span> San Francisco, CA (Hybrid)
+                        </div>
+</div>
+<!-- AI Reasoning -->
+<div class="mt-xs bg-surface-container-low border border-outline-variant rounded-lg p-sm flex gap-sm items-start relative overflow-hidden">
+<div class="absolute left-0 top-0 bottom-0 w-1 bg-secondary-fixed"></div>
+<span class="material-symbols-outlined text-secondary-fixed-dim mt-0.5">auto_awesome</span>
+<p class="text-body-md font-body-md text-on-surface-variant m-0">
+<strong>AI Reasoning:</strong> Strong overlap with your recent performance optimization projects. Required PostgreSQL experience matches your profile perfectly.
+                        </p>
+</div>
+<div class="flex flex-wrap gap-xs mt-xs">
+<span class="px-2 py-1 bg-surface-container text-on-surface-variant text-label-md font-label-md rounded border border-outline-variant/50">PostgreSQL</span>
+<span class="px-2 py-1 bg-surface-container text-on-surface-variant text-label-md font-label-md rounded border border-outline-variant/50">Node.js</span>
+<span class="px-2 py-1 bg-surface-container text-on-surface-variant text-label-md font-label-md rounded border border-outline-variant/50">Performance</span>
+</div>
+</div>
+<!-- Actions -->
+<div class="border-t border-outline-variant px-md py-sm bg-surface-bright flex items-center justify-between gap-sm">
+<div class="flex gap-sm">
+<button aria-label="Save" class="flex items-center justify-center p-2 rounded-full hover:bg-surface-container text-outline hover:text-primary transition-colors group">
+<span class="material-symbols-outlined group-hover:hidden">bookmark_border</span>
+<span class="material-symbols-outlined hidden group-hover:block" style="font-variation-settings: 'FILL' 1;">bookmark</span>
+</button>
+<button aria-label="Hide" class="flex items-center justify-center p-2 rounded-full hover:bg-surface-container text-outline hover:text-error transition-colors">
+<span class="material-symbols-outlined">visibility_off</span>
+</button>
+</div>
+<button class="flex items-center gap-xs px-4 py-2 bg-secondary-container text-on-secondary-container rounded-lg font-label-md text-label-md font-bold hover:bg-secondary-fixed transition-colors shadow-sm active:scale-95">
+<span class="material-symbols-outlined text-[18px]">edit_document</span>
+                        Tailor CV
+                    </button>
+</div>
+</article>
+</section>
+</main>
+<!-- BottomNavBar (Mobile Only) -->
+<nav class="md:hidden fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-base pb-safe pt-sm bg-surface dark:bg-background shadow-[0px_-4px_20px_rgba(0,0,0,0.05)] rounded-t-xl">
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-outline px-4 py-1 hover:text-primary dark:hover:text-primary-fixed transition-colors" href="#">
+<span class="material-symbols-outlined">dashboard</span>
+<span class="text-label-md font-label-md mt-1">Home</span>
+</a>
+<a class="flex flex-col items-center justify-center bg-primary-container dark:bg-primary text-on-primary-container dark:text-on-primary rounded-2xl px-4 py-1 hover:text-primary dark:hover:text-primary-fixed transition-colors scale-90 duration-200" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">search</span>
+<span class="text-label-md font-label-md mt-1 font-bold">Discovery</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-outline px-4 py-1 hover:text-primary dark:hover:text-primary-fixed transition-colors" href="#">
+<span class="material-symbols-outlined">record_voice_over</span>
+<span class="text-label-md font-label-md mt-1">Interview</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-outline px-4 py-1 hover:text-primary dark:hover:text-primary-fixed transition-colors" href="#">
+<span class="material-symbols-outlined">psychology</span>
+<span class="text-label-md font-label-md mt-1">Memory</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-outline px-4 py-1 hover:text-primary dark:hover:text-primary-fixed transition-colors" href="#">
+<span class="material-symbols-outlined">person</span>
+<span class="text-label-md font-label-md mt-1">Profile</span>
+</a>
+</nav>
+<!-- Desktop SideNav (Hidden on Mobile) - Placeholder for structural completeness if needed, but per instructions, TopAppBar and BottomNavBar are primary shells. We'll use TopAppBar for desktop nav. -->
+<nav class="hidden md:flex flex-col fixed left-0 top-[64px] h-[calc(100vh-64px)] w-64 bg-surface border-r border-outline-variant p-4 gap-2 z-30">
+<div class="text-label-md font-label-md text-outline uppercase tracking-wider mb-2 px-4">Navigation</div>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant hover:bg-surface-container transition-colors" href="#">
+<span class="material-symbols-outlined">dashboard</span>
+<span class="text-body-md font-body-md font-semibold">Home</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg bg-primary-container text-on-primary-container font-bold" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">search</span>
+<span class="text-body-md font-body-md font-semibold">Discovery</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant hover:bg-surface-container transition-colors" href="#">
+<span class="material-symbols-outlined">record_voice_over</span>
+<span class="text-body-md font-body-md font-semibold">Interview</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant hover:bg-surface-container transition-colors" href="#">
+<span class="material-symbols-outlined">psychology</span>
+<span class="text-body-md font-body-md font-semibold">Memory</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant hover:bg-surface-container transition-colors" href="#">
+<span class="material-symbols-outlined">person</span>
+<span class="text-body-md font-body-md font-semibold">Profile</span>
+</a>
+</nav>
+<!-- Adjust main container for desktop nav -->
+<style>
+        @media (min-width: 768px) {
+            main {
+                margin-left: 16rem; /* 64px * 4 = 256px for sidenav */
+                max-width: calc(100% - 16rem - 2rem);
+            }
+        }
+    </style>
+<script>
+        // Simple scroll effect for TopAppBar shadow
+        const header = document.getElementById('top-app-bar');
+        window.addEventListener('scroll', () => {
+            if (window.scrollY > 10) {
+                header.classList.add('shadow-md');
+                header.classList.remove('shadow-sm');
+            } else {
+                header.classList.remove('shadow-md');
+                header.classList.add('shadow-sm');
+            }
+        });
+    </script>
+</body></html>

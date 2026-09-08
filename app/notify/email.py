@@ -13,6 +13,7 @@ import asyncio
 import logging
 from email.message import EmailMessage
 from html import escape
+from urllib.parse import quote
 
 from sqlmodel import Session, select
 
@@ -175,6 +176,186 @@ def _cta_button(url: str, label: str) -> str:
 
 
 # ---------------------------------------------------------------------------
+#  Auth email templates
+# ---------------------------------------------------------------------------
+
+def _build_verification_email(verify_url: str) -> tuple[str, str, str]:
+    """Build the email verification email (subject, html, text)."""
+    subject = "Verify your email address — ApplyCanary"
+    preheader = "Verify your email address to activate your ApplyCanary account"
+
+    text = (
+        "Welcome to ApplyCanary!\n\n"
+        "Please verify your email address by clicking the link below:\n\n"
+        f"{verify_url}\n\n"
+        "This link expires in 24 hours.\n\n"
+        "If you didn't create an account, you can safely ignore this email."
+    )
+
+    body = (
+        "<table role='presentation' width='100%' cellspacing='0' cellpadding='0'>"
+        f"<tr><td style='padding-bottom:24px'>"
+        f"<h1 style='margin:0;font-size:24px;color:{_BRAND_TEXT}'>Welcome to ApplyCanary</h1>"
+        f"<p style='margin:12px 0 0;font-size:16px;color:{_BRAND_DIM};line-height:1.6'>"
+        f"Thanks for signing up! Please verify your email address to activate your account."
+        f"</p></td></tr>"
+        f"<tr><td style='padding:24px 0'>"
+        f"<a href='{escape(verify_url)}' style='display:inline-block;background:{_BRAND_ACCENT};"
+        f"color:#fff;font-weight:600;font-size:16px;padding:14px 28px;"
+        f"border-radius:8px;text-decoration:none'>Verify Email Address</a>"
+        f"</td></tr>"
+        f"<tr><td style='padding-top:16px;font-size:14px;color:{_BRAND_DIM};line-height:1.6'>"
+        f"This link expires in 24 hours. If you didn't create an account, "
+        f"you can safely ignore this email."
+        f"</td></tr>"
+        f"<tr><td style='padding-top:24px;font-size:13px;color:{_BRAND_DIM}'>"
+        f"If the button doesn't work, copy this link into your browser:<br>"
+        f"<span style='word-break:break-all'>{escape(verify_url)}</span>"
+        f"</td></tr>"
+        "</table>"
+    )
+    html = _wrap(body, preheader=preheader)
+    return subject, html, text
+
+
+def _build_password_reset_email(reset_url: str) -> tuple[str, str, str]:
+    """Build the password reset email (subject, html, text)."""
+    subject = "Reset your password — ApplyCanary"
+    preheader = "Reset your ApplyCanary password (link expires in 1 hour)"
+
+    text = (
+        "Password Reset Request\n\n"
+        "You requested a password reset for your ApplyCanary account.\n\n"
+        "Click the link below to set a new password:\n\n"
+        f"{reset_url}\n\n"
+        "This link expires in 1 hour.\n\n"
+        "If you didn't request this, you can safely ignore this email — "
+        "your password will not be changed."
+    )
+
+    body = (
+        "<table role='presentation' width='100%' cellspacing='0' cellpadding='0'>"
+        f"<tr><td style='padding-bottom:24px'>"
+        f"<h1 style='margin:0;font-size:24px;color:{_BRAND_TEXT}'>Reset Your Password</h1>"
+        f"<p style='margin:12px 0 0;font-size:16px;color:{_BRAND_DIM};line-height:1.6'>"
+        f"You requested a password reset for your ApplyCanary account."
+        f"</p></td></tr>"
+        f"<tr><td style='padding:24px 0'>"
+        f"<a href='{escape(reset_url)}' style='display:inline-block;background:{_BRAND_ACCENT};"
+        f"color:#fff;font-weight:600;font-size:16px;padding:14px 28px;"
+        f"border-radius:8px;text-decoration:none'>Reset Password</a>"
+        f"</td></tr>"
+        f"<tr><td style='padding-top:16px;font-size:14px;color:{_BRAND_DIM};line-height:1.6'>"
+        f"This link expires in 1 hour. If you didn't request this, you can safely "
+        f"ignore this email — your password will not be changed."
+        f"</td></tr>"
+        f"<tr><td style='padding-top:24px;font-size:13px;color:{_BRAND_DIM}'>"
+        f"If the button doesn't work, copy this link into your browser:<br>"
+        f"<span style='word-break:break-all'>{escape(reset_url)}</span>"
+        f"</td></tr>"
+        "</table>"
+    )
+    html = _wrap(body, preheader=preheader)
+    return subject, html, text
+
+
+def _build_email_change_email(verify_url: str, new_email: str) -> tuple[str, str, str]:
+    """Build the email change verification email (subject, html, text)."""
+    subject = "Confirm your new email address — ApplyCanary"
+    preheader = f"Confirm your new email address ({new_email})"
+
+    text = (
+        "Email Change Request\n\n"
+        "You requested to change your ApplyCanary account email to:\n\n"
+        f"{new_email}\n\n"
+        "Click the link below to confirm this change:\n\n"
+        f"{verify_url}\n\n"
+        "This link expires in 24 hours.\n\n"
+        "If you didn't request this, you can safely ignore this email — "
+        "your email address will not be changed."
+    )
+
+    body = (
+        "<table role='presentation' width='100%' cellspacing='0' cellpadding='0'>"
+        f"<tr><td style='padding-bottom:24px'>"
+        f"<h1 style='margin:0;font-size:24px;color:{_BRAND_TEXT}'>Confirm Your New Email</h1>"
+        f"<p style='margin:12px 0 0;font-size:16px;color:{_BRAND_DIM};line-height:1.6'>"
+        f"You requested to change your account email to <strong>{escape(new_email)}</strong>."
+        f"</p></td></tr>"
+        f"<tr><td style='padding:24px 0'>"
+        f"<a href='{escape(verify_url)}' style='display:inline-block;background:{_BRAND_ACCENT};"
+        f"color:#fff;font-weight:600;font-size:16px;padding:14px 28px;"
+        f"border-radius:8px;text-decoration:none'>Confirm Email Change</a>"
+        f"</td></tr>"
+        f"<tr><td style='padding-top:16px;font-size:14px;color:{_BRAND_DIM};line-height:1.6'>"
+        f"This link expires in 24 hours. If you didn't request this, you can safely "
+        f"ignore this email — your email address will not be changed."
+        f"</td></tr>"
+        f"<tr><td style='padding-top:24px;font-size:13px;color:{_BRAND_DIM}'>"
+        f"If the button doesn't work, copy this link into your browser:<br>"
+        f"<span style='word-break:break-all'>{escape(verify_url)}</span>"
+        f"</td></tr>"
+        "</table>"
+    )
+    html = _wrap(body, preheader=preheader)
+    return subject, html, text
+
+
+def _build_password_changed_email() -> tuple[str, str, str]:
+    """Build the password changed confirmation email (subject, html, text)."""
+    subject = "Your password was changed — ApplyCanary"
+    preheader = "Your ApplyCanary password has been changed"
+
+    text = (
+        "Password Changed\n\n"
+        "Your ApplyCanary password has been successfully changed.\n\n"
+        "If you didn't make this change, please contact support immediately."
+    )
+
+    body = (
+        "<table role='presentation' width='100%' cellspacing='0' cellpadding='0'>"
+        f"<tr><td style='padding-bottom:24px'>"
+        f"<h1 style='margin:0;font-size:24px;color:{_BRAND_TEXT}'>Password Changed</h1>"
+        f"<p style='margin:12px 0 0;font-size:16px;color:{_BRAND_DIM};line-height:1.6'>"
+        f"Your ApplyCanary password has been successfully changed."
+        f"</p></td></tr>"
+        f"<tr><td style='padding-top:16px;font-size:14px;color:#dc2626;line-height:1.6'>"
+        f"<strong>If you didn't make this change, please contact support immediately.</strong>"
+        f"</td></tr>"
+        "</table>"
+    )
+    html = _wrap(body, preheader=preheader)
+    return subject, html, text
+
+
+def _build_email_changed_email(old_email: str) -> tuple[str, str, str]:
+    """Build the email changed confirmation email (subject, html, text)."""
+    subject = "Your email address was changed — ApplyCanary"
+    preheader = "Your ApplyCanary email address has been changed"
+
+    text = (
+        "Email Address Changed\n\n"
+        f"Your ApplyCanary account email has been changed from {old_email}.\n\n"
+        "If you didn't make this change, please contact support immediately."
+    )
+
+    body = (
+        "<table role='presentation' width='100%' cellspacing='0' cellpadding='0'>"
+        f"<tr><td style='padding-bottom:24px'>"
+        f"<h1 style='margin:0;font-size:24px;color:{_BRAND_TEXT}'>Email Address Changed</h1>"
+        f"<p style='margin:12px 0 0;font-size:16px;color:{_BRAND_DIM};line-height:1.6'>"
+        f"Your ApplyCanary account email has been changed from <strong>{escape(old_email)}</strong>."
+        f"</p></td></tr>"
+        f"<tr><td style='padding-top:16px;font-size:14px;color:#dc2626;line-height:1.6'>"
+        f"<strong>If you didn't make this change, please contact support immediately.</strong>"
+        f"</td></tr>"
+        "</table>"
+    )
+    html = _wrap(body, preheader=preheader)
+    return subject, html, text
+
+
+# ---------------------------------------------------------------------------
 #  Low-level send
 # ---------------------------------------------------------------------------
 
@@ -239,6 +420,60 @@ async def send(subject: str, html: str, text: str, *, to: str = "") -> bool:
             return False
 
     return False
+
+
+# ---------------------------------------------------------------------------
+#  Auth emails — verification, password reset, email change
+# ---------------------------------------------------------------------------
+
+def _link(path: str, token: str) -> str:
+    """Build an absolute link into the frontend, or "" if none can be built.
+
+    The token is URL-encoded even though `token_urlsafe` output never needs it,
+    so this stays correct if the token format is ever changed.
+    """
+    base = get_settings().email_link_base
+    if not base:
+        log.warning(
+            "email: cannot build an absolute link for %s — set PUBLIC_BASE_URL "
+            "(or an absolute FRONTEND_BASE_URL). Skipping send.", path,
+        )
+        return ""
+    return f"{base}{path}?token={quote(token, safe='')}"
+
+
+async def send_verification_email(email: str, token: str) -> bool:
+    """Send an address-confirmation link to a newly registered user."""
+    url = _link("/verify-email", token)
+    if not url:
+        return False
+    return await send(*_build_verification_email(url), to=email)
+
+
+async def send_password_reset_email(email: str, token: str) -> bool:
+    """Send a password reset link."""
+    url = _link("/reset-password", token)
+    if not url:
+        return False
+    return await send(*_build_password_reset_email(url), to=email)
+
+
+async def send_email_change_email(new_email: str, token: str) -> bool:
+    """Send a confirmation link to the *new* address of a pending email change."""
+    url = _link("/verify-email-change", token)
+    if not url:
+        return False
+    return await send(*_build_email_change_email(url, new_email), to=new_email)
+
+
+async def send_password_changed_email(email: str) -> bool:
+    """Tell the account holder their password changed, so a theft is noticed."""
+    return await send(*_build_password_changed_email(), to=email)
+
+
+async def send_email_changed_email(new_email: str, old_email: str) -> bool:
+    """Confirm a completed email change, sent to the new address."""
+    return await send(*_build_email_changed_email(old_email), to=new_email)
 
 
 # ---------------------------------------------------------------------------

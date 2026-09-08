@@ -23,17 +23,28 @@ import logging
 import os
 import secrets
 import time
+from datetime import datetime, timedelta
 
 from fastapi import Request
 from sqlmodel import Session, select
 
 from app.config import get_settings
-from app.models import User
+from app.models import User, utcnow
 
 log = logging.getLogger(__name__)
 
 SESSION_COOKIE_NAME = "applycanary_session"
 SESSION_MAX_AGE = 86400 * 30  # 30 days
+
+# Emailed-token lifetimes. A reset is short because it is a live credential;
+# the other two only confirm an address, so a link that survives a day is a
+# kindness to anyone who reads mail on a different device.
+PASSWORD_RESET_TOKEN_TTL = 3600  # 1 hour
+EMAIL_VERIFICATION_TOKEN_TTL = 86400  # 24 hours
+EMAIL_CHANGE_TOKEN_TTL = 86400  # 24 hours
+
+# 256 bits: enough that the token needs no slow hash. See `hash_token`.
+_TOKEN_BYTES = 32
 
 # scrypt parameters. n=2**14 with r=8, p=1 costs ~16MB and a few tens of ms per
 # hash: enough to make offline cracking expensive without making login feel slow.
@@ -89,6 +100,122 @@ def generate_invite_code() -> str:
     return secrets.token_urlsafe(12)
 
 
+def generate_token() -> str:
+    """A URL-safe, unguessable token for an emailed link.
+
+    32 bytes = 256 bits of entropy. That matters for the hashing choice below.
+    """
+    return secrets.token_urlsafe(_TOKEN_BYTES)
+
+
+def hash_token(token: str) -> str:
+    """Hash an emailed token for storage.
+
+    Deliberately HMAC-SHA256 rather than the scrypt used for passwords. scrypt
+    is slow *on purpose*, to make guessing a low-entropy human secret expensive.
+    A token from `generate_token` has 256 bits of entropy and cannot be guessed
+    at any speed, so the slowness buys nothing — and it costs a great deal: a
+    salted digest differs per row, so finding the owner of a token means hashing
+    it against every user in the table at ~16MB a go. A keyed digest is
+    deterministic, so the lookup is one indexed equality query.
+
+    Keyed with the app secret so that a leaked database alone does not let an
+    attacker match a token they have intercepted elsewhere.
+    """
+    return hmac.new(_get_secret(), token.encode("utf-8"), hashlib.sha256).hexdigest()
+
+
+def _expires_in(seconds: int) -> datetime:
+    return utcnow() + timedelta(seconds=seconds)
+
+
+def _consume(session: Session, hash_attr: str, expiry_attr: str, token: str) -> User | None:
+    """Resolve a token to its user, or None if unknown or expired.
+
+    Shared by the three token kinds; `hash_attr` names the column to match,
+    which is what stops a token minted for one purpose satisfying another.
+    """
+    if not token:
+        return None
+    user = session.exec(
+        select(User).where(getattr(User, hash_attr) == hash_token(token))
+    ).first()
+    if user is None:
+        return None
+    expires_at = getattr(user, expiry_attr)
+    if expires_at is None or utcnow() > expires_at:
+        return None
+    return user
+
+
+# --- email verification ---------------------------------------------------
+
+
+def create_email_verification_token(user: User) -> str:
+    token = generate_token()
+    user.email_verification_token_hash = hash_token(token)
+    user.email_verification_expires_at = _expires_in(EMAIL_VERIFICATION_TOKEN_TTL)
+    return token
+
+
+def consume_email_verification_token(session: Session, token: str) -> User | None:
+    return _consume(
+        session, "email_verification_token_hash",
+        "email_verification_expires_at", token,
+    )
+
+
+def clear_email_verification_token(user: User) -> None:
+    user.email_verification_token_hash = ""
+    user.email_verification_expires_at = None
+
+
+# --- password reset -------------------------------------------------------
+
+
+def create_password_reset_token(user: User) -> str:
+    token = generate_token()
+    user.password_reset_token_hash = hash_token(token)
+    user.password_reset_expires_at = _expires_in(PASSWORD_RESET_TOKEN_TTL)
+    return token
+
+
+def consume_password_reset_token(session: Session, token: str) -> User | None:
+    return _consume(
+        session, "password_reset_token_hash",
+        "password_reset_expires_at", token,
+    )
+
+
+def clear_password_reset_token(user: User) -> None:
+    user.password_reset_token_hash = ""
+    user.password_reset_expires_at = None
+
+
+# --- email change ---------------------------------------------------------
+
+
+def create_email_change_token(user: User, new_email: str) -> str:
+    token = generate_token()
+    user.pending_email = new_email.strip().lower()
+    user.pending_email_token_hash = hash_token(token)
+    user.pending_email_expires_at = _expires_in(EMAIL_CHANGE_TOKEN_TTL)
+    return token
+
+
+def consume_email_change_token(session: Session, token: str) -> User | None:
+    return _consume(
+        session, "pending_email_token_hash",
+        "pending_email_expires_at", token,
+    )
+
+
+def clear_email_change_token(user: User) -> None:
+    user.pending_email = ""
+    user.pending_email_token_hash = ""
+    user.pending_email_expires_at = None
+
+
 # ---------------------------------------------------------------- sessions
 
 
@@ -137,7 +264,13 @@ def parse_session_token(token: str) -> tuple[int, int] | None:
 
 
 def authenticate(session: Session, email: str, password: str) -> User | None:
-    """Look up a user by email and verify their password."""
+    """Look up a user by email and verify their password.
+
+    Answers "are these credentials correct?" and nothing else. Whether an
+    unverified address is allowed to hold a session is a separate, configurable
+    question, and it is decided at the login endpoint — folding it in here would
+    silently apply it to every other caller too.
+    """
     if not email or not password:
         return None
     user = session.exec(
