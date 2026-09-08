@@ -1148,6 +1148,31 @@ details > summary:hover { color: var(--text); }
 }
 .similar-card:hover { border-color: var(--accent); background: var(--bg-hover); }
 
+/* ------------------------------------------------------------ page intro
+ *
+ * The dashboard/memory mockups open with a display-size greeting and a
+ * variant-coloured subline. Shared by every redesigned screen.
+ */
+
+.page-intro { margin-bottom: 20px; }
+.page-title {
+  margin: 0 0 2px;
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--text);
+}
+.page-sub {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-dim);
+}
+.page-sub .material-symbols-outlined { font-size: 18px; color: var(--ac-canary); }
+
 /* ------------------------------------------------------------ memory page */
 
 .trend {
