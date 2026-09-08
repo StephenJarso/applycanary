@@ -389,7 +389,7 @@ export default function InterviewStudio() {
           </div>
 
           {question && (
-            <div className="studio-card">
+            <div className="studio-card studio-stage">
               <div className="interviewer-row">
                 <div className="interviewer-avatar" aria-hidden="true">◆</div>
                 <div className="interviewer-bubble">
