@@ -506,7 +506,109 @@ tbody tr:hover { background: var(--bg-hover); }
  * eyebrow, headline title, company/location row, meta chips, accent action.
  */
 
+/* Discovery Two-Column Layout */
+.discovery-layout {
+  display: grid;
+  grid-template-columns: 1fr 300px;
+  gap: 20px;
+  align-items: start;
+}
+
+@media (max-width: 960px) {
+  .discovery-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
 .job-feed { display: flex; flex-direction: column; gap: 14px; }
+
+.discovery-card {
+  flex-direction: column;
+  gap: 8px;
+  padding: 20px;
+}
+
+.discovery-card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.company-logo-placeholder {
+  width: 42px; height: 42px;
+  border-radius: 10px;
+  background: var(--ac-surface-container);
+  color: var(--ac-on-surface-variant);
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.job-card-company {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.match-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.match-badge-strong { background: var(--ok-bg); color: var(--ok); }
+.match-badge-mid { background: var(--canary-bg); color: var(--ac-secondary); }
+.match-badge-weak { background: var(--bad-bg); color: var(--bad); }
+.match-badge-none { background: var(--bg-active); color: var(--text-faint); }
+
+.discovery-card-bottom {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+
+.discovery-card-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.market-insights .card {
+  padding: 18px;
+}
+.insight-block {
+  padding: 12px;
+  background: var(--ac-surface-container-low);
+  border-radius: var(--radius);
+}
+.insight-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.salary-bar-container {
+  height: 6px;
+  background: var(--ac-surface-container-high);
+  border-radius: 3px;
+  overflow: hidden;
+  margin-top: 8px;
+}
+.salary-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--ac-canary), var(--ac-primary));
+}
 
 .job-card {
   position: relative;

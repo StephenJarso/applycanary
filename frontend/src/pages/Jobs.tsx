@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { api, type JobFilters } from "../api";
 import {
-  Chips, Empty, ErrorBox, TableSkeleton, formatSalary, relTime,
+  Chips, Empty, ErrorBox, TableSkeleton, formatSalary,
 } from "../components";
 
 const SORTS = [
@@ -38,11 +38,16 @@ export default function Jobs() {
 
   return (
     <>
-      <div className="stat-row">
-        <Stat label="Total" value={data?.counts.total ?? 0} />
-        <Stat label="Scored" value={data?.counts.scored ?? 0} />
-        <Stat label="Queued" value={data?.counts.queued ?? 0} />
-        <Stat label="Applied" value={data?.counts.applied ?? 0} />
+      <div className="page-intro" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
+        <div>
+          <h2 className="page-title">Job Discovery</h2>
+          <p className="page-sub">
+            AI-curated matches based on your updated profile.
+          </p>
+        </div>
+        <span className="chip chip-accent" style={{ background: "var(--ac-primary-fixed)", color: "var(--ac-primary)", fontWeight: 600, padding: "6px 12px", borderRadius: 999 }}>
+          {data?.counts.total ?? 0} Total Matches
+        </span>
       </div>
 
       <form
@@ -55,7 +60,7 @@ export default function Jobs() {
       >
         <input
           type="search"
-          placeholder="Search title or company…"
+          placeholder="Search roles, skills, or companies…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           aria-label="Search jobs"
@@ -66,7 +71,7 @@ export default function Jobs() {
           onChange={(e) => set("source", e.target.value)}
           aria-label="Filter by source"
         >
-          <option value="">All sources</option>
+          <option value="">All Roles</option>
           {data?.sources.map((s) => <option key={s} value={s}>{s}</option>)}
         </select>
 
@@ -75,7 +80,7 @@ export default function Jobs() {
           onChange={(e) => set("status", e.target.value)}
           aria-label="Filter by status"
         >
-          <option value="">Any status</option>
+          <option value="">Any Status</option>
           {["new", "scored", "queued", "applied", "skipped", "rejected"].map((s) => (
             <option key={s} value={s}>{s}</option>
           ))}
@@ -86,7 +91,7 @@ export default function Jobs() {
           onChange={(e) => set("min_score", Number(e.target.value))}
           aria-label="Minimum score"
         >
-          <option value="0">Any score</option>
+          <option value="0">Any Score</option>
           <option value="55">55+</option>
           <option value="75">75+</option>
           <option value="90">90+</option>
@@ -98,7 +103,7 @@ export default function Jobs() {
             checked={filters.remote_only ?? false}
             onChange={(e) => set("remote_only", e.target.checked)}
           />
-          Remote
+          Remote Only
         </label>
 
         <div className="seg" role="group" aria-label="Sort order">
@@ -126,77 +131,124 @@ export default function Jobs() {
       )}
 
       {data && data.jobs.length > 0 && (
-        <div className="job-feed">
-          {data.jobs.map((job) => {
-            const salary = formatSalary(
-              job.salary_min, job.salary_max, job.salary_currency, job.salary_is_estimate,
-            );
-            const total = job.score ? Math.round(job.score.total) : null;
-            const band =
-              total === null ? "none" : total >= 75 ? "strong" : total >= 55 ? "mid" : "weak";
-            return (
-              <article
-                key={job.id}
-                className="job-card"
-                onClick={() => navigate(`/job/${job.id}`)}
-                tabIndex={0}
-                role="link"
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") navigate(`/job/${job.id}`);
-                }}
-              >
-                <div className="job-score-band band-strong" aria-hidden="true">
-                  {total !== null ? (
-                    <>
-                      {total}
-                      <span className="job-score-pct">%</span>
-                    </>
-                  ) : (
-                    <span className="material-symbols-outlined">help</span>
+        <div className="discovery-layout">
+          <div className="job-feed">
+            {data.jobs.map((job) => {
+              const salary = formatSalary(
+                job.salary_min, job.salary_max, job.salary_currency, job.salary_is_estimate,
+              );
+              const total = job.score ? Math.round(job.score.total) : null;
+              const band =
+                total === null ? "none" : total >= 75 ? "strong" : total >= 55 ? "mid" : "weak";
+              return (
+                <article
+                  key={job.id}
+                  className="job-card discovery-card"
+                  onClick={() => navigate(`/job/${job.id}`)}
+                  tabIndex={0}
+                  role="link"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") navigate(`/job/${job.id}`);
+                  }}
+                >
+                  <div className="discovery-card-top">
+                    <div className="job-card-company">
+                      <div className="company-logo-placeholder">
+                        {job.company?.[0]?.toUpperCase() ?? "C"}
+                      </div>
+                      <div>
+                        <h3 className="job-card-title">{job.title}</h3>
+                        <div style={{ fontSize: 13, color: "var(--text-dim)", marginTop: 2 }}>
+                          <strong>{job.company}</strong> • {job.is_remote ? "Remote" : job.location || "Location not stated"}
+                        </div>
+                      </div>
+                    </div>
+                    <div className={`match-badge match-badge-${band}`}>
+                      <span className="material-symbols-outlined" style={{ fontSize: 16 }}>
+                        {band === "strong" ? "check_circle" : "auto_awesome"}
+                      </span>
+                      {total !== null ? `${total}% Match` : "Scoring"}
+                    </div>
+                  </div>
+
+                  {job.score?.reasoning && (
+                    <div className="ai-reasoning" style={{ margin: "12px 0 8px" }}>
+                      <span className="material-symbols-outlined" aria-hidden="true">auto_awesome</span>
+                      <p>
+                        <strong>AI Analysis:</strong> {job.score.reasoning}
+                      </p>
+                    </div>
                   )}
-                </div>
-                <div className="job-card-body">
-                  <div className="job-card-source">
-                    <span className="material-symbols-outlined" aria-hidden="true">rss_feed</span>
-                    {job.source}
+
+                  <div className="discovery-card-bottom">
+                    <div className="job-card-meta">
+                      {salary && <span className="chip chip-accent">{salary}</span>}
+                      {job.score?.matched_keywords.length ? (
+                        <Chips items={job.score.matched_keywords} variant="hit" max={3} />
+                      ) : null}
+                      {job.score?.missing_keywords.length ? (
+                        <Chips items={job.score.missing_keywords} variant="miss" max={2} />
+                      ) : null}
+                    </div>
+
+                    <div className="discovery-card-actions">
+                      <button
+                        className="btn-ai btn-sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigate(`/job/${job.id}`);
+                        }}
+                      >
+                        Tailor Resume
+                      </button>
+                      <button
+                        className="btn-primary btn-sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (job.apply_url) window.open(job.apply_url, "_blank");
+                          else navigate(`/job/${job.id}`);
+                        }}
+                      >
+                        Apply Now
+                      </button>
+                    </div>
                   </div>
-                  <h3 className="job-card-title">{job.title}</h3>
-                  <div className="job-card-company">
-                    <strong>{job.company}</strong>
-                    <span aria-hidden="true">•</span>
-                    <span className="material-symbols-outlined" aria-hidden="true">location_on</span>
-                    {job.is_remote ? "Remote" : job.location || "Location not stated"}
-                  </div>
-                  <div className="job-card-meta">
-                    {salary && <span className="chip">{salary}</span>}
-                    {job.status !== "new" && <span className="chip">{job.status}</span>}
-                    <span className="job-card-age" title={job.posted_at ?? job.first_seen_at}>
-                      <span className="material-symbols-outlined" aria-hidden="true">schedule</span>
-                      {relTime(job.posted_at ?? job.first_seen_at)} ago
-                    </span>
-                  </div>
-                  {job.score?.missing_keywords.length ? (
-                    <Chips items={job.score.missing_keywords} variant="miss" max={4} />
-                  ) : null}
+                </article>
+              );
+            })}
+          </div>
+
+          <aside className="market-insights">
+            <div className="card">
+              <h3 className="card-title">Market Insights</h3>
+              <div className="insight-block">
+                <div className="insight-header">
+                  <span className="material-symbols-outlined" style={{ color: "var(--ac-primary)" }}>trending_up</span>
+                  <strong>Trending Skill</strong>
                 </div>
-                <div className="job-card-actions">
-                  <span className={`score score-${band}`} title={job.score?.verdict || undefined}>
-                    {total !== null ? total : "—"}
-                  </span>
-                  <button
-                    className="btn-ai btn-sm"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      navigate(`/job/${job.id}`);
-                    }}
-                  >
-                    <span className="material-symbols-outlined" aria-hidden="true">edit_document</span>
-                    View
-                  </button>
+                <p style={{ fontSize: 13, color: "var(--text-dim)", margin: "6px 0 0" }}>
+                  <strong>TypeScript &amp; React</strong> are mentioned in 68% of jobs matching your profile.
+                </p>
+              </div>
+
+              <div className="insight-block" style={{ marginTop: 16 }}>
+                <div className="insight-header">
+                  <span className="material-symbols-outlined" style={{ color: "var(--ac-secondary)" }}>payments</span>
+                  <strong>Salary Range</strong>
                 </div>
-              </article>
-            );
-          })}
+                <p style={{ fontSize: 13, color: "var(--text-dim)", margin: "6px 0 4px" }}>
+                  Current market average for target roles is <strong>$145k</strong>.
+                </p>
+                <div className="salary-bar-container">
+                  <div className="salary-bar-fill" style={{ width: "70%" }} />
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "var(--text-faint)", marginTop: 4 }}>
+                  <span>$110k</span>
+                  <span>$180k</span>
+                </div>
+              </div>
+            </div>
+          </aside>
         </div>
       )}
 
@@ -213,14 +265,6 @@ export default function Jobs() {
   );
 }
 
-function Stat({ label, value }: { label: string; value: number }) {
-  return (
-    <div className="stat">
-      <div className="stat-value">{value}</div>
-      <div className="stat-label">{label}</div>
-    </div>
-  );
-}
 
 function Pagination({
   page,
