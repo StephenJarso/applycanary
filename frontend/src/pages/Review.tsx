@@ -34,8 +34,12 @@ export default function Review() {
 
   return (
     <>
-      <div className="banner" role="note">
-        Applications prepared and waiting for you. Nothing here has been sent.
+      <div className="page-intro">
+        <h2 className="page-title">Review queue</h2>
+        <p className="page-sub">
+          <span className="material-symbols-outlined" aria-hidden="true">pending_actions</span>
+          Applications prepared and waiting — nothing here has been sent.
+        </p>
       </div>
 
       {submit.isError && <ErrorBox error={submit.error} />}

@@ -14,6 +14,14 @@ export default function Applications() {
 
   return (
     <>
+      <div className="page-intro">
+        <h2 className="page-title">Applications</h2>
+        <p className="page-sub">
+          <span className="material-symbols-outlined" aria-hidden="true">work</span>
+          Everything the agent has submitted on your behalf
+        </p>
+      </div>
+
       {data && data.length === 0 && (
         <Empty
           title="No applications sent yet"
