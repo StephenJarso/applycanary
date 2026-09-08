@@ -9,6 +9,83 @@
  * measure.
  */
 
+/* ------------------------------------------------------------ design tokens
+ *
+ * The tokens below are the DESIGN.md palette verbatim ("designs for mobile
+ * and web/desktop/.../DESIGN.md") — the light, indigo-led "Corporate Modern"
+ * system the mockups share. Screens are being migrated to it screen by screen;
+ * the legacy dark shell tokens above stay until every screen has moved.
+ */
+
+:root {
+  --ac-primary: #5000e1;
+  --ac-primary-hover: #6933ff;
+  --ac-primary-container: #6933ff;
+  --ac-on-primary: #ffffff;
+  --ac-on-primary-container: #e5dcff;
+  --ac-primary-fixed: #e7deff;
+  --ac-primary-fixed-dim: #cbbeff;
+  --ac-surface-tint: #642afa;
+
+  --ac-surface: #f8f9fa;
+  --ac-surface-card: #ffffff;
+  --ac-surface-container-lowest: #ffffff;
+  --ac-surface-container-low: #f3f4f5;
+  --ac-surface-container: #edeeef;
+  --ac-surface-container-high: #e7e8e9;
+  --ac-surface-container-highest: #e1e3e4;
+  --ac-surface-variant: #e1e3e4;
+  --ac-surface-dim: #d9dadb;
+
+  --ac-on-surface: #191c1d;
+  --ac-on-surface-variant: #484456;
+  --ac-outline: #797488;
+  --ac-outline-variant: #cac3d9;
+
+  --ac-canary: #fcd400;
+  --ac-canary-fixed: #ffe16d;
+  --ac-on-canary: #221b00;
+  --ac-secondary: #705d00;
+
+  --ac-tertiary: #853100;
+  --ac-tertiary-container: #ac4200;
+  --ac-on-tertiary-container: #ffd9ca;
+  --ac-tertiary-fixed: #ffdbcd;
+
+  --ac-error: #ba1a1a;
+  --ac-error-container: #ffdad6;
+  --ac-on-error-container: #93000a;
+  --ac-ok: #2e7d32;
+  --ac-ok-container: #e8f5e9;
+  --ac-on-ok: #2e7d32;
+
+  --ac-inverse-surface: #2e3132;
+  --ac-inverse-on-surface: #f0f1f2;
+
+  --ac-radius: 0.5rem;
+  --ac-radius-card: 1rem;
+  --ac-radius-xl: 1.5rem;
+  --ac-shadow-card: 0 4px 20px rgba(0, 0, 0, 0.05);
+  --ac-font: Inter, ui-sans-serif, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+.material-symbols-outlined {
+  font-family: "Material Symbols Outlined";
+  font-weight: normal;
+  font-style: normal;
+  display: inline-block;
+  line-height: 1;
+  letter-spacing: normal;
+  text-transform: none;
+  white-space: nowrap;
+  word-wrap: normal;
+  direction: ltr;
+  font-variation-settings: "FILL" 0, "wght" 400, "GRAD" 0, "opsz" 24;
+  user-select: none;
+}
+
+/* ------------------------------------------------------------ legacy shell */
+
 :root {
   --bg: #0b0c0e;
   --bg-raised: #121317;
@@ -540,29 +617,6 @@ details > summary:hover { color: var(--text); }
  * redesigned, without anything here having to move.
  */
 
-:root {
-  --ac-primary: #5000e1;
-  --ac-primary-hover: #6933ff;
-  --ac-on-primary: #ffffff;
-  --ac-primary-fixed: #e7deff;
-
-  --ac-surface: #f8f9fa;
-  --ac-surface-card: #ffffff;
-  --ac-surface-container: #edeeef;
-  --ac-on-surface: #191c1d;
-  --ac-on-surface-variant: #484456;
-  --ac-outline-variant: #cac3d9;
-
-  --ac-error: #ba1a1a;
-  --ac-error-container: #ffdad6;
-  --ac-on-error-container: #93000a;
-
-  --ac-radius-control: 0.5rem;
-  --ac-radius-card: 1rem;
-  --ac-shadow-card: 0 4px 20px rgba(0, 0, 0, 0.05);
-  --ac-font: Inter, ui-sans-serif, -apple-system, "Segoe UI", Roboto, sans-serif;
-}
-
 .auth-page {
   min-height: 100vh;
   display: grid;
@@ -656,7 +710,7 @@ details > summary:hover { color: var(--text); }
   color: var(--ac-on-surface);
   background: var(--ac-surface-card);
   border: 1px solid var(--ac-outline-variant);
-  border-radius: var(--ac-radius-control);
+  border-radius: var(--ac-radius);
   box-shadow: none;
   transition: border-color 120ms ease, box-shadow 120ms ease;
 }
@@ -696,7 +750,7 @@ details > summary:hover { color: var(--text); }
   color: var(--ac-primary);
   background: var(--ac-surface-card);
   border: 1px solid var(--ac-outline-variant);
-  border-radius: var(--ac-radius-control);
+  border-radius: var(--ac-radius);
   cursor: pointer;
 }
 .auth-secondary:hover:not(:disabled) { background: var(--ac-primary-fixed); border-color: var(--ac-primary); }
@@ -718,7 +772,7 @@ details > summary:hover { color: var(--text); }
   color: var(--ac-on-primary);
   background: linear-gradient(180deg, var(--ac-primary-hover), var(--ac-primary));
   border: 0;
-  border-radius: var(--ac-radius-control);
+  border-radius: var(--ac-radius);
   text-decoration: none;
   cursor: pointer;
   transition: filter 120ms ease;
@@ -727,7 +781,7 @@ details > summary:hover { color: var(--text); }
 .auth-card .auth-submit:hover { filter: brightness(1.08); }
 .auth-card button[type="submit"]:disabled { opacity: 0.6; cursor: not-allowed; }
 
-.auth-card .banner { margin: 0; border-radius: var(--ac-radius-control); font-size: 14px; }
+.auth-card .banner { margin: 0; border-radius: var(--ac-radius); font-size: 14px; }
 .auth-card .banner-bad {
   color: var(--ac-on-error-container);
   background: var(--ac-error-container);
