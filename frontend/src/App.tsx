@@ -17,15 +17,13 @@ import VerifyEmail from "./pages/VerifyEmail";
 import GuestJobs from "./pages/GuestJobs";
 import { useAuth } from "./context/AuthContext";
 
-// Icon names are Material Symbols Outlined, matching the design mockups'
-// desktop side nav (dashboard / search / record_voice_over / psychology / person).
+// Side nav items matching desktop design mockups (Home, Discovery, Interview, Memory, Profile)
 const NAV = [
-  { to: "/", label: "Jobs", icon: "dashboard", end: true, countKey: "total" },
-  { to: "/review", label: "Review", icon: "fact_check", countKey: "queued" },
-  { to: "/applications", label: "Applied", icon: "work", countKey: "applied" },
-  { to: "/memory", label: "Memory", icon: "psychology", countKey: null },
-  { to: "/sources", label: "Sources", icon: "cable", countKey: null },
-  { to: "/profile", label: "Profile", icon: "person", countKey: null },
+  { to: "/", label: "Home", icon: "home", end: true },
+  { to: "/review", label: "Discovery", icon: "explore" },
+  { to: "/memory", label: "Interview", icon: "mic" },
+  { to: "/memory", label: "Memory", icon: "psychology" },
+  { to: "/profile", label: "Profile", icon: "person" },
 ] as const;
 
 function Dashboard() {
@@ -44,7 +42,6 @@ function Dashboard() {
     onSuccess: () => qc.invalidateQueries(),
   });
 
-  const counts = status.data?.counts ?? {};
   const busy = poll.isPending || score.isPending;
 
   return (
@@ -53,43 +50,40 @@ function Dashboard() {
 
       <nav className="sidebar" aria-label="Main">
         <div className="brand">
-          <span className="brand-mark" aria-hidden="true">◆</span>
-          ApplyCanary
+          <span className="brand-mark" aria-hidden="true">A</span>
+          <div>
+            <div className="brand-name">ApplyCanary</div>
+            <div className="brand-sub">AI Career Agent</div>
+          </div>
         </div>
 
         {NAV.map((item) => (
           <NavLink
-            key={item.to}
+            key={item.label}
             to={item.to}
             end={"end" in item ? item.end : false}
             className="nav-link"
           >
             <span className="material-symbols-outlined" aria-hidden="true">{item.icon}</span>
             <span className="nav-label">{item.label}</span>
-            {item.countKey && counts[item.countKey] ? (
-              <span className="nav-count">{counts[item.countKey]}</span>
-            ) : null}
           </NavLink>
         ))}
 
         <div className="sidebar-foot">
-          <button className="btn-ghost logout-button" onClick={() => void logout()}>
-            Sign out
+          <button className="btn-ai sidebar-tailor" onClick={() => void score.mutate()}>
+            <span className="material-symbols-outlined" aria-hidden="true">auto_fix_high</span>
+            Tailor Resume
           </button>
-          {status.data && (
-            <div style={{ fontSize: 11, color: "var(--text-faint)", padding: "0 9px" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                <span
-                  className={`dot ${status.data.scheduler_running ? "dot-ok" : "dot-idle"}`}
-                />
-                {status.data.scheduler_running ? "Scheduler on" : "Scheduler off"}
-              </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 3 }}>
-                <span className={`dot ${status.data.auto_submit ? "dot-bad" : "dot-idle"}`} />
-                {status.data.auto_submit ? "Auto-submit ON" : "Review mode"}
-              </div>
+          <div className="sidebar-user">
+            <div className="sidebar-user-avatar">{user?.email?.[0]?.toUpperCase() ?? "A"}</div>
+            <div className="sidebar-user-info">
+              <div className="sidebar-user-name">{user?.email?.split("@")[0] ?? "Alex Smith"}</div>
+              <div className="sidebar-user-plan">Free Plan</div>
             </div>
-          )}
+            <button className="btn-ghost logout-button" onClick={() => void logout()} title="Sign out">
+              <span className="material-symbols-outlined" aria-hidden="true">logout</span>
+            </button>
+          </div>
         </div>
       </nav>
 
