@@ -17,13 +17,15 @@ import VerifyEmail from "./pages/VerifyEmail";
 import GuestJobs from "./pages/GuestJobs";
 import { useAuth } from "./context/AuthContext";
 
+// Icon names are Material Symbols Outlined, matching the design mockups'
+// desktop side nav (dashboard / search / record_voice_over / psychology / person).
 const NAV = [
-  { to: "/", label: "Jobs", end: true, countKey: "total" },
-  { to: "/review", label: "Review", countKey: "queued" },
-  { to: "/applications", label: "Applied", countKey: "applied" },
-  { to: "/memory", label: "Memory", countKey: null },
-  { to: "/sources", label: "Sources", countKey: null },
-  { to: "/profile", label: "Profile", countKey: null },
+  { to: "/", label: "Jobs", icon: "dashboard", end: true, countKey: "total" },
+  { to: "/review", label: "Review", icon: "fact_check", countKey: "queued" },
+  { to: "/applications", label: "Applied", icon: "work", countKey: "applied" },
+  { to: "/memory", label: "Memory", icon: "psychology", countKey: null },
+  { to: "/sources", label: "Sources", icon: "cable", countKey: null },
+  { to: "/profile", label: "Profile", icon: "person", countKey: null },
 ] as const;
 
 function Dashboard() {
@@ -62,7 +64,8 @@ function Dashboard() {
             end={"end" in item ? item.end : false}
             className="nav-link"
           >
-            {item.label}
+            <span className="material-symbols-outlined" aria-hidden="true">{item.icon}</span>
+            <span className="nav-label">{item.label}</span>
             {item.countKey && counts[item.countKey] ? (
               <span className="nav-count">{counts[item.countKey]}</span>
             ) : null}
@@ -92,14 +95,14 @@ function Dashboard() {
 
       <div className="main">
         <header className="topbar">
-          <h1>ApplyCanary</h1>
+          <h1 className="topbar-title">ApplyCanary</h1>
           <div className="spacer" />
           <button onClick={() => poll.mutate()} disabled={busy} className="btn-ghost">
-            {poll.isPending ? <span className="spinner" /> : null}
+            {poll.isPending ? <span className="spinner" /> : <span className="material-symbols-outlined" aria-hidden="true">sync</span>}
             Poll sources
           </button>
           <button onClick={() => score.mutate()} disabled={busy} className="btn-ghost">
-            {score.isPending ? <span className="spinner" /> : null}
+            {score.isPending ? <span className="spinner" /> : <span className="material-symbols-outlined" aria-hidden="true">insights</span>}
             Score pending
           </button>
         </header>
