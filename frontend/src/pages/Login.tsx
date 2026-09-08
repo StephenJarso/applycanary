@@ -47,7 +47,20 @@ export default function Login() {
   }
 
   return (
-    <AuthShell title="Welcome back" subtitle="Log in to your job dashboard to continue." onSubmit={submit}>
+    <AuthShell title="Welcome back" subtitle="Log in to Agentic Workspace to continue." onSubmit={submit}>
+      <button type="button" className="auth-social" disabled>
+        <span className="material-symbols-outlined" aria-hidden="true">login</span>
+        Continue with Google
+      </button>
+      <button type="button" className="auth-social" disabled>
+        <span className="material-symbols-outlined" aria-hidden="true">code</span>
+        Continue with GitHub
+      </button>
+
+      <div className="auth-divider">
+        <span>OR CONTINUE WITH EMAIL</span>
+      </div>
+
       {unverified && !resent && (
         <div className="banner banner-bad" role="status">
           Confirm your email address before signing in.{" "}
