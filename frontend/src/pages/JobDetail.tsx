@@ -72,7 +72,9 @@ export default function JobDetail() {
       <Link to="/" className="btn-ghost btn-sm" style={{ marginBottom: 14 }}>← Jobs</Link>
 
       <div className="detail-head">
-        <ScoreBadge score={job.score} />
+        <div className="job-score-band band-strong" aria-hidden="true">
+          {job.score ? Math.round(job.score.total) : "—"}
+        </div>
         <div>
           <h2 className="detail-title">{job.title}</h2>
           <div className="detail-meta">
@@ -140,9 +142,19 @@ export default function JobDetail() {
       {job.score && (
         <div className="card">
           <h3 className="card-title">
+            <span className="material-symbols-outlined" aria-hidden="true">auto_awesome</span>
             Match <span className="chip">{job.score.verdict || "unscored"}</span>
             {job.score.decided_by && <span className="chip">{job.score.decided_by}</span>}
           </h3>
+
+          {job.score.reasoning && (
+            <div className="ai-reasoning">
+              <span className="material-symbols-outlined" aria-hidden="true">auto_awesome</span>
+              <p>
+                <strong>AI Reasoning:</strong> {job.score.reasoning}
+              </p>
+            </div>
+          )}
 
           <div className="grid2" style={{ marginBottom: 12 }}>
             <Meter label="Keyword" value={job.score.keyword_score} />
