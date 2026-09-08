@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { api } from "../api";
-import { Chips, ErrorBox, Loading, ScoreBadge, formatSalary, relTime } from "../components";
+import { Chips, ErrorBox, Loading, formatSalary, relTime } from "../components";
 
 /** Artifact downloads are same-origin: in dev Vite proxies /api to the backend. */
 function downloadUrl(versionId: number, fmt: "docx" | "pdf" | "txt") {
