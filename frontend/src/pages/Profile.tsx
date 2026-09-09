@@ -185,6 +185,80 @@ export default function ProfilePage() {
       </div>
 
       <div className="card">
+        <h3 className="card-title">
+          <span className="material-symbols-outlined" aria-hidden="true">key</span>
+          LLM API Key
+        </h3>
+        <p className="cell-dim">
+          Bring your own provider key so scoring and tailoring use your account
+          instead of the operator's. Leave blank to use the server default.
+        </p>
+        <div className="field">
+          <label htmlFor="llm-provider">Provider</label>
+          <select
+            id="llm-provider"
+            value={form.llm_provider ?? ""}
+            onChange={(e) => set("llm_provider", e.target.value)}
+          >
+            <option value="">Use server default</option>
+            <option value="xai">xAI (Grok)</option>
+            <option value="gemini">Google Gemini</option>
+            <option value="openrouter">OpenRouter</option>
+            <option value="groq">Groq</option>
+            <option value="anthropic">Anthropic</option>
+          </select>
+        </div>
+        <div className="field">
+          <label htmlFor="llm-key">API Key</label>
+          <input
+            id="llm-key"
+            type="password"
+            placeholder={data?.llm_api_key_masked || "sk-..."}
+            value=""
+            onChange={(e) => {
+              // Store in form state with a special key so save_profile sends it
+              if (e.target.value) {
+                setForm((f) => ({ ...f, llm_api_key: e.target.value } as any));
+              }
+            }}
+          />
+          {data?.llm_api_key_masked && (
+            <p className="cell-dim" style={{ marginTop: 4 }}>
+              Current: {data.llm_api_key_masked}
+            </p>
+          )}
+        </div>
+      </div>
+
+      <div className="card">
+        <h3 className="card-title">
+          <span className="material-symbols-outlined" aria-hidden="true">tune</span>
+          Job Preferences
+        </h3>
+        <div className="field">
+          <label htmlFor="work-type">Preferred work type</label>
+          <select
+            id="work-type"
+            value={form.preferred_work_type ?? "any"}
+            onChange={(e) => set("preferred_work_type" as any, e.target.value)}
+          >
+            <option value="any">Any (remote, hybrid, onsite)</option>
+            <option value="remote">Remote only</option>
+            <option value="hybrid">Hybrid preferred</option>
+            <option value="onsite">Onsite preferred</option>
+          </select>
+        </div>
+        <label className="check" style={{ marginBottom: 14 }}>
+          <input
+            type="checkbox"
+            checked={form.remote_only ?? false}
+            onChange={(e) => set("remote_only", e.target.checked)}
+          />
+          Remote roles only (strict filter)
+        </label>
+      </div>
+
+      <div className="card">
         <h3 className="card-title">GitHub evidence</h3>
         <p className="cell-dim">
           Public repos are scanned for verifiable proof of skills, so CV tailoring can
@@ -292,15 +366,6 @@ export default function ProfilePage() {
             />
           </div>
         ))}
-
-        <label className="check" style={{ marginBottom: 14 }}>
-          <input
-            type="checkbox"
-            checked={form.remote_only ?? false}
-            onChange={(e) => set("remote_only", e.target.checked)}
-          />
-          Remote roles only
-        </label>
 
         <button type="submit" className="btn-primary" disabled={save.isPending}>
           {save.isPending && <span className="spinner" />} Save profile

@@ -174,6 +174,9 @@ export interface Profile {
   github_synced_at: string | null;
   github_repo_count: number;
   alert_min_score: number;
+  llm_provider: string;
+  llm_api_key_masked: string;
+  preferred_work_type: string;
 }
 
 export interface SourceHealth {
