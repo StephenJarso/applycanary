@@ -1,8 +1,8 @@
 name: release
 
-# Builds the desktop application on a version tag and attaches the installers
-# to the GitHub Release. Uses PyInstaller to bundle the Python backend +
-# React frontend into a native window (pywebview).
+# Builds the desktop application on a version tag and produces real installers:
+#   Linux:   .deb package (apt/dpkg install)
+#   Windows: .exe installer (NSIS wizard) + portable zip
 #
 # Each platform builds on its native runner: PyInstaller cannot cross-compile.
 
@@ -35,8 +35,7 @@ jobs:
       - run: python -m pytest -q
 
   frontend:
-    # Built once and shared: both packages embed the same bundle, and building
-    # it on each platform risks them drifting apart.
+    # Built once and shared by both platform jobs.
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -68,25 +67,29 @@ jobs:
         with:
           name: frontend-dist
           path: frontend/dist
-      # pywebview needs webkit2gtk on Linux for the native webview.
+
       - name: Install system deps
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
-            libwebkit2gtk-4.1-dev gir1.2-webkit2gtk-4.1
+            libwebkit2gtk-4.1-dev gir1.2-webkit2gtk-4.1 dpkg-dev
+
       - run: pip install -r requirements.txt pywebview pyinstaller
 
-      - name: Build desktop app (Linux)
+      - name: Build PyInstaller bundle
         run: python -m PyInstaller --clean applycanary.spec
 
-      - name: Package Linux desktop app
+      - name: Build .deb installer
         run: |
-          cd dist && zip -r ApplyCanary_linux_x64.zip ApplyCanary/
+          TAG="${{ github.event.inputs.tag || github.ref_name }}"
+          VERSION="${TAG#v}"
+          chmod +x scripts/package_deb.sh
+          ./scripts/package_deb.sh "$VERSION"
 
       - uses: actions/upload-artifact@v4
         with:
-          name: linux-artifacts
-          path: dist/ApplyCanary_linux_x64.zip
+          name: linux-installer
+          path: dist/ApplyCanary_*.deb
           if-no-files-found: error
 
   windows:
@@ -102,22 +105,41 @@ jobs:
         with:
           name: frontend-dist
           path: frontend/dist
+
       - run: pip install -r requirements.txt pywebview pyinstaller
 
-      - name: Build desktop app (Windows)
+      - name: Build PyInstaller bundle
         run: python -m PyInstaller --clean applycanary.spec
 
-      - name: Package Windows desktop app
+      - name: Build .exe installer (NSIS)
+        shell: bash
+        run: |
+          # Download NSIS
+          choco install nsis -y --no-progress 2>/dev/null || true
+          NSIS_PATH="/c/Program Files (x86)/NSIS/makensis.exe"
+          if [ ! -f "$NSIS_PATH" ]; then
+            NSIS_PATH="$(which makensis.exe 2>/dev/null || echo '')"
+          fi
+          if [ -n "$NSIS_PATH" ] && [ -f "$NSIS_PATH" ]; then
+            "$NSIS_PATH" scripts/installer.nsi
+            echo "NSIS installer built"
+          else
+            echo "NSIS not found — skipping .exe installer, producing portable zip"
+          fi
+
+      - name: Package portable zip
         shell: pwsh
         run: |
           Compress-Archive -Path dist/ApplyCanary/* `
-                           -DestinationPath dist/ApplyCanary_windows_x64.zip
+                           -DestinationPath dist/ApplyCanary_windows_portable.zip
 
       - uses: actions/upload-artifact@v4
         with:
-          name: windows-artifacts
-          path: dist/ApplyCanary_windows_x64.zip
-          if-no-files-found: error
+          name: windows-installer
+          path: |
+            dist/ApplyCanary_windows_x64_setup.exe
+            dist/ApplyCanary_windows_portable.zip
+          if-no-files-found: warn
 
   publish:
     needs: [linux, windows]
@@ -125,18 +147,16 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
-          pattern: "*-artifacts"
+          pattern: "*-installer"
           merge-multiple: true
           path: dist
-      - run: ls -lh dist
+      - run: ls -lh dist/
 
-      - name: Attach desktop app to the release
+      - name: Attach installers to the release
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ github.event.inputs.tag || github.ref_name }}
         run: |
-          # --clobber so re-running the workflow replaces assets rather than
-          # failing on a name that already exists.
           gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 \
             || gh release create "$TAG" --repo "$GITHUB_REPOSITORY" \
                  --title "$TAG" --generate-notes
