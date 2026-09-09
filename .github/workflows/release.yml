@@ -68,7 +68,13 @@ jobs:
         with:
           name: frontend-dist
           path: frontend/dist
-      - run: pip install -r requirements.txt pyinstaller
+      # pywebview needs webkit2gtk on Linux for the native webview.
+      - name: Install system deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libwebkit2gtk-4.1-dev gir1.2-webkit2gtk-4.1
+      - run: pip install -r requirements.txt pywebview pyinstaller
 
       - name: Build desktop app (Linux)
         run: python -m PyInstaller --clean applycanary.spec
@@ -96,7 +102,7 @@ jobs:
         with:
           name: frontend-dist
           path: frontend/dist
-      - run: pip install -r requirements.txt pyinstaller
+      - run: pip install -r requirements.txt pywebview pyinstaller
 
       - name: Build desktop app (Windows)
         run: python -m PyInstaller --clean applycanary.spec

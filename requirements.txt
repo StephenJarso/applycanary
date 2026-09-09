@@ -55,8 +55,11 @@ anthropic>=0.40,<1.0
 aiosmtplib>=3.0,<4.0
 resend>=2.0,<4.0
 
-# --- desktop app ---
-pywebview>=5.0,<6.0
+# --- desktop app (optional — only needed for run_desktop.py) ---
+# On Linux the system needs webkit2gtk: apt install libwebkit2gtk-4.1-dev
+# On macOS: brew install webkitgtk
+# On Windows: Edge WebView2 is built-in.
+# pywebview>=5.0,<6.0
 
 # --- dev ---
 pytest>=8.3,<9.0
