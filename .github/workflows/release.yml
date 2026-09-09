@@ -53,7 +53,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: frontend-dist
-          path: app/web/dist
+          path: frontend/dist
           if-no-files-found: error
 
   linux:
