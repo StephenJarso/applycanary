@@ -121,7 +121,7 @@ def tier1(job: Job, profile: Profile) -> Decision:
 async def tier2(job: Job, profile: Profile, base: Decision) -> Decision:
     """LLM fit assessment. Falls back to the tier-1 decision on any failure."""
     llm = get_llm()
-    if not llm.available:
+    if not llm.available and not (profile.llm_provider and profile.llm_api_key):
         return base
 
     system = cached_system(
@@ -129,7 +129,7 @@ async def tier2(job: Job, profile: Profile, base: Decision) -> Decision:
         # Resume in the cached prefix: identical for every job this cycle.
         f"\n\n<candidate_profile>\n{_profile_block(profile)}\n</candidate_profile>",
     )
-    user = build_scoring_user(
+    user_msg = build_scoring_user(
         title=job.title,
         company=job.company,
         location=job.location or "unspecified",
@@ -137,12 +137,20 @@ async def tier2(job: Job, profile: Profile, base: Decision) -> Decision:
         missing_keywords=base.missing,
     )
 
+    # When the server has no provider but the user brought their own key,
+    # the client can still complete the call — it just needs to be told to
+    # try the user's provider even when the server chain is empty.
+    if not llm.available:
+        llm._provider_order = [profile.llm_provider]  # noqa: SLF001
+
     try:
         parsed, result = await llm.complete_json(
             model=llm.triage_model,
             system=system,
-            messages=[{"role": "user", "content": user}],
+            messages=[{"role": "user", "content": user_msg}],
             max_tokens=4096,
+            user_provider=profile.llm_provider or "",
+            user_api_key=profile.llm_api_key or "",
         )
     except Exception as exc:  # noqa: BLE001 - scoring must never break ingestion
         log.warning("tier2 scoring failed for job %s: %s", job.id, exc)

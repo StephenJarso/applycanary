@@ -42,8 +42,11 @@ async def prep_for_job(
         return existing
 
     llm = get_llm()
-    if not llm.available:
+    has_user_key = bool(profile.llm_provider and profile.llm_api_key)
+    if not llm.available and not has_user_key:
         raise InterviewPrepError("no LLM API key configured (GEMINI_API_KEY or ANTHROPIC_API_KEY)")
+    if not llm.available and has_user_key:
+        llm._provider_order = [profile.llm_provider]  # noqa: SLF001
 
     resume_text = (profile.base_resume_text or "").strip()
     if not resume_text:
@@ -67,6 +70,8 @@ async def prep_for_job(
             }],
             max_tokens=8000,
             temperature=0.3,
+            user_provider=profile.llm_provider or "",
+            user_api_key=profile.llm_api_key or "",
         )
     except Exception as exc:  # noqa: BLE001
         raise InterviewPrepError(f"interview prep call failed: {exc}") from exc
