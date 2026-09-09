@@ -68,7 +68,7 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: frontend-dist
-          path: app/web/dist
+          path: frontend/dist
       - run: pip install -r requirements.txt pyinstaller
 
       - name: Build .deb
@@ -107,7 +107,7 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: frontend-dist
-          path: app/web/dist
+          path: frontend/dist
       - run: pip install -r requirements.txt pyinstaller
 
       - name: Build Windows .exe
