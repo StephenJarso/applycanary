@@ -17,11 +17,12 @@ import VerifyEmail from "./pages/VerifyEmail";
 import GuestJobs from "./pages/GuestJobs";
 import { useAuth } from "./context/AuthContext";
 
-// Side nav items matching desktop design mockups (Home, Discovery, Interview, Memory, Profile)
+// Side nav items matching desktop design mockups (Home, Discovery, Memory, Profile).
+// Interviews are reached per-job (JobDetail → AI Interview), not from the nav —
+// the earlier duplicate /memory entry made two items highlight at once.
 const NAV = [
   { to: "/", label: "Home", icon: "home", end: true },
   { to: "/review", label: "Discovery", icon: "explore" },
-  { to: "/memory", label: "Interview", icon: "mic" },
   { to: "/memory", label: "Memory", icon: "psychology" },
   { to: "/profile", label: "Profile", icon: "person" },
 ] as const;
@@ -70,9 +71,14 @@ function Dashboard() {
         ))}
 
         <div className="sidebar-foot">
-          <button className="btn-ai sidebar-tailor" onClick={() => void score.mutate()}>
+          <button
+            className="btn-ai sidebar-tailor"
+            onClick={() => void score.mutate()}
+            disabled={busy}
+            title="Score unscored jobs against your resume"
+          >
             <span className="material-symbols-outlined" aria-hidden="true">auto_fix_high</span>
-            Tailor Resume
+            Score Jobs
           </button>
           <div className="sidebar-user">
             <div className="sidebar-user-avatar">{user?.email?.[0]?.toUpperCase() ?? "A"}</div>
