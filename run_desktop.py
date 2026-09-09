@@ -71,6 +71,7 @@ def main() -> int:
 
         def _run_server() -> None:
             import uvicorn
+
             from app.main import app as target
             uvicorn.run(
                 target,
@@ -110,7 +111,7 @@ def main() -> int:
             server_thread.join()
         return 0
 
-    window = webview.create_window(
+    webview.create_window(
         title="ApplyCanary — AI Career Agent",
         url=url,
         width=1280,
