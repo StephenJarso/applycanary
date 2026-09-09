@@ -530,12 +530,14 @@ async def send_digest(
         select(Job, JobScore)
         .join(JobScore, JobScore.job_id == Job.id)
         .where(Job.first_seen_at >= since)
-        .where(JobScore.total >= 70)
+        # Only strong or possible matches (not weak/disqualified).
+        .where(JobScore.verdict.in_("strong_match", "possible"))
+        .where(JobScore.total >= 60)
     )
     if uid:
         new_stmt = new_stmt.where(JobScore.user_id == uid)
     new_matches = session.exec(
-        new_stmt.order_by(JobScore.total.desc()).limit(15)
+        new_stmt.order_by(JobScore.total.desc()).limit(10)
     ).all()
 
     if not (applied or queued or new_matches):
