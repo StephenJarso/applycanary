@@ -1,11 +1,10 @@
 name: release
 
-# Builds every distributable on a version tag and attaches them to the GitHub
-# Release. Releases were previously cut by hand, which is why v0.1.0-rc.1 and
-# rc.2 shipped with zero assets — the artifacts existed only on a laptop.
+# Builds the desktop application on a version tag and attaches the installers
+# to the GitHub Release. Uses PyInstaller to bundle the Python backend +
+# React frontend into a native window (pywebview).
 #
-# Windows and Linux build on their native runners: PyInstaller produces a
-# host-platform binary and cannot cross-compile.
+# Each platform builds on its native runner: PyInstaller cannot cross-compile.
 
 on:
   push:
@@ -71,28 +70,17 @@ jobs:
           path: frontend/dist
       - run: pip install -r requirements.txt pyinstaller
 
-      - name: Build .deb
-        env:
-          SKIP_FRONTEND: "1"
-        run: |
-          chmod +x scripts/package_deb.sh
-          ./scripts/package_deb.sh
+      - name: Build desktop app (Linux)
+        run: python -m PyInstaller --clean applycanary.spec
 
-      - name: Build Linux standalone binary
+      - name: Package Linux desktop app
         run: |
-          python -m PyInstaller --clean applycanary.spec
-          cd dist && zip -r applycanary_standalone_linux.zip applycanary
-
-      - name: Build portable bundle
-        run: python scripts/package_exe.py --skip-frontend --portable-only
+          cd dist && zip -r ApplyCanary_linux_x64.zip ApplyCanary/
 
       - uses: actions/upload-artifact@v4
         with:
           name: linux-artifacts
-          path: |
-            dist/*.deb
-            dist/applycanary_standalone_linux.zip
-            dist/applycanary_portable.zip
+          path: dist/ApplyCanary_linux_x64.zip
           if-no-files-found: error
 
   windows:
@@ -110,19 +98,19 @@ jobs:
           path: frontend/dist
       - run: pip install -r requirements.txt pyinstaller
 
-      - name: Build Windows .exe
+      - name: Build desktop app (Windows)
         run: python -m PyInstaller --clean applycanary.spec
 
-      - name: Package .exe
+      - name: Package Windows desktop app
         shell: pwsh
         run: |
-          Compress-Archive -Path dist/applycanary/* `
-                           -DestinationPath dist/applycanary_standalone_win64.zip
+          Compress-Archive -Path dist/ApplyCanary/* `
+                           -DestinationPath dist/ApplyCanary_windows_x64.zip
 
       - uses: actions/upload-artifact@v4
         with:
           name: windows-artifacts
-          path: dist/applycanary_standalone_win64.zip
+          path: dist/ApplyCanary_windows_x64.zip
           if-no-files-found: error
 
   publish:
@@ -136,7 +124,7 @@ jobs:
           path: dist
       - run: ls -lh dist
 
-      - name: Attach artifacts to the release
+      - name: Attach desktop app to the release
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ github.event.inputs.tag || github.ref_name }}
