@@ -111,6 +111,15 @@ def main() -> int:
             server_thread.join()
         return 0
 
+    # Resolve icon path — works both in source tree and PyInstaller bundle.
+    import pathlib
+    _icon_dir = pathlib.Path(getattr(sys, '_MEIPASS', pathlib.Path(__file__).parent))
+    _icon = _icon_dir / 'assets' / 'icon.ico'
+    if not _icon.is_file():
+        _icon = _icon_dir / 'assets' / 'icon_256.png'
+    if not _icon.is_file():
+        _icon = None
+
     webview.create_window(
         title="ApplyCanary — AI Career Agent",
         url=url,
@@ -119,7 +128,7 @@ def main() -> int:
         min_size=(900, 600),
         text_select=True,
     )
-    webview.start(debug=args.dev)
+    webview.start(debug=args.dev, gui='edgechromium' if sys.platform == 'win32' else None)
     return 0
 
 

@@ -9,6 +9,8 @@ block_cipher = None
 added_files = [
     ('companies.yaml', '.'),
     ('frontend/dist', 'frontend/dist'),
+    ('assets/icon.ico', 'assets'),
+    ('assets/icon.svg', 'assets'),
 ]
 
 # Every app submodule. The entrypoint imports app.main directly (not as a module
@@ -66,7 +68,7 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon=None,               # add icon='assets/icon.ico' when available
+    icon='assets/icon.ico',
 )
 
 coll = COLLECT(
