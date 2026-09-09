@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <!-- Background: deep indigo circle -->
+  <rect width="512" height="512" rx="96" fill="#5000E1"/>
+  <!-- Subtle radial glow -->
+  <circle cx="256" cy="220" r="180" fill="url(#glow)" opacity="0.3"/>
+  <!-- Letter A: bold geometric -->
+  <path d="M256 100 L370 380 L330 380 L300 310 L212 310 L182 380 L142 380 Z M222 280 L256 190 L290 280 Z"
+        fill="#FFFFFF" fill-rule="evenodd"/>
+  <!-- Canary yellow accent bar -->
+  <rect x="140" y="400" width="232" height="12" rx="6" fill="#FCD400"/>
+  <!-- Canary eye dot -->
+  <circle cx="256" cy="232" r="14" fill="#FCD400"/>
+  <defs>
+    <radialGradient id="glow" cx="0.5" cy="0.4" r="0.6">
+      <stop offset="0" stop-color="#6933FF"/>
+      <stop offset="1" stop-color="#5000E1" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+</svg>
