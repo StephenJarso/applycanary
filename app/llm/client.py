@@ -183,9 +183,20 @@ class LlmClient:
         max_tokens: int = 2048,
         temperature: float = 0.0,
         json_mode: bool = False,
+        user_provider: str = "",
+        user_api_key: str = "",
     ) -> LlmResult:
-        """Complete with automatic provider fallback."""
-        if not self.available:
+        """Complete with automatic provider fallback.
+
+        ``user_provider`` / ``user_api_key``: when a user has supplied their own
+        LLM key, this completes against that provider first (ignoring cooldowns
+        for the user's choice), then falls back to the server chain as usual.
+        """
+        # Build the candidate list: user's provider first (if any), then server chain.
+        candidates: list[str] = []
+        if user_provider and user_api_key:
+            candidates.append(user_provider)
+        elif not self.available:
             raise RuntimeError(
                 "no LLM provider configured. Set one of: "
                 "XAI_API_KEY, GEMINI_API_KEY, OPENROUTER_API_KEY, "
@@ -193,18 +204,14 @@ class LlmClient:
                 "or run Ollama locally (OLLAMA_HOST)"
             )
 
-        last_exc: Exception | None = None
-
-        # Skip providers currently sitting out their cooldown. If every provider
-        # is cooling down, fail fast rather than trying the soonest-recovering
-        # one: with a dead provider chain that override would still burn retry
-        # budget on every scheduler call, which is exactly what the breaker
-        # exists to stop. Cooldowns expire on their own and the chain recovers.
+        # Append server providers (skip the user's if already prepended).
         now = time.monotonic()
-        candidates = [
-            p for p in self._provider_order
-            if now >= self._cooldowns.get(p, 0.0)
-        ]
+        for p in self._provider_order:
+            if p in candidates:
+                continue
+            if now >= self._cooldowns.get(p, 0.0):
+                candidates.append(p)
+
         if not candidates:
             cooling = ", ".join(
                 f"{p} (~{int(self._cooldowns[p] - now)}s left)"
@@ -215,13 +222,20 @@ class LlmClient:
                 "retry once a cooldown expires"
             )
 
+        last_exc: Exception | None = None
+
         for provider in candidates:
+            # Use the user's key for their chosen provider.
+            effective_key = (
+                user_api_key if provider == user_provider and user_api_key else ""
+            )
             try:
                 await self._pace(provider)
                 log.debug("Trying provider: %s with model: %s", provider, model)
                 result = await self._complete_for(
                     provider, model=model, system=system, messages=messages,
                     max_tokens=max_tokens, temperature=temperature, json_mode=json_mode,
+                    user_api_key=effective_key,
                 )
                 # Succeeded - lift any cooldown so a recovered provider is
                 # used again immediately.
@@ -310,6 +324,7 @@ class LlmClient:
         max_tokens: int,
         temperature: float,
         json_mode: bool,
+        user_api_key: str = "",
     ) -> LlmResult:
         """Dispatch a single provider call (used by the fallback loop)."""
         model = self._model_for_provider(provider, model)
@@ -317,21 +332,25 @@ class LlmClient:
             return await self._complete_gemini(
                 model=model, system=system, messages=messages,
                 max_tokens=max_tokens, temperature=temperature, json_mode=json_mode,
+                user_api_key=user_api_key,
             )
         if provider == "openrouter":
             return await self._complete_openrouter(
                 model=model, system=system, messages=messages,
                 max_tokens=max_tokens, temperature=temperature, json_mode=json_mode,
+                user_api_key=user_api_key,
             )
         if provider == "groq":
             return await self._complete_groq(
                 model=model, system=system, messages=messages,
                 max_tokens=max_tokens, temperature=temperature, json_mode=json_mode,
+                user_api_key=user_api_key,
             )
         if provider == "xai":
             return await self._complete_xai(
                 model=model, system=system, messages=messages,
                 max_tokens=max_tokens, temperature=temperature, json_mode=json_mode,
+                user_api_key=user_api_key,
             )
         if provider == "ollama":
             return await self._complete_ollama(
@@ -342,6 +361,7 @@ class LlmClient:
             return await self._complete_anthropic(
                 model=model, system=system, messages=messages,
                 max_tokens=max_tokens, temperature=temperature, json_mode=json_mode,
+                user_api_key=user_api_key,
             )
         if provider == "bedrock":
             return await self._complete_bedrock(
@@ -379,6 +399,7 @@ class LlmClient:
         max_tokens: int,
         temperature: float,
         json_mode: bool,
+        user_api_key: str = "",
     ) -> LlmResult:
         payload: dict[str, Any] = {
             "contents": [_gemini_content(m) for m in messages],
@@ -402,10 +423,11 @@ class LlmClient:
             payload["generationConfig"]["thinkingConfig"] = {"thinkingBudget": budget}
 
         url = f"{GEMINI_API}/models/{model}:generateContent"
+        api_key = user_api_key or self._settings.gemini_api_key
         try:
             return await self._post_with_retry(
                 "gemini", url, model,
-                params={"key": self._settings.gemini_api_key},
+                params={"key": api_key},
                 headers={"Content-Type": "application/json"},
                 json=payload,
                 parse_fn=_parse_gemini_response,
@@ -419,7 +441,7 @@ class LlmClient:
                 payload["generationConfig"].pop("thinkingConfig", None)
                 return await self._post_with_retry(
                     "gemini", url, model,
-                    params={"key": self._settings.gemini_api_key},
+                    params={"key": api_key},
                     headers={"Content-Type": "application/json"},
                     json=payload,
                     parse_fn=_parse_gemini_response,
@@ -438,6 +460,7 @@ class LlmClient:
         max_tokens: int,
         temperature: float,
         json_mode: bool,
+        user_api_key: str = "",
     ) -> LlmResult:
         payload = {
             "model": model,
@@ -450,10 +473,11 @@ class LlmClient:
             payload["response_format"] = {"type": "json_object"}
 
         url = f"{OPENROUTER_API}/chat/completions"
+        api_key = user_api_key or self._settings.openrouter_api_key
         return await self._post_with_retry(
             "openrouter", url, model,
             headers={
-                "Authorization": f"Bearer {self._settings.openrouter_api_key}",
+                "Authorization": f"Bearer {api_key}",
                 "Content-Type": "application/json",
                 "HTTP-Referer": "https://github.com/applycanary",
                 "X-Title": "ApplyCanary",
@@ -474,6 +498,7 @@ class LlmClient:
         max_tokens: int,
         temperature: float,
         json_mode: bool,
+        user_api_key: str = "",
     ) -> LlmResult:
         payload = {
             "model": model,
@@ -486,10 +511,11 @@ class LlmClient:
             payload["response_format"] = {"type": "json_object"}
 
         url = f"{GROQ_API}/chat/completions"
+        api_key = user_api_key or self._settings.groq_api_key
         return await self._post_with_retry(
             "groq", url, model,
             headers={
-                "Authorization": f"Bearer {self._settings.groq_api_key}",
+                "Authorization": f"Bearer {api_key}",
                 "Content-Type": "application/json",
             },
             json=payload,
@@ -508,6 +534,7 @@ class LlmClient:
         max_tokens: int,
         temperature: float,
         json_mode: bool,
+        user_api_key: str = "",
     ) -> LlmResult:
         """Complete via xAI's OpenAI-compatible Chat Completions API.
 
@@ -527,10 +554,11 @@ class LlmClient:
             payload["response_format"] = {"type": "json_object"}
 
         url = f"{XAI_API}/chat/completions"
+        api_key = user_api_key or self._settings.xai_api_key
         return await self._post_with_retry(
             "xai", url, model,
             headers={
-                "Authorization": f"Bearer {self._settings.xai_api_key}",
+                "Authorization": f"Bearer {api_key}",
                 "Content-Type": "application/json",
             },
             json=payload,
@@ -635,6 +663,7 @@ class LlmClient:
         max_tokens: int,
         temperature: float,
         json_mode: bool,
+        user_api_key: str = "",
     ) -> LlmResult:
         """Complete via the Anthropic Messages API (official SDK).
 
@@ -656,11 +685,15 @@ class LlmClient:
                 "anthropic", 503, "anthropic package not installed"
             ) from exc
 
-        if self._anthropic_client is None:
-            self._anthropic_client = AsyncAnthropic(
-                api_key=self._settings.anthropic_api_key
-            )
-        client = self._anthropic_client
+        api_key = user_api_key or self._settings.anthropic_api_key
+        if user_api_key:
+            # Per-user key: create a fresh client (not cached).
+            client = AsyncAnthropic(api_key=api_key)
+        elif self._anthropic_client is None:
+            self._anthropic_client = AsyncAnthropic(api_key=api_key)
+            client = self._anthropic_client
+        else:
+            client = self._anthropic_client
 
         # The Anthropic API only accepts user/assistant roles; the app never
         # sends anything else, but coerce defensively anyway.
@@ -776,11 +809,14 @@ class LlmClient:
         messages: list[dict],
         max_tokens: int = 2048,
         temperature: float = 0.0,
+        user_provider: str = "",
+        user_api_key: str = "",
     ) -> tuple[dict, LlmResult]:
         """Complete and parse a JSON object, retrying once on unparseable output."""
         result = await self.complete(
             model=model, system=system, messages=messages,
             max_tokens=max_tokens, temperature=temperature, json_mode=True,
+            user_provider=user_provider, user_api_key=user_api_key,
         )
         parsed = extract_json(result.text)
         if parsed is None:
@@ -800,6 +836,7 @@ class LlmClient:
             result = await self.complete(
                 model=model, system=system, messages=retry_messages,
                 max_tokens=max_tokens, temperature=temperature, json_mode=True,
+                user_provider=user_provider, user_api_key=user_api_key,
             )
             parsed = extract_json(result.text)
             if parsed is None:

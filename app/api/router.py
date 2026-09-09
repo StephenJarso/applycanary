@@ -131,6 +131,11 @@ class ProfileOut(BaseModel):
     github_repo_count: int = 0
     # Email alerts: when a posting scores at/above this, email it immediately.
     alert_min_score: float = 90.0
+    # Per-user LLM key
+    llm_provider: str = ""
+    llm_api_key_masked: str = ""  # masked, never the raw key
+    # Job subscription preferences
+    preferred_work_type: str = "any"
 
 
 class ProfileIn(BaseModel):
@@ -154,6 +159,11 @@ class ProfileIn(BaseModel):
     skills: list[str] = Field(default_factory=list)
     # Email alerts: send immediately when a posting scores at/above this (0 = off).
     alert_min_score: float | None = None
+    # Per-user LLM key (optional — blank means use server default)
+    llm_provider: str = ""
+    llm_api_key: str = ""  # sent once, stored, never read back raw
+    # Job subscription preferences
+    preferred_work_type: str = "any"
 
 
 class SourceHealthOut(BaseModel):
@@ -676,6 +686,8 @@ def get_profile(
     if profile is None:
         return ProfileOut()
     evidence = profile.github_evidence or {}
+    key = profile.llm_api_key or ""
+    masked = (key[:4] + "••••••••" + key[-4:]) if len(key) > 8 else ("••••••••" if key else "")
     return ProfileOut(
         full_name=profile.full_name,
         email=profile.email,
@@ -699,6 +711,9 @@ def get_profile(
         github_synced_at=profile.github_synced_at,
         github_repo_count=len(evidence.get("repos") or []),
         alert_min_score=profile.alert_min_score,
+        llm_provider=profile.llm_provider,
+        llm_api_key_masked=masked,
+        preferred_work_type=profile.preferred_work_type,
     )
 
 
@@ -720,6 +735,12 @@ def save_profile(
         # None means "leave unchanged" for the optional alert threshold, so an
         # old client that omits it cannot null out the stored preference.
         if field == "alert_min_score" and value is None:
+            continue
+        # llm_api_key: only overwrite when the user actually sent a new key;
+        # an empty string means "I forgot to fill this in", not "clear my key".
+        if field == "llm_api_key":
+            if value:
+                profile.llm_api_key = str(value)
             continue
         setattr(profile, field, value)
     # Store canonical skill names so variants such as "Golang" and "go" score

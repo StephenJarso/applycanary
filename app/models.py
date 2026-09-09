@@ -168,6 +168,14 @@ class Profile(SQLModel, table=True):
     enable_auto_submit: bool = False
     digest_to: str = ""
 
+    # Per-user LLM API key: lets the user bring their own provider key.
+    # Stored encrypted at rest (future), sent to the client only masked.
+    llm_provider: str = ""       # xai | gemini | openrouter | groq | anthropic
+    llm_api_key: str = ""
+
+    # Job subscription preferences: what work arrangement the user wants.
+    preferred_work_type: str = "any"  # any | remote | hybrid | onsite
+
     created_at: datetime = Field(default_factory=utcnow)
     updated_at: datetime = Field(default_factory=utcnow)
 
