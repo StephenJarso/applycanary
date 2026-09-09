@@ -1,136 +1,93 @@
 #!/usr/bin/env bash
-# Build a native Debian/Ubuntu .deb package for ApplyCanary
+# Build a .deb package for the ApplyCanary desktop application.
 #
-# Output: dist/applycanary_<version>_amd64.deb
+# Expects the PyInstaller bundle at dist/ApplyCanary/
+# Output: dist/ApplyCanary_<version>_amd64.deb
 #
-# Install:   sudo dpkg -i dist/applycanary_0.1.0_amd64.deb
+# Install:   sudo dpkg -i dist/ApplyCanary_0.2.0_amd64.deb
 # Remove:    sudo dpkg -r applycanary
 
 set -euo pipefail
 
-VERSION="0.1.0"
+VERSION="${1:-0.2.0}"
 ARCH="amd64"
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 BUILD_DIR="${ROOT_DIR}/build/deb"
 DIST_DIR="${ROOT_DIR}/dist"
 PKG_NAME="applycanary"
 
-echo "=== Building ApplyCanary .deb Release v${VERSION} ==="
+echo "=== Building ApplyCanary Desktop .deb v${VERSION} ==="
 
-# 1. Build frontend bundle
-# SKIP_FRONTEND=1 is set by the CI release workflow, which builds the bundle
-# once and shares it between the Linux and Windows jobs.
-if [ "${SKIP_FRONTEND:-0}" = "1" ]; then
-    echo "Skipping frontend build (SKIP_FRONTEND=1)"
-else
-    echo "Building React frontend..."
-    cd "${ROOT_DIR}/frontend"
-    npm ci --no-audit --no-fund
-    npm run build
-    cd "${ROOT_DIR}"
+# Source: the PyInstaller one-dir build
+SRC_DIR="${DIST_DIR}/ApplyCanary"
+if [ ! -d "${SRC_DIR}" ]; then
+    echo "ERROR: ${SRC_DIR} not found. Run PyInstaller first."
+    exit 1
 fi
 
-# 2. Clean previous build directory
+# Clean previous build
 rm -rf "${BUILD_DIR}"
 mkdir -p "${BUILD_DIR}/DEBIAN"
 mkdir -p "${BUILD_DIR}/opt/applycanary"
+mkdir -p "${BUILD_DIR}/usr/share/applications"
+mkdir -p "${BUILD_DIR}/usr/share/icons/hicolor/256x256/apps"
 mkdir -p "${BUILD_DIR}/usr/bin"
-mkdir -p "${BUILD_DIR}/lib/systemd/system"
-mkdir -p "${BUILD_DIR}/var/lib/applycanary"
 mkdir -p "${DIST_DIR}"
 
-# 3. Create Debian control file
+# Debian control file
 cat <<EOF > "${BUILD_DIR}/DEBIAN/control"
 Package: ${PKG_NAME}
 Version: ${VERSION}
 Architecture: ${ARCH}
 Maintainer: Stephen Jarso <stephen@applycanary.local>
-Depends: python3 (>= 3.10), python3-venv, systemd
+Depends: libwebkit2gtk-4.1-0
 Section: utils
 Priority: optional
-Description: Self-hosted job discovery, ATS resume tailoring, and application tracking.
- ApplyCanary runs on your own machine, polls job boards around the clock, scores
- openings against your resume, and prepares tailored applications.
+Description: AI Career Agent — job discovery, ATS scoring, interview prep
+ ApplyCanary runs as a native desktop application on your machine.
+ It polls job boards around the clock, scores openings against your
+ resume, and prepares tailored applications. Bring your own LLM API
+ key or use the server defaults.
 EOF
 
-# 4. Create post-installation script
-cat <<EOF > "${BUILD_DIR}/DEBIAN/postinst"
+# Copy the PyInstaller bundle into /opt/applycanary
+cp -r "${SRC_DIR}/"* "${BUILD_DIR}/opt/applycanary/"
+chmod 755 "${BUILD_DIR}/opt/applycanary/ApplyCanary"
+
+# Launcher in /usr/bin
+cat <<'LAUNCHER' > "${BUILD_DIR}/usr/bin/applycanary"
 #!/bin/sh
-set -e
-
-# Create applycanary user if not present
-if ! id -u applycanary >/dev/null 2>&1; then
-    useradd --system --user-group --no-create-home applycanary || true
-fi
-
-# Set directory permissions
-mkdir -p /var/lib/applycanary
-chown -R applycanary:applycanary /var/lib/applycanary /opt/applycanary
-
-# Install python virtualenv if needed
-if [ ! -d "/opt/applycanary/.venv" ]; then
-    python3 -m venv /opt/applycanary/.venv
-    /opt/applycanary/.venv/bin/pip install --no-cache-dir -r /opt/applycanary/requirements.txt
-fi
-
-systemctl daemon-reload || true
-systemctl enable applycanary.service || true
-echo "ApplyCanary v${VERSION} installed. Start service with: sudo systemctl start applycanary"
-EOF
-chmod 755 "${BUILD_DIR}/DEBIAN/postinst"
-
-# 5. Create pre-removal script
-cat <<EOF > "${BUILD_DIR}/DEBIAN/prerm"
-#!/bin/sh
-set -e
-systemctl stop applycanary.service || true
-systemctl disable applycanary.service || true
-EOF
-chmod 755 "${BUILD_DIR}/DEBIAN/prerm"
-
-# 6. Create Systemd Service File
-cat <<EOF > "${BUILD_DIR}/lib/systemd/system/applycanary.service"
-[Unit]
-Description=ApplyCanary Service
-After=network.target
-
-[Service]
-Type=simple
-User=applycanary
-WorkingDirectory=/opt/applycanary
-Environment="DATA_DIR=/var/lib/applycanary"
-Environment="DATABASE_URL=sqlite:////var/lib/applycanary/applycanary.db"
-ExecStart=/opt/applycanary/.venv/bin/python /opt/applycanary/run.py
-Restart=always
-RestartSec=5s
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-# 7. Copy Application Files
-cp -r "${ROOT_DIR}/app" "${BUILD_DIR}/opt/applycanary/"
-cp "${ROOT_DIR}/run.py" "${BUILD_DIR}/opt/applycanary/"
-cp "${ROOT_DIR}/companies.yaml" "${BUILD_DIR}/opt/applycanary/"
-cp "${ROOT_DIR}/requirements.txt" "${BUILD_DIR}/opt/applycanary/"
-if [ -f "${ROOT_DIR}/.env.example" ]; then
-    cp "${ROOT_DIR}/.env.example" "${BUILD_DIR}/opt/applycanary/.env.example"
-fi
-
-# 8. Create CLI wrapper in /usr/bin/applycanary
-cat <<'EOF' > "${BUILD_DIR}/usr/bin/applycanary"
-#!/bin/sh
-if [ -d "/opt/applycanary/.venv" ]; then
-    exec /opt/applycanary/.venv/bin/python /opt/applycanary/run.py "$@"
-else
-    exec python3 /opt/applycanary/run.py "$@"
-fi
-EOF
+exec /opt/applycanary/ApplyCanary "$@"
+LAUNCHER
 chmod 755 "${BUILD_DIR}/usr/bin/applycanary"
 
-# 9. Build .deb package
-DEB_FILE="${DIST_DIR}/applycanary_${VERSION}_${ARCH}.deb"
+# Desktop entry (.desktop file)
+cat <<EOF > "${BUILD_DIR}/usr/share/applications/applycanary.desktop"
+[Desktop Entry]
+Name=ApplyCanary
+Comment=AI Career Agent — job discovery, ATS scoring, interview prep
+Exec=/opt/applycanary/ApplyCanary
+Icon=applycanary
+Terminal=false
+Type=Application
+Categories=Office;Utility;
+Keywords=jobs;career;resume;interview;
+EOF
+
+# Copy icon
+if [ -f "${ROOT_DIR}/assets/icon_256.png" ]; then
+    cp "${ROOT_DIR}/assets/icon_256.png" \
+       "${BUILD_DIR}/usr/share/icons/hicolor/256x256/apps/applycanary.png"
+fi
+
+# Build .deb
+DEB_FILE="${DIST_DIR}/ApplyCanary_${VERSION}_${ARCH}.deb"
 dpkg-deb --build "${BUILD_DIR}" "${DEB_FILE}"
 
-echo "SUCCESS: Debian package created at ${DEB_FILE}"
+echo ""
+echo "SUCCESS: ${DEB_FILE}"
 ls -lh "${DEB_FILE}"
+echo ""
+echo "Install:  sudo dpkg -i ${DEB_FILE}"
+echo "Remove:   sudo dpkg -r applycanary"
+echo "Launch:   applycanary  or  find 'ApplyCanary' in your app menu"
