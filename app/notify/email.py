@@ -531,7 +531,7 @@ async def send_digest(
         .join(JobScore, JobScore.job_id == Job.id)
         .where(Job.first_seen_at >= since)
         # Only strong or possible matches (not weak/disqualified).
-        .where(JobScore.verdict.in_("strong_match", "possible"))
+        .where(JobScore.verdict.in_(["strong_match", "possible"]))
         .where(JobScore.total >= 60)
     )
     if uid:

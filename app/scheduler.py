@@ -129,7 +129,7 @@ async def job_score_new() -> None:
                 .where(JobScore.total >= profile.alert_min_score)
                 # Only strong or possible matches — weak/disqualified should
                 # never trigger an email alert.
-                .where(JobScore.verdict.in_("strong_match", "possible"))
+                .where(JobScore.verdict.in_(["strong_match", "possible"]))
                 .order_by(JobScore.total.desc())
                 .limit(3)
             ).all()
