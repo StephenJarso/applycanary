@@ -99,6 +99,21 @@ async def job_score_new() -> None:
             # score and the status are this user's own. 0 disables alerts.
             if profile.alert_min_score <= 0:
                 continue
+
+            # Only email alerts when the user has their own email address;
+            # falling back to the operator's digest_to creates spam for the
+            # operator when multiple users are on the instance.
+            has_own_email = bool(
+                (profile.email and profile.email.strip())
+                or (profile.digest_to and profile.digest_to.strip())
+            )
+            if not has_own_email:
+                log.debug(
+                    "score_new: skipping alerts for user %s — no email set",
+                    profile.user_id,
+                )
+                continue
+
             rows = session.exec(
                 select(Job, JobScore)
                 .join(
@@ -112,12 +127,47 @@ async def job_score_new() -> None:
                 )
                 .where(UserJob.status == JobStatus.SCORED)
                 .where(JobScore.total >= profile.alert_min_score)
+                # Only strong or possible matches — weak/disqualified should
+                # never trigger an email alert.
+                .where(JobScore.verdict.in_("strong_match", "possible"))
                 .order_by(JobScore.total.desc())
-                .limit(5)
+                .limit(3)
             ).all()
+
+            # Further filter by work-type preference.
+            rows = _filter_by_work_type(rows, profile)
+
             user = session.get(User, profile.user_id)
             for job, score in rows:
                 await notify.send_alert(job, score, profile=profile, user=user)
+
+
+def _filter_by_work_type(rows: list, profile) -> list:  # noqa: ANN001
+    """Filter scored job rows by the user's preferred work arrangement.
+
+    ``rows`` is a list of (Job, JobScore) tuples from the scoring query.
+    Returns only those matching the profile's ``preferred_work_type`` and
+    ``remote_only`` settings.
+    """
+    wtype = getattr(profile, "preferred_work_type", "any") or "any"
+    if wtype == "any" and not getattr(profile, "remote_only", False):
+        return rows
+
+    filtered: list = []
+    for item in rows:
+        # Support both (Job, JobScore) and bare Job rows.
+        job = item[0] if isinstance(item, tuple) else item
+        is_remote = getattr(job, "is_remote", False)
+        if wtype == "remote" and not is_remote:
+            continue
+        if wtype == "onsite" and is_remote:
+            continue
+        # hybrid matches everything (we cannot distinguish hybrid from other
+        # non-remote postings at the data level, so include it).
+        if profile.remote_only and not is_remote:
+            continue
+        filtered.append(item)
+    return filtered
 
 
 async def job_prepare_queue() -> None:
@@ -198,6 +248,19 @@ async def job_digest() -> None:
 
     with session_scope() as session:
         for profile in _active_profiles(session):
+            # Only send digests when the user has their own email; the
+            # operator's fallback address should not receive other users'
+            # job digests.
+            has_own_email = bool(
+                (profile.email and profile.email.strip())
+                or (profile.digest_to and profile.digest_to.strip())
+            )
+            if not has_own_email:
+                log.debug(
+                    "digest: skipping user %s — no email configured",
+                    profile.user_id,
+                )
+                continue
             user = session.get(User, profile.user_id)
             await notify.send_digest(session, profile=profile, user=user)
 
