@@ -130,6 +130,11 @@ async def job_score_new() -> None:
                 # Only strong or possible matches — weak/disqualified should
                 # never trigger an email alert.
                 .where(JobScore.verdict.in_(["strong_match", "possible"]))
+                # Keyword-only scores are not evidence of fit: with no resume
+                # context they reward generic postings (a finance job once hit
+                # 100 on token overlap alone). Only alert on scores an LLM
+                # actually assessed, so tier-1 noise never reaches the inbox.
+                .where(JobScore.decided_by == "tier2_llm")
                 .order_by(JobScore.total.desc())
                 .limit(3)
             ).all()
@@ -262,7 +267,9 @@ async def job_digest() -> None:
                 )
                 continue
             user = session.get(User, profile.user_id)
-            await notify.send_digest(session, profile=profile, user=user)
+            await notify.send_digest(
+                session, profile=profile, user=user, llm_only=True
+            )
 
 
 async def job_discover_roles() -> None:

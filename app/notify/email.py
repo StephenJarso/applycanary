@@ -486,6 +486,7 @@ async def send_digest(
     *,  # keyword-only
     profile=None,  # noqa: ANN001
     user=None,  # noqa: ANN001
+    llm_only: bool = False,
 ) -> bool:
     """Summarise the last window *for one user*: applications, queue, new matches.
 
@@ -534,6 +535,10 @@ async def send_digest(
         .where(JobScore.verdict.in_(["strong_match", "possible"]))
         .where(JobScore.total >= 60)
     )
+    if llm_only:
+        # Keyword-only scores misrepresent fit (generic postings score high on
+        # raw token overlap), so the digest only reports LLM-assessed matches.
+        new_stmt = new_stmt.where(JobScore.decided_by == "tier2_llm")
     if uid:
         new_stmt = new_stmt.where(JobScore.user_id == uid)
     new_matches = session.exec(
