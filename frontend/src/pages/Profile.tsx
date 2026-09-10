@@ -38,7 +38,6 @@ export default function ProfilePage() {
   });
   const github = useMutation({ mutationFn: api.syncGithub, onSuccess: invalidate });
   const discover = useMutation({ mutationFn: api.discover, onSuccess: invalidate });
-  const invite = useQuery({ queryKey: ["invite"], queryFn: api.auth.invite, retry: false });
 
   const changeEmail = useMutation({
     mutationFn: () => api.auth.changeEmail(newEmail, emailPassword),
@@ -106,19 +105,6 @@ export default function ProfilePage() {
           <div className="banner banner-ok" role="status">
             Confirmation sent. The change takes effect once you open the link at the new address —
             and it will sign your other devices out.
-          </div>
-        )}
-      </div>
-      <div className="card">
-        <h3 className="card-title">Invite someone</h3>
-        <p className="cell-dim">Share this single-use link to invite someone to create an account.</p>
-        {invite.isPending && <Loading label="Loading invite code" />}
-        {invite.isError && <ErrorBox error={invite.error} />}
-        {invite.data && (
-          <div className="field" style={{ marginTop: 12 }}>
-            <label htmlFor="invite-link">Your invite link</label>
-            <input id="invite-link" readOnly value={`${window.location.origin}${invite.data.link}`} onFocus={(e) => e.currentTarget.select()} />
-            <p className="cell-dim">Code: <code>{invite.data.code}</code> · Click the field to copy.</p>
           </div>
         )}
       </div>

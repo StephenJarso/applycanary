@@ -7,7 +7,7 @@ interface AuthContextValue {
   login: (email: string, password: string) => Promise<void>;
   /** Resolves to the created account. Check `session_started` before navigating
    *  into the app — when email verification is enforced there is no session yet. */
-  register: (email: string, password: string, inviteCode: string) => Promise<AuthUser>;
+  register: (email: string, password: string) => Promise<AuthUser>;
   logout: () => Promise<void>;
   /** Re-pull /auth/me. Used after confirming an address so the nudge banner clears. */
   refresh: () => Promise<void>;
@@ -27,8 +27,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(await api.auth.login(email, password));
   };
 
-  const register = async (email: string, password: string, inviteCode: string) => {
-    const created = await api.auth.register(email, password, inviteCode);
+  const register = async (email: string, password: string) => {
+    const created = await api.auth.register(email, password);
     // Only adopt the account as the current user if the backend actually issued
     // a session; otherwise the app would render as logged in and 401 on load.
     if (created.session_started) setUser(created);
