@@ -46,14 +46,18 @@ for _k in (
     "RESEND_API_KEY",
     "SMTP_HOST",
     "SMTP_USER",
-    # Hackathon open-signup code: blank it so registration tests exercise the
-    # strict invite-gated path unless a test explicitly sets it.
-    "DEFAULT_INVITE_CODE",
     # Origin used for links in email. Left blank so no test depends on a
     # developer's deployment URL.
     "PUBLIC_BASE_URL",
 ):
     os.environ[_k] = ""
+
+# Auth is forced ON for the suite: nearly every test signs in with a cookie or
+# credentials, and the local-user fallback that serves unauthenticated traffic
+# when auth is off would mask the very behaviour these tests assert. A developer
+# .env with AUTH_ENABLED=false must not leak that mode into pytest. Tests that
+# exercise the auth-off mode set it explicitly with monkeypatch.
+os.environ["AUTH_ENABLED"] = "true"
 
 # Same rationale, but this one is a bool and pydantic rejects "" for that, so it
 # is pinned rather than blanked. A developer .env that enforced confirmation
