@@ -731,7 +731,11 @@ def save_profile(
     profile = session.exec(
         select(Profile).where(Profile.user_id == user.id)
     ).first() or Profile(user_id=user.id)
-    for field, value in payload.model_dump().items():
+    # Partial update: only fields the client actually sent are applied. A
+    # payload that omits target_titles means "leave my titles alone", not
+    # "wipe them" — the old behaviour reset every omitted field to its model
+    # default, which silently destroyed data when a caller sent a subset.
+    for field, value in payload.model_dump(exclude_unset=True).items():
         # None means "leave unchanged" for the optional alert threshold, so an
         # old client that omits it cannot null out the stored preference.
         if field == "alert_min_score" and value is None:
@@ -743,10 +747,12 @@ def save_profile(
                 profile.llm_api_key = str(value)
             continue
         setattr(profile, field, value)
-    # Store canonical skill names so variants such as "Golang" and "go" score
-    # identically and display consistently.
-    profile.skills = sorted(extract_skills(", ".join(payload.skills)))
-    profile.github_username = profile.github_username.strip().removeprefix("@")
+    if "skills" in payload.model_fields_set:
+        # Store canonical skill names so variants such as "Golang" and "go" score
+        # identically and display consistently.
+        profile.skills = sorted(extract_skills(", ".join(payload.skills)))
+    if "github_username" in payload.model_fields_set:
+        profile.github_username = profile.github_username.strip().removeprefix("@")
     profile.updated_at = utcnow()
     session.add(profile)
     session.commit()
