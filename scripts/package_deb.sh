@@ -4,12 +4,12 @@
 # Expects the PyInstaller bundle at dist/ApplyCanary/
 # Output: dist/ApplyCanary_<version>_amd64.deb
 #
-# Install:   sudo dpkg -i dist/ApplyCanary_0.2.0_amd64.deb
+# Install:   sudo dpkg -i dist/ApplyCanary_0.3.0_amd64.deb
 # Remove:    sudo dpkg -r applycanary
 
 set -euo pipefail
 
-VERSION="${1:-0.2.0}"
+VERSION="${1:-0.3.0}"
 ARCH="amd64"
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 BUILD_DIR="${ROOT_DIR}/build/deb"
