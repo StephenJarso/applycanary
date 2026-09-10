@@ -2,20 +2,14 @@ import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, type Profile } from "../api";
 import { Chips, ErrorBox, Loading } from "../components";
-import { useAuth } from "../context/AuthContext";
 
 const CSV_FIELDS = ["skills", "target_titles", "target_locations", "excluded_companies"] as const;
 
 export default function ProfilePage() {
   const qc = useQueryClient();
-  const { user } = useAuth();
   const { data, isPending, error } = useQuery({ queryKey: ["profile"], queryFn: api.profile });
   const [form, setForm] = useState<Partial<Profile>>({});
   const fileRef = useRef<HTMLInputElement>(null);
-  // Changing the login address is password-gated, so it gets its own small form
-  // rather than riding along with the profile save.
-  const [newEmail, setNewEmail] = useState("");
-  const [emailPassword, setEmailPassword] = useState("");
 
   // Seed the form once the profile arrives. Keyed on the fetch so a background
   // refetch does not clobber edits in progress.
@@ -39,11 +33,6 @@ export default function ProfilePage() {
   const github = useMutation({ mutationFn: api.syncGithub, onSuccess: invalidate });
   const discover = useMutation({ mutationFn: api.discover, onSuccess: invalidate });
 
-  const changeEmail = useMutation({
-    mutationFn: () => api.auth.changeEmail(newEmail, emailPassword),
-    onSuccess: () => { setNewEmail(""); setEmailPassword(""); },
-  });
-
   const ats = useQuery({
     queryKey: ["ats"],
     queryFn: api.atsReport,
@@ -65,50 +54,7 @@ export default function ProfilePage() {
           <span className="material-symbols-outlined" aria-hidden="true">person</span>
           Your resume, targets and agent preferences
         </p>
-      </div>
-
-      <div className="card">
-        <h3 className="card-title">Account email</h3>
-        <p className="cell-dim">
-          Signed in as <strong>{user?.email}</strong>
-          {user && (user.email_verified
-            ? " · confirmed"
-            : " · not confirmed yet — check your inbox for the link")}
-        </p>
-
-        <form
-          onSubmit={(e) => { e.preventDefault(); changeEmail.mutate(); }}
-          style={{ marginTop: 12 }}
-        >
-          <div className="field">
-            <label htmlFor="new-email">New email address</label>
-            <input
-              id="new-email" type="email" value={newEmail} autoComplete="email"
-              onChange={(e) => setNewEmail(e.target.value)} required
-            />
-          </div>
-          <div className="field">
-            <label htmlFor="email-password">Current password</label>
-            <input
-              id="email-password" type="password" value={emailPassword} autoComplete="current-password"
-              onChange={(e) => setEmailPassword(e.target.value)} required
-            />
-          </div>
-          <button disabled={changeEmail.isPending}>
-            {changeEmail.isPending && <span className="spinner" />}
-            Send confirmation link
-          </button>
-        </form>
-
-        {changeEmail.isError && <ErrorBox error={changeEmail.error} />}
-        {changeEmail.isSuccess && (
-          <div className="banner banner-ok" role="status">
-            Confirmation sent. The change takes effect once you open the link at the new address —
-            and it will sign your other devices out.
-          </div>
-        )}
-      </div>
-      <div className="card">
+      </div>      <div className="card">
         <h3 className="card-title">Resume</h3>
         {data?.has_resume ? (
           <p className="cell-dim">
