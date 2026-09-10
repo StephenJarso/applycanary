@@ -92,7 +92,7 @@ def create_app() -> FastAPI:
     app = FastAPI(
         title="ApplyCanary",
         description="Self-hosted job discovery, ATS resume tailoring and application tracking.",
-        version="0.1.0",
+        version="0.3.0",
         lifespan=lifespan,
     )
     request_windows: dict[tuple[str, str], deque[float]] = defaultdict(deque)
