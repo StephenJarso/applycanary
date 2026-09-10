@@ -101,10 +101,11 @@ def create_app() -> FastAPI:
     @app.middleware("http")
     async def auth_middleware(request: Request, call_next):  # noqa: ANN001, ANN202
         from fastapi.responses import JSONResponse, RedirectResponse
-        from sqlmodel import Session
+        from sqlmodel import Session, select
 
         from app.auth import resolve_current_user
         from app.db import engine
+        from app.models import Profile, User
 
         path = request.url.path
         bucket = "auth" if path.startswith("/api/auth/") else ("api-write" if path.startswith("/api/") and request.method not in {"GET", "HEAD", "OPTIONS"} else "api-read" if path.startswith("/api/") else "")
@@ -125,7 +126,7 @@ def create_app() -> FastAPI:
                 # bounces the user to /login and the token in the URL is lost.
                 "/forgot-password", "/reset-password",
                 "/verify-email", "/verify-email-change",
-                "/api/auth/login", "/api/auth/register", "/api/auth/signup-info",
+                "/api/auth/login", "/api/auth/register",
                 # Emailed links carry their own proof (a one-time token) and are
                 # opened from whatever browser the mail client picks, so they
                 # cannot depend on an existing session.
@@ -147,6 +148,23 @@ def create_app() -> FastAPI:
         # catch-alls (which take no Request) both read the same answer.
         with Session(engine) as session:
             user = resolve_current_user(request, session)
+            if user is None and not settings.is_auth_required:
+                # Auth disabled: serve the whole app without a login screen by
+                # attaching the shared local account, creating it on demand.
+                # First caller wins the race; the unique index handles ties.
+                user = session.exec(select(User).where(User.is_admin.is_(True))).first()
+                if user is None:
+                    user = User(email="local@applycanary.local", is_admin=True,
+                                email_verified=True)
+                    session.add(user)
+                    try:
+                        session.commit()
+                    except Exception:  # noqa: BLE001 - concurrent creation
+                        session.rollback()
+                        user = session.exec(select(User).where(User.is_admin.is_(True))).first()
+                    if user is not None:
+                        session.add(Profile(user_id=user.id, email=user.email))
+                        session.commit()
             request.state.user_id = user.id if user is not None else None
 
         if user is None:
