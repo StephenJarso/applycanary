@@ -83,7 +83,7 @@ function Dashboard() {
           <div className="sidebar-user">
             <div className="sidebar-user-avatar">{user?.email?.[0]?.toUpperCase() ?? "A"}</div>
             <div className="sidebar-user-info">
-              <div className="sidebar-user-name">{user?.email?.split("@")[0] ?? "Alex Smith"}</div>
+              <div className="sidebar-user-name">{user?.email?.split("@")[0] ?? ""}</div>
               <div className="sidebar-user-plan">Free Plan</div>
             </div>
             <button className="btn-ghost logout-button" onClick={() => void logout()} title="Sign out">

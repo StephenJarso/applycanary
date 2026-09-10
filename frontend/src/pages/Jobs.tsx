@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { api, type JobFilters } from "../api";
+import { useAuth } from "../context/AuthContext";
 import {
   Chips, Empty, ErrorBox, TableSkeleton, formatSalary,
 } from "../components";
@@ -18,6 +19,14 @@ export default function Jobs() {
   const [filters, setFilters] = useState<JobFilters>({ sort: "score" });
   const [search, setSearch] = useState("");
   const navigate = useNavigate();
+  const { user } = useAuth();
+  // Greet by profile name when one is on file, falling back to the email
+  // handle — never a hardcoded placeholder.
+  const { data: profile } = useQuery({ queryKey: ["profile"], queryFn: api.profile });
+  const firstName =
+    profile?.full_name?.trim().split(/\s+/)[0]
+    || user?.email?.split("@")[0]
+    || "there";
 
   const offset = page * PAGE_SIZE;
 
@@ -40,7 +49,7 @@ export default function Jobs() {
     <>
       <div className="dashboard-hero">
         <div>
-          <h2 className="dashboard-greeting">Hello, Alex.</h2>
+          <h2 className="dashboard-greeting">Hello, {firstName}.</h2>
           <p className="dashboard-subtext">
             Your AI agent is actively searching and preparing your career moves.
           </p>
