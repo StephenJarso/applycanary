@@ -169,10 +169,13 @@ def create_app() -> FastAPI:
 
         if user is None:
             if path.startswith("/api/"):
+                # Deliberately no WWW-Authenticate header: advertising Basic
+                # auth makes browsers pop their native username/password dialog
+                # whenever the SPA fires a request without a session. The React
+                # app owns that flow — it routes to /login instead.
                 return JSONResponse(
                     status_code=401,
                     content={"detail": "Authentication required"},
-                    headers={"WWW-Authenticate": 'Basic realm="ApplyCanary"'},
                 )
             return RedirectResponse(url="/login", status_code=303)
 
