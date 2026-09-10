@@ -48,7 +48,9 @@ class Credentials(BaseModel):
 
 class Registration(Credentials):
     password: str = Field(min_length=10, max_length=1024)
-    invite_code: str = Field(min_length=1, max_length=256)
+    # Optional: when auth is enabled, a valid single-use code is still honoured,
+    # but open signups register with just an email and a password.
+    invite_code: str = Field(default="", max_length=256)
 
 
 class CurrentUser(BaseModel):
@@ -65,13 +67,6 @@ class CurrentUser(BaseModel):
 class InviteOut(BaseModel):
     code: str
     link: str
-
-
-class SignupInfoOut(BaseModel):
-    # Hackathon open-signup: prefilled into the register form so new users can
-    # sign up without hunting for a single-use invite code.
-    default_invite_code: str = ""
-    require_email_verification: bool = False
 
 
 class EmailRequest(BaseModel):
@@ -135,17 +130,19 @@ def register(
     session: Session = Depends(get_session),
 ) -> CurrentUser:
     email = payload.email.strip().lower()
-    code = payload.invite_code.strip()
+    code = (payload.invite_code or "").strip()
     settings = get_settings()
-    # Hackathon open-signup: the shared default code is accepted without
-    # consuming an InviteCode row, so every new user can register with the same
-    # prefilled referral code.
-    if settings.default_invite_code and code == settings.default_invite_code:
-        invite = None
-    else:
-        invite = session.exec(select(InviteCode).where(InviteCode.code == code)).first()
-        if invite is None or not invite.is_redeemable():
-            raise HTTPException(status.HTTP_400_BAD_REQUEST, "That invite code is not valid")
+    # Open signup needs no code at all. A shared default code is accepted
+    # without consuming an InviteCode row, and a personal single-use code is
+    # honoured when one is supplied; anything else fails closed.
+    invite = None
+    if code:
+        if settings.default_invite_code and code == settings.default_invite_code:
+            invite = None
+        else:
+            invite = session.exec(select(InviteCode).where(InviteCode.code == code)).first()
+            if invite is None or not invite.is_redeemable():
+                raise HTTPException(status.HTTP_400_BAD_REQUEST, "That invite code is not valid")
     if session.exec(select(User).where(User.email == email)).first() is not None:
         raise HTTPException(status.HTTP_409_CONFLICT, "That email is already registered")
     user = User(email=email, password_hash=hash_password(payload.password))
@@ -310,16 +307,6 @@ def verify_email_change(
     background.add_task(send_email_changed_email, user.email, old_email)
     background.add_task(send_email_changed_email, old_email, old_email)
     return Response(status_code=_NO_CONTENT)
-
-
-@router.get("/signup-info", response_model=SignupInfoOut)
-def signup_info() -> SignupInfoOut:
-    """Public signup defaults so the register form can prefill the invite code."""
-    settings = get_settings()
-    return SignupInfoOut(
-        default_invite_code=settings.default_invite_code,
-        require_email_verification=settings.require_email_verification,
-    )
 
 
 @router.post("/logout", status_code=_NO_CONTENT)

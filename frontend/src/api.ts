@@ -16,16 +16,6 @@ export interface AuthUser {
   session_started: boolean;
 }
 
-export interface Invite {
-  code: string;
-  link: string;
-}
-
-export interface SignupInfo {
-  default_invite_code: string;
-  require_email_verification: boolean;
-}
-
 export interface Score {
   total: number;
   keyword_score: number;
@@ -382,11 +372,9 @@ export const api = {
     me: () => request<AuthUser>("/auth/me"),
     login: (email: string, password: string) =>
       request<AuthUser>("/auth/login", { method: "POST", body: JSON.stringify({ email, password }) }),
-    register: (email: string, password: string, invite_code: string) =>
-      request<AuthUser>("/auth/register", { method: "POST", body: JSON.stringify({ email, password, invite_code }) }),
+    register: (email: string, password: string) =>
+      request<AuthUser>("/auth/register", { method: "POST", body: JSON.stringify({ email, password }) }),
     logout: () => request<void>("/auth/logout", { method: "POST" }),
-    invite: () => request<Invite>("/auth/invite"),
-    signupInfo: () => request<SignupInfo>("/auth/signup-info"),
 
     // Emailed-link flows. All return 204, so there is no body to read; failures
     // surface as a thrown ApiError carrying the backend's `detail` message.
