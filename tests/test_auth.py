@@ -188,6 +188,23 @@ def _make_invite(code: str = "GOODCODE") -> None:
         session.commit()
 
 
+def test_register_open_signup(isolated_db):
+    """No invite code at all: signup is open, and a Profile is still created."""
+    client = TestClient(create_app(), follow_redirects=False)
+    res = client.post(
+        "/api/auth/register",
+        json={"email": "new@example.com", "password": "a-long-enough-pw"},
+    )
+    assert res.status_code == 201
+    assert SESSION_COOKIE_NAME in res.cookies
+
+    with Session(engine) as session:
+        user = session.exec(select(User)).one()
+        assert user.email == "new@example.com"
+        assert session.exec(select(Profile)).one().user_id == user.id
+        assert session.exec(select(InviteCode)).all() == []
+
+
 def test_register_requires_valid_invite(isolated_db):
     client = TestClient(create_app(), follow_redirects=False)
     res = client.post(
@@ -250,10 +267,11 @@ def test_invite_cannot_be_reused(isolated_db):
 
 
 def test_register_with_default_invite_code_does_not_consume_a_row(isolated_db, monkeypatch):
-    """Hackathon open-signup: the shared DEFAULT_INVITE_CODE is accepted for
-    every registrant without touching the invite_code table, so it never runs
-    out. Any other code still needs a real, redeemable invite row."""
+    """A shared DEFAULT_INVITE_CODE is accepted for every registrant without
+    touching the invite_code table, so it never runs out. A supplied code that
+    matches nothing is still rejected."""
     monkeypatch.setenv("DEFAULT_INVITE_CODE", "HACKATHON2026")
+    get_settings.cache_clear()
     client = TestClient(create_app(), follow_redirects=False)
     payload = {"password": "a-long-enough-pw", "invite_code": "HACKATHON2026"}
 
@@ -272,27 +290,6 @@ def test_register_with_default_invite_code_does_not_consume_a_row(isolated_db, m
         json={"email": "three@example.com", "password": "a-long-enough-pw", "invite_code": "NOPE"},
     )
     assert bad.status_code == 400
-
-
-def test_signup_info_exposes_default_invite_code(isolated_db, monkeypatch):
-    monkeypatch.setenv("DEFAULT_INVITE_CODE", "HACKATHON2026")
-    client = TestClient(create_app(), follow_redirects=False)
-    res = client.get("/api/auth/signup-info")
-    assert res.status_code == 200
-    assert res.json() == {
-        "default_invite_code": "HACKATHON2026",
-        "require_email_verification": False,
-    }
-
-
-def test_signup_info_empty_when_no_default(isolated_db):
-    client = TestClient(create_app(), follow_redirects=False)
-    res = client.get("/api/auth/signup-info")
-    assert res.status_code == 200
-    assert res.json() == {
-        "default_invite_code": "",
-        "require_email_verification": False,
-    }
 
 
 def test_expired_invite_is_refused(isolated_db):
@@ -613,3 +610,69 @@ def test_emailed_token_endpoints_need_no_session(isolated_db, outbox):
         res = client.post(path, json=body)
         # 400 (bad token) rather than 401 (no session) is the point here.
         assert res.status_code == 400, f"{path} returned {res.status_code}"
+
+
+# ------------------------------------------------ auth disabled (local mode)
+
+
+@pytest.fixture
+def auth_off(isolated_db, monkeypatch):
+    """Serve the app with authentication disabled (the local default)."""
+    monkeypatch.setenv("AUTH_ENABLED", "false")
+    monkeypatch.delenv("AUTH_PASSWORD", raising=False)
+    get_settings.cache_clear()
+    yield
+    get_settings.cache_clear()
+
+
+def test_auth_disabled_serves_app_without_login(auth_off):
+    """With AUTH_ENABLED=false the dashboard and API answer without a session.
+
+    A shared local account is attached on demand, so per-user queries still have
+    an owner instead of silently seeing another user's data.
+    """
+    client = TestClient(create_app(), follow_redirects=False)
+
+    assert client.get("/health").status_code == 200
+    assert client.get("/api/jobs").status_code == 200
+    # Served, not bounced to /login with a 303.
+    assert client.get("/").status_code == 200
+
+    with Session(engine) as session:
+        local_users = session.exec(select(User).where(User.is_admin.is_(True))).all()
+        assert len(local_users) == 1
+        assert local_users[0].email == "local@applycanary.local"
+
+
+def test_auth_disabled_reuses_the_same_local_account(auth_off):
+    """Repeated unauthenticated requests must not mint a new user each time."""
+    client = TestClient(create_app(), follow_redirects=False)
+    for _ in range(3):
+        assert client.get("/api/jobs").status_code == 200
+
+    with Session(engine) as session:
+        assert len(session.exec(select(User)).all()) == 1
+
+
+def test_auth_disabled_registers_without_a_code(auth_off, outbox):
+    """Open signup with auth off: no invite code, straight into the app."""
+    client = TestClient(create_app(), follow_redirects=False)
+    # Hitting a guarded route first attaches the shared local account.
+    assert client.get("/api/jobs").status_code == 200
+
+    res = client.post(
+        "/api/auth/register",
+        json={"email": "new@example.com", "password": "a-long-enough-pw"},
+    )
+    assert res.status_code == 201
+    with Session(engine) as session:
+        assert len(session.exec(select(User)).all()) == 2  # local + registered
+
+
+def test_auth_reenabled_rejects_anonymous_requests(isolated_db):
+    """Guard against an AUTH_ENABLED flip silently exposing the data."""
+    client = TestClient(create_app(), follow_redirects=False)
+    assert client.get("/api/jobs").status_code == 401
+    res_ui = client.get("/")
+    assert res_ui.status_code == 303
+    assert res_ui.headers["location"] == "/login"
