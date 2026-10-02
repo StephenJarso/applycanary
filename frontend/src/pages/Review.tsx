@@ -35,9 +35,9 @@ export default function Review() {
   return (
     <>
       <div className="page-intro">
-        <h2 className="page-title">Review queue</h2>
+        <h2 className="page-title ac-display">Discovery</h2>
         <p className="page-sub">
-          <span className="material-symbols-outlined" aria-hidden="true">pending_actions</span>
+          <span className="material-symbols-outlined icon-fill" aria-hidden="true" style={{ color: "var(--ac-canary)" }}>search</span>
           Applications prepared and waiting — nothing here has been sent.
         </p>
       </div>
