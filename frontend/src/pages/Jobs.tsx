@@ -49,54 +49,59 @@ export default function Jobs() {
     <>
       <div className="dashboard-hero">
         <div>
-          <h2 className="dashboard-greeting">Hello, {firstName}.</h2>
-          <p className="dashboard-subtext">
-            Your AI agent is actively searching and preparing your career moves.
+          <h2 className="dashboard-greeting ac-display">Hello, {firstName}.</h2>
+          {/* dashboard_1: agent line with the gradient-highlighted count. */}
+          <p className="dashboard-subtext ac-headline-md">
+            <span className="material-symbols-outlined icon-fill" style={{ color: "var(--ac-canary)", fontSize: 22 }}>auto_awesome</span>{" "}
+            Your agent found <span className="gradient-text" style={{ fontWeight: 700 }}>{data?.counts.total ?? 12} new roles</span> today.
           </p>
         </div>
-        <div className="dashboard-agent-status card">
+        <div className="dashboard-agent-status card glass-card">
           <div className="agent-status-icon">
             <span className="material-symbols-outlined" style={{ color: "var(--ac-on-primary)" }}>auto_awesome</span>
           </div>
           <div>
-            <strong>Found {data?.counts.total ?? 12} new roles today</strong>
+            <strong>Agent active</strong>
             <div style={{ fontSize: 12, color: "var(--text-dim)" }}>
-              Agent scanned {data?.total ?? 1432} listings
+              Scanned {data?.total ?? 1432} listings
             </div>
           </div>
         </div>
       </div>
 
-      <div className="stat-row" style={{ marginTop: 20 }}>
-        <div className="stat">
-          <div className="stat-icon-row">
-            <span className="material-symbols-outlined">send</span>
-          </div>
-          <div className="stat-value">{data?.counts.applied ?? 47}</div>
-          <div className="stat-label">Total Applications</div>
-          <span className="stat-badge">+3 this week</span>
+      {/* dashboard_1: Job Search Status glass card with three metric tiles. */}
+      <div className="glass-card stat-panel" style={{ marginTop: 20 }}>
+        <div className="stat-panel-head">
+          <h3 className="ac-headline-md" style={{ margin: 0 }}>Job Search Status</h3>
+          <span className="material-symbols-outlined" style={{ color: "var(--text-faint)" }}>query_stats</span>
         </div>
-        <div className="stat">
-          <div className="stat-icon-row">
-            <span className="material-symbols-outlined">pending_actions</span>
+        <div className="stat-row" style={{ marginBottom: 0 }}>
+          <div className="ac-metric">
+            <span className="ac-metric-value" style={{ color: "var(--ac-primary)" }}>{data?.counts.applied ?? 47}</span>
+            <span className="ac-metric-label">Total Applications</span>
           </div>
-          <div className="stat-value">{data?.counts.queued ?? 12}</div>
-          <div className="stat-label">Pending Reviews</div>
-          <span className="stat-badge muted">Awaiting response</span>
-        </div>
-        <div className="stat">
-          <div className="stat-icon-row">
-            <span className="material-symbols-outlined">record_voice_over</span>
+          <div className="ac-metric">
+            <span className="ac-metric-value" style={{ color: "var(--ac-tertiary-container)" }}>{data?.counts.queued ?? 12}</span>
+            <span className="ac-metric-label">Pending Reviews</span>
           </div>
-          <div className="stat-value">2</div>
-          <div className="stat-label">Interviews Prep</div>
-          <span className="stat-link" onClick={() => navigate("/memory")}>Start Studio &rarr;</span>
+          <div className="ac-metric" style={{ position: "relative", overflow: "hidden" }}>
+            <div style={{ position: "absolute", inset: 0, background: "var(--ac-primary-container)", opacity: 0.1 }} />
+            <span className="ac-metric-value" style={{ position: "relative", color: "var(--ac-primary)" }}>2</span>
+            <span className="ac-metric-label" style={{ position: "relative" }}>Interviews Prep</span>
+          </div>
         </div>
       </div>
 
-      <div style={{ margin: "24px 0 14px", display: "flex", alignItems: "center", gap: 8 }}>
-        <span className="material-symbols-outlined" style={{ color: "var(--ac-canary)", fontSize: 22 }}>star</span>
-        <h3 style={{ margin: 0, fontSize: 20, fontWeight: 700 }}>Top Matches for You</h3>
+      <div className="feed-head" style={{ margin: "28px 0 14px" }}>
+        <h3 className="ac-headline-md" style={{ margin: 0 }}>Top Matches for You</h3>
+        <button
+          className="ac-label-md"
+          style={{ border: "none", background: "none", color: "var(--ac-primary)", cursor: "pointer", display: "inline-flex", alignItems: "center" }}
+          onClick={() => set("sort", "score")}
+        >
+          View All
+          <span className="material-symbols-outlined" style={{ fontSize: 16, marginLeft: 4 }}>arrow_forward</span>
+        </button>
       </div>
 
       <form
@@ -203,7 +208,7 @@ export default function Jobs() {
                   <div className="discovery-card-top">
                     <div className="job-card-company">
                       <div className="company-logo-placeholder">
-                        {job.company?.[0]?.toUpperCase() ?? "C"}
+                        <span className="material-symbols-outlined">terminal</span>
                       </div>
                       <div>
                         <h3 className="job-card-title">{job.title}</h3>
@@ -212,9 +217,10 @@ export default function Jobs() {
                         </div>
                       </div>
                     </div>
+                    {/* dashboard_1 match badge: canary pill, fire icon. */}
                     <div className={`match-badge match-badge-${band}`}>
-                      <span className="material-symbols-outlined" style={{ fontSize: 16 }}>
-                        {band === "strong" ? "check_circle" : "auto_awesome"}
+                      <span className="material-symbols-outlined" style={{ fontSize: 14 }}>
+                        {band === "strong" ? "local_fire_department" : band === "mid" ? "check_circle" : "star"}
                       </span>
                       {total !== null ? `${total}% Match` : "Scoring"}
                     </div>
@@ -249,7 +255,7 @@ export default function Jobs() {
                           else navigate(`/job/${job.id}`);
                         }}
                       >
-                        Auto-Apply ⚡
+                        Auto-Apply
                       </button>
                       <button
                         className="btn-ai btn-sm"
@@ -268,55 +274,57 @@ export default function Jobs() {
           </div>
 
           <aside className="market-insights">
-            <div className="card daily-digest-card">
-              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
-                <span className="material-symbols-outlined" style={{ color: "var(--ac-primary)" }}>history</span>
+            <div className="card daily-digest-card" style={{ padding: 16, borderRadius: 24 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14, paddingBottom: 12, borderBottom: "1px solid var(--ac-surface-variant)" }}>
+                <div style={{ width: 32, height: 32, borderRadius: "50%", background: "var(--ac-canary)", display: "grid", placeItems: "center" }}>
+                  <span className="material-symbols-outlined" style={{ color: "var(--ac-secondary)", fontSize: 18 }}>smart_toy</span>
+                </div>
                 <h3 className="card-title" style={{ margin: 0 }}>Daily Digest</h3>
               </div>
 
               <div className="timeline">
                 <div className="timeline-item">
-                  <div className="timeline-time">10:42 AM</div>
+                  <div className="timeline-time">10:45 AM</div>
                   <div className="timeline-badge badge-purple">
-                    <span className="material-symbols-outlined" style={{ fontSize: 14 }}>bolt</span>
+                    <span className="timeline-dot" style={{ background: "var(--ac-primary)" }} />
                   </div>
                   <div className="timeline-content">
-                    <strong>Auto-Applied to Acme Corp</strong>
-                    <p>Tailored resume sent for Senior UX Designer role based on 98% match.</p>
+                    <strong>Scored 42 newly posted roles</strong>
+                    <p>Matching roles ranked against your resume and preferences.</p>
                   </div>
                 </div>
 
                 <div className="timeline-item">
                   <div className="timeline-time">09:15 AM</div>
-                  <div className="timeline-badge badge-yellow">
-                    <span className="material-symbols-outlined" style={{ fontSize: 14 }}>edit</span>
+                  <div className="timeline-badge badge-purple">
+                    <span className="timeline-dot" style={{ background: "var(--ac-tertiary-container)" }} />
                   </div>
                   <div className="timeline-content">
                     <strong>CV Tailored</strong>
-                    <p>Agent highlighted 'Design Systems' experience for upcoming tech roles.</p>
+                    <p>Tailored resume generated for your next application.</p>
                   </div>
                 </div>
 
                 <div className="timeline-item">
-                  <div className="timeline-time">Yesterday</div>
-                  <div className="timeline-badge badge-gray">
-                    <span className="material-symbols-outlined" style={{ fontSize: 14 }}>psychology</span>
+                  <div className="timeline-time">08:00 AM</div>
+                  <div className="timeline-badge badge-purple">
+                    <span className="timeline-dot" style={{ background: "var(--ac-secondary)" }} />
                   </div>
                   <div className="timeline-content">
-                    <strong>Feedback Remembered</strong>
-                    <p>Noted your preference to avoid roles requiring 100% travel.</p>
+                    <strong>Polled 5 target companies</strong>
+                    <p>ATS systems checked for application status updates.</p>
                   </div>
                 </div>
+              </div>
 
-                <div className="timeline-item">
-                  <div className="timeline-time">Yesterday</div>
-                  <div className="timeline-badge badge-gray">
-                    <span className="material-symbols-outlined" style={{ fontSize: 14 }}>search</span>
-                  </div>
-                  <div className="timeline-content">
-                    <strong>Found 5 roles</strong>
-                    <p>Added 5 new roles to your Discovery queue.</p>
-                  </div>
+              {/* dashboard_1: gradient agent-activity meter at the card foot. */}
+              <div style={{ marginTop: 18, paddingTop: 14, borderTop: "1px solid var(--ac-surface-variant)" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                  <span className="ac-label-md" style={{ color: "var(--text-dim)" }}>Agent Activity</span>
+                  <span className="material-symbols-outlined icon-fill" style={{ color: "var(--ac-primary)", fontSize: 16, animation: "spin 2s linear infinite" }}>autorenew</span>
+                </div>
+                <div style={{ height: 6, background: "var(--ac-surface-variant)", borderRadius: 999, overflow: "hidden" }}>
+                  <div style={{ height: "100%", width: "75%", background: "linear-gradient(90deg, var(--ac-primary), var(--ac-primary-container))", borderRadius: 999 }} />
                 </div>
               </div>
             </div>
