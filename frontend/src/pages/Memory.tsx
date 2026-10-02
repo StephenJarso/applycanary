@@ -24,9 +24,10 @@ export default function Memory() {
     <>
       <div className="page-intro" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", flexWrap: "wrap", gap: 12 }}>
         <div>
-          <h2 className="page-title">Career Intelligence</h2>
+          <h2 className="page-title ac-display">Memory &amp; Trends</h2>
           <p className="page-sub">
-            Insights derived from your long-term interview data and feedback.
+            <span className="material-symbols-outlined" aria-hidden="true" style={{ color: "var(--ac-secondary)", fontSize: 18 }}>memory</span>
+            AI-powered career insights indexed over time
           </p>
         </div>
         <span className="chip chip-accent" style={{ background: "var(--ac-primary-fixed)", color: "var(--ac-primary)", fontWeight: 700, padding: "6px 14px", borderRadius: 999 }}>
@@ -36,16 +37,15 @@ export default function Memory() {
 
       <div className="grid2" style={{ gap: 16, marginBottom: 16 }}>
         <div className="card">
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-            <h3 className="card-title" style={{ margin: 0 }}>
-              <span className="material-symbols-outlined" style={{ color: "var(--ac-primary)" }}>trending_up</span>
-              Performance Trajectory
-            </h3>
-            <select style={{ width: "auto", fontSize: 12, padding: "4px 8px" }}>
-              <option>Last 6 Months</option>
-              <option>Last 3 Months</option>
-              <option>All Time</option>
-            </select>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 6 }}>
+            <div>
+              <h3 className="ac-headline-md" style={{ margin: 0 }}>Improvement Trend</h3>
+              <p style={{ fontSize: 13, color: "var(--text-faint)", margin: "2px 0 0" }}>Mock Interview Scores</p>
+            </div>
+            <span className="trend-mom-badge">
+              <span className="material-symbols-outlined icon-fill" style={{ fontSize: 15 }}>trending_up</span>
+              +14% MoM
+            </span>
           </div>
           <p style={{ fontSize: 12, color: "var(--text-dim)", margin: "-6px 0 14px" }}>
             Interview composite scores over the last 6 months.
@@ -71,81 +71,68 @@ export default function Memory() {
         </div>
 
         <div className="card">
-          <h3 className="card-title">
-            <span className="material-symbols-outlined" style={{ color: "var(--ac-secondary)" }}>tune</span>
-            Opportunity Sensitivity
-          </h3>
-          <p style={{ fontSize: 12, color: "var(--text-dim)", margin: "-4px 0 16px" }}>
-            Adjust the AI's strictness for matching your profile against new job postings.
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+            <span className="material-symbols-outlined" style={{ color: "var(--ac-primary)" }}>notifications_active</span>
+            <h3 className="ac-headline-md" style={{ margin: 0 }}>Match Threshold</h3>
+          </div>
+          <p style={{ fontSize: 12, color: "var(--text-dim)", margin: "0 0 16px" }}>
+            Alert me when a job matches my profile above this confidence score.
           </p>
+          {/* memory_trends_1: threshold tile — big value above a real slider. */}
           <div className="sensitivity-card">
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-              <span style={{ fontSize: 11, fontWeight: 600, color: "var(--text-dim)" }}>Broad Reach</span>
-              <strong className="num" style={{ fontSize: 18, color: "var(--ac-primary)" }}>85%</strong>
-              <span style={{ fontSize: 11, fontWeight: 600, color: "var(--text-dim)" }}>High Precision</span>
+            <div className="ac-metric-value" style={{ color: "var(--ac-primary)", marginBottom: 8 }}>90%</div>
+            <input
+              type="range"
+              min={50}
+              max={100}
+              defaultValue={90}
+              aria-label="Match threshold"
+              style={{ width: "100%" }}
+            />
+            <div style={{ display: "flex", justifyContent: "space-between", marginTop: 8 }}>
+              <span className="ac-label-md" style={{ color: "var(--text-faint)" }}>Loose (50%)</span>
+              <span className="ac-label-md" style={{ color: "var(--text-faint)" }}>Strict (100%)</span>
             </div>
-            <div className="sensitivity-slider-track">
-              <div className="sensitivity-slider-fill" style={{ width: "85%" }} />
-              <div className="sensitivity-slider-handle" style={{ left: "85%" }} />
-            </div>
-            <p style={{ fontSize: 11, color: "var(--text-faint)", textAlign: "center", margin: "10px 0 0" }}>
-              Currently filtering out roles below 85% match score.
-            </p>
           </div>
         </div>
       </div>
 
       <div className="memory-cards-trio" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 16, marginBottom: 16 }}>
         <div className="card">
-          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.06em", color: "var(--text-dim)", display: "flex", alignItems: "center", gap: 6, marginBottom: 10 }}>
-            <span className="material-symbols-outlined" style={{ fontSize: 16, color: "var(--ac-primary)" }}>workspace_premium</span>
-            VERIFIED STRENGTHS
+          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", color: "var(--text-faint)", display: "flex", alignItems: "center", gap: 6, marginBottom: 10 }}>
+            <span className="material-symbols-outlined icon-fill" style={{ fontSize: 16, color: "var(--ac-secondary)", background: "var(--ac-canary)", borderRadius: "50%", width: 28, height: 28, display: "grid", placeItems: "center" }}>code</span>
+            STRONGEST SKILL
           </div>
-          <div className="chips" style={{ marginBottom: 10 }}>
-            <span className="chip chip-accent">System Design</span>
-            <span className="chip chip-accent">React.js</span>
-            <span className="chip chip-accent">Agile Leadership</span>
-          </div>
-          <p style={{ fontSize: 11.5, color: "var(--text-faint)", margin: 0 }}>
-            Consistently scored &gt;90% across last 4 technical rounds.
-          </p>
+          <p className="ac-headline-md" style={{ margin: 0, fontSize: 15, color: "var(--text)" }}>Go / System Design</p>
         </div>
 
         <div className="card">
-          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.06em", color: "var(--text-dim)", display: "flex", alignItems: "center", gap: 6, marginBottom: 10 }}>
-            <span className="material-symbols-outlined" style={{ fontSize: 16, color: "var(--ac-tertiary)" }}>track_changes</span>
-            TARGET FOCUS AREAS
+          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", color: "var(--text-faint)", display: "flex", alignItems: "center", gap: 6, marginBottom: 10 }}>
+            <span className="material-symbols-outlined" style={{ fontSize: 16, color: "var(--ac-on-error-container)", background: "var(--ac-error-container)", borderRadius: "50%", width: 28, height: 28, display: "grid", placeItems: "center" }}>communication</span>
+            IMPROVEMENT AREA
           </div>
-          <ul style={{ paddingLeft: 14, margin: "0 0 8px", fontSize: 12, color: "var(--text-dim)" }}>
-            <li>Conciseness in behavioral answers (STAR method)</li>
-            <li>Advanced Database Indexing theories</li>
-          </ul>
+          <p className="ac-headline-md" style={{ margin: 0, fontSize: 15, color: "var(--text)" }}>Behavioral STAR examples</p>
         </div>
 
         <div className="card">
-          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.06em", color: "var(--text-dim)", display: "flex", alignItems: "center", gap: 6, marginBottom: 10 }}>
-            <span className="material-symbols-outlined" style={{ fontSize: 16, color: "var(--ac-secondary)" }}>speed</span>
-            AI RECOMMENDED PACE
+          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", color: "var(--text-faint)", display: "flex", alignItems: "center", gap: 6, marginBottom: 10 }}>
+            <span className="material-symbols-outlined" style={{ fontSize: 16, color: "var(--ac-on-primary-container)", background: "var(--ac-primary-container)", borderRadius: "50%", width: 28, height: 28, display: "grid", placeItems: "center" }}>speed</span>
+            IDEAL PACE
           </div>
-          <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
-            <span style={{ fontSize: 26, fontWeight: 800, color: "var(--text)" }}>2-3</span>
-            <span style={{ fontSize: 13, color: "var(--text-dim)" }}>Interviews / Week</span>
-          </div>
-          <div className="salary-bar-container" style={{ margin: "8px 0" }}>
-            <div className="salary-bar-fill" style={{ width: "60%" }} />
-          </div>
-          <p style={{ fontSize: 11, color: "var(--text-faint)", margin: 0 }}>
-            Optimized for knowledge retention and avoiding burnout based on past activity logs.
-          </p>
+          <p className="ac-headline-md" style={{ margin: 0, fontSize: 15, color: "var(--text)" }}>Fast-growing Series B/C</p>
         </div>
       </div>
 
       <div className="card">
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14, flexWrap: "wrap", gap: 8 }}>
-          <h3 className="card-title" style={{ margin: 0 }}>
-            <span className="material-symbols-outlined" style={{ color: "var(--ac-primary)" }}>radar</span>
-            Semantic Recall Log
-          </h3>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <span className="material-symbols-outlined" style={{ color: "var(--ac-primary)" }}>history_edu</span>
+            <h3 className="ac-headline-md" style={{ margin: 0 }}>Remembered Feedback</h3>
+          </div>
+          <span className="chip" title="Every memory is embedded and indexed for semantic recall">
+            <span className="material-symbols-outlined" style={{ fontSize: 12 }}>database</span>
+            Vector Indexed
+          </span>
           <div style={{ display: "flex", gap: 8 }}>
             <button className="btn-sm btn-ghost">Filter</button>
             <button className="btn-sm btn-ghost">Export Log</button>
