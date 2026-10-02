@@ -372,6 +372,24 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     } catch {
       /* non-JSON error body */
     }
+    // Proxy/gateway failures (Vercel→Railway rewrite, Railway's own 404 page)
+    // return JSON like {status:"error", code:404, message:"Application not
+    // found"} or an HTML page. Surface what actually happened rather than a
+    // bare statusText that reads like an app bug.
+    if (res.status === 502 || res.status === 503 || res.status === 504) {
+      message = "Cannot reach the ApplyCanary server. It may be down or redeploying — try again in a minute.";
+    } else if (!message || message === res.statusText) {
+      const text = await res.text().catch(() => "");
+      if (text) {
+        try {
+          const body = JSON.parse(text) as { message?: string; detail?: string };
+          const m = body.message ?? body.detail;
+ if (typeof m === "string" && m) message = m;
+        } catch {
+          /* HTML/plain body — keep statusText */
+        }
+      }
+    }
     throw new ApiError(message, res.status);
   }
 
