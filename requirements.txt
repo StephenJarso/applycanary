@@ -10,7 +10,11 @@ jinja2>=3.1,<4.0
 python-multipart>=0.0.9,<0.1
 
 # --- persistence ---
-sqlmodel>=0.0.22,<0.1
+# sqlmodel is capped below 0.0.25: newer releases raise ValueError on the
+# naive-UTC datetimes this codebase stores on purpose (SQLite has no tz-aware
+# type; see app/models.py utcnow). On unpinned installs every INSERT with a
+# default timestamp — including User on register/login — fails at runtime.
+sqlmodel>=0.0.22,<0.0.25
 sqlalchemy>=2.0,<3.0
 # CockroachDB (Postgres wire protocol) driver. Optional: the app falls back to
 # SQLite when DATABASE_URL is sqlite:///...
