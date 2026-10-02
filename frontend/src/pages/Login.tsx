@@ -24,7 +24,7 @@ export default function Login() {
     setBusy(true);
     try {
       await login(email, password);
-      navigate("/", { replace: true });
+      navigate("/jobs", { replace: true });
     } catch (err) {
       if (err instanceof ApiError && err.status === 403) setUnverified(true);
       else setError(err instanceof Error ? err.message : "Invalid credentials");

@@ -69,7 +69,7 @@ export default function JobDetail() {
 
   return (
     <>
-      <Link to="/" className="btn-ghost btn-sm" style={{ marginBottom: 14 }}>← Jobs</Link>
+      <Link to="/jobs" className="btn-ghost btn-sm" style={{ marginBottom: 14 }}>← Jobs</Link>
 
       <div className="detail-head">
         <div className="job-score-band band-strong" aria-hidden="true">

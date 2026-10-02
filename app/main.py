@@ -16,6 +16,7 @@ from collections import defaultdict, deque
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from app.config import get_settings
@@ -97,6 +98,25 @@ def create_app() -> FastAPI:
     )
     request_windows: dict[tuple[str, str], deque[float]] = defaultdict(deque)
     limits = {"auth": (10, 60.0), "api-write": (30, 60.0), "api-read": (120, 60.0)}
+
+    # CORS for the Capacitor mobile shell. The WebView origin is a custom
+    # scheme (capacitor://localhost on iOS, https://localhost on Android), so
+    # API calls are cross-origin and need explicit allowance + credentials.
+    # WEB_CORS_ORIGINS adds e.g. a separately-hosted web frontend.
+    cors_origins = [
+        "capacitor://localhost",
+        "http://localhost",
+        "https://localhost",
+        *(o.strip() for o in settings.web_cors_origins.split(",") if o.strip()),  # type: ignore[attr-defined]
+    ]
+    if cors_origins:
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=cors_origins,
+            allow_credentials=True,
+            allow_methods=["*"],
+            allow_headers=["*"],
+        )
 
     @app.middleware("http")
     async def auth_middleware(request: Request, call_next):  # noqa: ANN001, ANN202

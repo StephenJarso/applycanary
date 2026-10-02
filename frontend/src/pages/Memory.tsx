@@ -196,7 +196,7 @@ export default function Memory() {
             hint={
               <>
                 Open a job and hit{" "}
-                <Link to="/" className="cell-dim">AI Interview</Link> to start practising.
+                <Link to="/jobs" className="cell-dim">AI Interview</Link> to start practising.
               </>
             }
           />
