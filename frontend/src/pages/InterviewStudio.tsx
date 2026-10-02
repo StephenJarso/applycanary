@@ -308,35 +308,25 @@ export default function InterviewStudio() {
 
   return (
     <>
-      <Link to={`/job/${jobId}`} className="btn-ghost btn-sm" style={{ marginBottom: 14 }}>← Back to job</Link>
-
-      <div className="studio-head">
-        <div>
-          <h2 className="detail-title">AI Interview Studio</h2>
-          <div className="detail-meta">
-            {job.data ? (
-              <><strong style={{ color: "var(--text)" }}>{job.data.title}</strong>
-                <span>·</span><span>{job.data.company}</span></>
-            ) : null}
-            {voice && (
-              <span className="chip chip-accent" title="Which engines power the session">
-                {voice.tts === "polly"
-                  ? `Polly voice${voice.voice_id ? ` · ${voice.voice_id}` : ""}`
-                  : "Browser voice · female"}
-                {" · "}
-                {voice.stt === "transcribe" ? "Transcribe hearing" : "Browser hearing"}
-              </span>
-            )}
-          </div>
+      <div className="studio-topbar">
+        <div className="studio-topbar-left">
+          <Link to={`/job/${jobId}`} className="studio-back" aria-label="Back to job">
+            <span className="material-symbols-outlined">arrow_back</span>
+          </Link>
+          <span className="studio-topbar-title">ApplyCanary</span>
         </div>
-
-        {!state && (
+        {!finished && state ? (
+          <span className="studio-live-badge">
+            <span className="material-symbols-outlined icon-fill" style={{ fontSize: 16 }}>radio_button_checked</span>
+            Live
+          </span>
+        ) : (
           <div className="seg" role="group" aria-label="Interview mode">
             <button type="button" aria-pressed={mode === "speech"} onClick={() => setMode("speech")}>
-              🎙 Voice
+              Voice
             </button>
             <button type="button" aria-pressed={mode === "text"} onClick={() => setMode("text")}>
-              ⌨ Typed
+              Typed
             </button>
           </div>
         )}
@@ -345,32 +335,34 @@ export default function InterviewStudio() {
       {error && <div className="banner banner-bad" role="alert">{error}</div>}
 
       {!state ? (
-        <div className="studio-card">
-          <p className="prose" style={{ color: "var(--text-dim)", maxWidth: 560 }}>
-            A live mock interview for this posting. The coach asks the questions
-            an interviewer would, listens to your answers, and scores each one
-            against the rubric — drawing on what it remembers about you from
-            previous sessions. Answers are transcribed and stored with the
-            session, so you can close the tab and resume where you left off.
-          </p>
-          {voice && (
-            <div className="studio-engine-row">
-              <EngineBadge on={voice.aws_enabled} label="Amazon Bedrock + Polly + Transcribe" />
-              <EngineBadge on={voice.tts === "polly"} label="Neural voice" />
-              <EngineBadge on={voice.stt === "transcribe"} label="AWS speech-to-text" />
-              <EngineBadge on={!voice.aws_enabled} label="Zero-config browser mode" />
-            </div>
-          )}
-          <button
-            className="btn-primary"
-            onClick={() => start.mutate()}
-            disabled={start.isPending}
-            style={{ marginTop: 6 }}
-          >
-            {start.isPending ? <span className="spinner" /> : null}
-            Start interview
-          </button>
-          {start.isError && <ErrorBox error={start.error} />}
+        <div className="studio-intro-wrap">
+          <div className="studio-card">
+            <p className="prose" style={{ color: "var(--text-dim)", maxWidth: 560 }}>
+              A live mock interview for this posting. The coach asks the questions
+              an interviewer would, listens to your answers, and scores each one
+              against the rubric — drawing on what it remembers about you from
+              previous sessions. Answers are transcribed and stored with the
+              session, so you can close the tab and resume where you left off.
+            </p>
+            {voice && (
+              <div className="studio-engine-row">
+                <EngineBadge on={voice.aws_enabled} label="Amazon Bedrock + Polly + Transcribe" />
+                <EngineBadge on={voice.tts === "polly"} label="Neural voice" />
+                <EngineBadge on={voice.stt === "transcribe"} label="AWS speech-to-text" />
+                <EngineBadge on={!voice.aws_enabled} label="Zero-config browser mode" />
+              </div>
+            )}
+            <button
+              className="btn-primary"
+              onClick={() => start.mutate()}
+              disabled={start.isPending}
+              style={{ marginTop: 6 }}
+            >
+              {start.isPending ? <span className="spinner" /> : null}
+              Start interview
+            </button>
+            {start.isError && <ErrorBox error={start.error} />}
+          </div>
         </div>
       ) : finished ? (
         <SummaryPanel state={state} />
@@ -395,6 +387,16 @@ export default function InterviewStudio() {
 
               {question && (
                 <div className="studio-card studio-stage-hero">
+                  {/* ai_interview_studio_1: indigo glow behind the stage. */}
+                  <div className="stage-glow" aria-hidden="true" />
+
+                  {/* Mockup's animated voice bars — indigo, bottom-anchored. */}
+                  <div className="voice-visualizer" aria-hidden="true">
+                    {Array.from({ length: 7 }, (_, i) => (
+                      <span key={i} className="voice-bar" style={{ animationDelay: `${i * 0.1}s` }} />
+                    ))}
+                  </div>
+
                   <div className="coach-avatar-wrapper">
                     <div className="coach-avatar">
                       <span className="material-symbols-outlined" style={{ fontSize: 28 }}>smart_toy</span>
@@ -406,9 +408,12 @@ export default function InterviewStudio() {
                     {phase === "recording" ? "RECORDING YOUR ANSWER" : phase === "evaluating" ? "AI COACH EVALUATING" : "AI COACH LISTENING"}
                   </div>
 
-                  <h2 className="coach-question-text">
-                    "{question.question}"
-                  </h2>
+                  <div className="coach-question-card">
+                    <span className="coach-question-pill">AI Coach</span>
+                    <h2 className="coach-question-text">
+                      "{question.question}"
+                    </h2>
+                  </div>
 
                   {phase === "recording" && (
                     <div className="recording-row" role="status" aria-live="polite" style={{ justifyContent: "center" }}>
@@ -507,11 +512,11 @@ export default function InterviewStudio() {
                 <div className="studio-details-body">
                   <div className="studio-insight-card canary-card">
                     <div className="insight-badge-row">
-                      <span className="material-symbols-outlined" style={{ fontSize: 14 }}>psychology</span>
-                      <span>AI MEMORY RECALL</span>
+                      <span className="material-symbols-outlined icon-fill" style={{ fontSize: 14, color: "var(--ac-tertiary-container)" }}>lightbulb</span>
+                      <span>MEMORY INSIGHT</span>
                     </div>
                     <p style={{ margin: "6px 0 0", fontSize: 12.5, lineHeight: 1.4, color: "var(--ac-on-canary)" }}>
-                      {state.memory[0]?.content ?? "In your last session, you mentioned leading key projects. This is a great opportunity to use that as your STAR method example."}
+                      {state.memory[0]?.content ?? "The coach remembers your previous sessions. Take a deep breath and pace your delivery."}
                     </p>
                   </div>
 
