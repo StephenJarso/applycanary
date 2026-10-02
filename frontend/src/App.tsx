@@ -15,13 +15,14 @@ import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import VerifyEmail from "./pages/VerifyEmail";
 import GuestJobs from "./pages/GuestJobs";
+import Landing from "./pages/Landing";
 import { useAuth } from "./context/AuthContext";
 
 // Side nav items matching desktop design mockups (Home, Discovery, Memory, Profile).
 // Interviews are reached per-job (JobDetail → AI Interview), not from the nav —
 // the earlier duplicate /memory entry made two items highlight at once.
 const NAV = [
-  { to: "/", label: "Home", icon: "home", end: true },
+  { to: "/jobs", label: "Home", icon: "home", end: true },
   { to: "/review", label: "Discovery", icon: "explore" },
   { to: "/memory", label: "Memory", icon: "psychology" },
   { to: "/profile", label: "Profile", icon: "person" },
@@ -128,7 +129,7 @@ function Dashboard() {
           ))}
 
           <Routes>
-            <Route path="/" element={<Jobs />} />
+            <Route path="/jobs" element={<Jobs />} />
             <Route path="/job/:id" element={<JobDetail />} />
             <Route path="/job/:id/interview" element={<InterviewStudio />} />
             <Route path="/memory" element={<Memory />} />
@@ -151,9 +152,11 @@ export default function App() {
   const { user, loading } = useAuth();
   if (loading) return <div className="empty">Loading session…</div>;
   return <Routes>
-    <Route path="/login" element={user ? <Navigate to="/" replace /> : <Login />} />
+    {/* Signed-out visitors get the marketing page at /, not a login wall. */}
+    <Route path="/" element={user ? <Navigate to="/jobs" replace /> : <Landing />} />
+    <Route path="/login" element={user ? <Navigate to="/jobs" replace /> : <Login />} />
     <Route path="/guest" element={<GuestJobs />} />
-    <Route path="/register" element={user ? <Navigate to="/" replace /> : <Register />} />
+    <Route path="/register" element={user ? <Navigate to="/jobs" replace /> : <Register />} />
     {/* Public regardless of session: these are opened from an email, and the
         link must not be swallowed by a redirect to /login. Confirming an
         address is also something a signed-in user does. */}

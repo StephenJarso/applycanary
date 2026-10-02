@@ -178,6 +178,11 @@ class Settings(BaseSettings):
     # since that means the app is reachable off-box and the cookie must not
     # travel in clear text.
     cookie_secure: bool | None = None
+    # Extra CORS origins allowed to call the API with credentials (the
+    # Capacitor shell origins capacitor://localhost and http(s)://localhost are
+    # always allowed). Comma-separated, e.g.
+    # WEB_CORS_ORIGINS=https://app.example.com,http://localhost:5173
+    web_cors_origins: str = ""
 
     # ------------------------------------------------------------------
     @property

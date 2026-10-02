@@ -7,6 +7,25 @@
  * the mismatch shows up here first.
  */
 
+/**
+ * Base URL for API calls.
+ *
+ * - Web build: empty (same-origin, the Vite dev proxy / FastAPI mount answers).
+ * - Capacitor app: the WebView origin is capacitor://localhost (iOS) or
+ *   http://localhost (Android), so a relative "/api" would hit the shell, not
+ *   the backend. Set VITE_API_BASE (e.g. https://canary.example.com) at build
+ *   time, or override at runtime with localStorage["ac.api-base"] for dev.
+ */
+import { Capacitor } from "@capacitor/core";
+
+export const API_BASE: string =
+  (typeof localStorage !== "undefined" && localStorage.getItem("ac.api-base")) ||
+  (import.meta.env?.VITE_API_BASE as string | undefined) ||
+  "";
+
+/** True when running inside the Capacitor native shell (not a plain browser). */
+export const IS_NATIVE: boolean = Capacitor.isNativePlatform();
+
 export interface AuthUser {
   id: number;
   email: string;
@@ -334,9 +353,13 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   if (typeof init?.body === "string" && !headers.has("Content-Type")) {
     headers.set("Content-Type", "application/json");
   }
-  const res = await fetch(`/api${path}`, {
+  // Cross-origin (native app): cookies must be requested explicitly or the
+  // FastAPI session cookie is never stored by the WebView.
+  const crossOrigin = API_BASE !== "" && !API_BASE.includes(window.location.host);
+  const res = await fetch(`${API_BASE}/api${path}`, {
     ...init,
     headers,
+    credentials: crossOrigin ? "include" : init?.credentials,
   });
 
   if (!res.ok) {

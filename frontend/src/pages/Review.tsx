@@ -52,7 +52,7 @@ export default function Review() {
       {data && data.jobs.length === 0 && (
         <Empty
           title="Nothing awaiting review"
-          hint={<>Tailor a CV from a <Link to="/">job</Link> to queue an application.</>}
+          hint={<>Tailor a CV from a <Link to="/jobs">job</Link> to queue an application.</>}
         />
       )}
 

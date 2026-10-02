@@ -3,9 +3,14 @@ import { createRoot } from "react-dom/client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter } from "react-router-dom";
 import { Analytics } from "@vercel/analytics/react";
+import { initNative } from "./native";
 import App from "./App";
 import { AuthProvider } from "./context/AuthContext";
 import "./styles.css";
+
+// Patches fetch for the Capacitor WebView (native HTTP, no CORS) before any
+// component can fire a request. Resolves immediately in a plain browser.
+void initNative();
 
 const client = new QueryClient({
   defaultOptions: {

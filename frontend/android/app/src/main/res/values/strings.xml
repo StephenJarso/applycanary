@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">ApplyCanary</string>
+    <string name="title_activity_main">ApplyCanary</string>
+    <string name="package_name">app.applycanary.mobile</string>
+    <string name="custom_url_scheme">app.applycanary.mobile</string>
+</resources>
