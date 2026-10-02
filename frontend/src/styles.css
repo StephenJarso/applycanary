@@ -169,6 +169,75 @@ a { color: inherit; text-decoration: none; }
   border-radius: var(--radius);
 }
 
+/* Design-pack utilities — used by the redesigned screens.
+ *
+ * .glass-card: dashboard_1's frosted status card. .gradient-text / .ai-glow
+ * mirror the mockups' inline styles (indigo→rust gradient text, indigo FAB
+ * glow). .ac-display etc. mirror the mockups' type scale. */
+.glass-card {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+}
+
+.gradient-text {
+  background: linear-gradient(135deg, var(--ac-primary), var(--ac-tertiary-container));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+
+.ai-glow { box-shadow: 0 0 15px rgba(80, 0, 225, 0.2); }
+
+.ac-display {
+  font-size: 32px;
+  font-weight: 700;
+  line-height: 40px;
+  letter-spacing: -0.02em;
+}
+.ac-headline-lg { font-size: 24px; font-weight: 700; line-height: 32px; }
+.ac-headline-md { font-size: 20px; font-weight: 600; line-height: 28px; }
+.ac-label-md {
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 16px;
+  letter-spacing: 0.05em;
+}
+
+/* Material Symbols filled variant, matching the mockups' filled icons. */
+.icon-fill .material-symbols-outlined,
+.material-symbols-outlined.icon-fill {
+  font-variation-settings: "FILL" 1, "wght" 400, "GRAD" 0, "opsz" 24;
+}
+
+/* Metric tiles from dashboard_1's Job Search Status card. */
+.ac-metric {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+  border-radius: var(--ac-radius);
+  background: var(--ac-surface-container-lowest);
+  border: 1px solid var(--border);
+}
+.ac-metric-value {
+  font-size: 32px;
+  font-weight: 700;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+.ac-metric-label {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  color: var(--text-dim);
+  text-align: center;
+  margin-top: 4px;
+}
+
 /* ------------------------------------------------------------ layout */
 
 .app { display: flex; height: 100%; }
@@ -176,8 +245,8 @@ a { color: inherit; text-decoration: none; }
 .sidebar {
   width: var(--sidebar-w);
   flex-shrink: 0;
-  border-right: 1px solid var(--border);
-  background: var(--bg-raised);
+  border-right: 1px solid var(--border-strong);
+  background: var(--ac-surface);
   display: flex;
   flex-direction: column;
   padding: 16px 12px;
@@ -189,6 +258,7 @@ a { color: inherit; text-decoration: none; }
   font-size: 15px;
   letter-spacing: -0.02em;
   line-height: 1.2;
+  color: var(--ac-primary);
 }
 
 .brand-sub {
@@ -215,8 +285,8 @@ a { color: inherit; text-decoration: none; }
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 8px 10px;
-  border-radius: var(--radius-lg);
+  padding: 10px 14px;
+  border-radius: var(--radius);
   color: var(--text-dim);
   font-weight: 600;
   font-size: 13.5px;
@@ -224,9 +294,23 @@ a { color: inherit; text-decoration: none; }
 }
 .nav-link .material-symbols-outlined { font-size: 20px; }
 .nav-link:hover { background: var(--bg-hover); color: var(--text); }
+/* Design-pack nav: active item is the indigo primary-container pill with a
+ * filled icon, per dashboard_1/job_discovery_1 mockups. */
 .nav-link[aria-current="page"] {
-  background: var(--ac-canary);
-  color: var(--ac-on-canary);
+  background: var(--ac-primary-container);
+  color: var(--ac-on-primary-container);
+}
+.nav-link[aria-current="page"] .material-symbols-outlined {
+  font-variation-settings: "FILL" 1, "wght" 400, "GRAD" 0, "opsz" 24;
+}
+
+.nav-eyebrow {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  margin: 10px 4px 6px;
 }
 
 .nav-count {
@@ -240,8 +324,8 @@ a { color: inherit; text-decoration: none; }
   font-variant-numeric: tabular-nums;
 }
 .nav-link[aria-current="page"] .nav-count {
-  background: rgba(80, 0, 225, 0.14);
-  color: var(--accent);
+  background: rgba(255, 255, 255, 0.22);
+  color: var(--ac-on-primary-container);
 }
 
 .sidebar-foot { margin-top: auto; padding-top: 12px; display: flex; flex-direction: column; gap: 8px; }
@@ -312,30 +396,49 @@ a { color: inherit; text-decoration: none; }
 
 .topbar-title {
   margin: 0;
-  font-size: 18px;
+  font-size: 20px;
   font-weight: 700;
   letter-spacing: -0.02em;
-  color: var(--accent);
+  color: var(--ac-primary);
 }
 .topbar .spacer { flex: 1; }
+/* The mockup topbar carries a primary "Discover" text action. */
+.topbar .btn-ghost { color: var(--ac-primary); font-weight: 600; }
+.topbar .btn-ghost:hover:not(:disabled) { background: var(--bg-hover); color: var(--ac-primary); }
 
 .content { padding: 24px 28px 64px; }
 
 @media (max-width: 720px) {
   .app { flex-direction: column; }
+  /* Design pack: on phones the rail becomes a bottom bar with pill-shaped
+   * active items, exactly like dashboard_1's BottomNavBar. */
   .sidebar {
+    order: 2;
     width: 100%;
     flex-direction: row;
     overflow-x: auto;
-    padding: 8px;
+    padding: 8px 8px 14px;
     align-items: center;
+    justify-content: space-around;
+    border-right: none;
+    border-top: 1px solid var(--border);
+    border-radius: 12px 12px 0 0;
+    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.05);
+    background: var(--ac-surface);
   }
-  .brand { padding: 0 10px 0 4px; font-size: 14px; }
-  .nav-label { display: none; }
-  .nav-link { border-radius: 999px; padding: 8px; }
-  .sidebar-foot { margin: 0 0 0 auto; padding: 0; }
-  .nav-count { display: none; }
-  .content { padding: 16px 16px 60px; }
+  .brand, .nav-eyebrow, .sidebar-foot { display: none; }
+  .nav-label { display: block; font-size: 11px; font-weight: 600; }
+  .nav-link {
+    flex-direction: column;
+    gap: 2px;
+    border-radius: 16px;
+    padding: 6px 14px;
+    font-size: 11px;
+  }
+  .nav-link[aria-current="page"] { transform: scale(0.94); }
+  .content { padding: 16px 16px 24px; }
+  .main { overflow-y: visible; }
+  .app { height: auto; min-height: 100%; }
 }
 
 /* ------------------------------------------------------------ controls */
@@ -444,8 +547,7 @@ label {
 .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 14px; }
 @media (max-width: 640px) { .grid2 { grid-template-columns: 1fr; } }
 
-.stat-row { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; }
-
+/* Stat row kept for screens that stack badges under values. */
 .stat {
   flex: 1;
   min-width: 120px;
@@ -621,16 +723,16 @@ tbody tr:hover { background: var(--bg-hover); }
 }
 
 .dashboard-greeting {
-  font-size: 32px;
-  font-weight: 800;
-  letter-spacing: -0.02em;
   margin: 0 0 4px;
-  color: var(--ac-primary);
+  color: var(--text);
 }
 
 .dashboard-subtext {
   margin: 0;
-  font-size: 15px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
   color: var(--text-dim);
 }
 
@@ -640,7 +742,7 @@ tbody tr:hover { background: var(--bg-hover); }
   gap: 12px;
   padding: 12px 18px;
   margin: 0;
-  border-radius: var(--radius-lg);
+  border-radius: var(--ac-radius-xl);
 }
 
 .agent-status-icon {
@@ -651,6 +753,38 @@ tbody tr:hover { background: var(--bg-hover); }
   place-items: center;
   flex-shrink: 0;
 }
+
+/* dashboard_1: "Job Search Status" glass panel + metric tiles. */
+.stat-panel { padding: 16px; border-radius: var(--ac-radius-xl); }
+.stat-panel-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 14px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--ac-surface-variant);
+}
+.stat-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 16px; }
+@media (max-width: 640px) { .stat-row { grid-template-columns: 1fr; } }
+.stat-badge {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ac-primary);
+  margin-top: 4px;
+  display: inline-block;
+}
+.stat-badge.muted { color: var(--text-faint); }
+.stat-link {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ac-primary);
+  cursor: pointer;
+  margin-top: 4px;
+  display: inline-block;
+}
+.stat-link:hover { text-decoration: underline; }
+
+.feed-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
 
 .stat-badge {
   font-size: 11px;
@@ -700,16 +834,16 @@ tbody tr:hover { background: var(--bg-hover); }
 }
 
 .timeline-badge {
-  width: 26px; height: 26px;
+  width: 24px; height: 24px;
   border-radius: 50%;
+  background: var(--ac-surface-container);
+  border: 2px solid var(--ac-surface-card);
   display: grid;
   place-items: center;
   z-index: 1;
   flex-shrink: 0;
 }
-.badge-purple { background: var(--ac-primary); color: #fff; }
-.badge-yellow { background: var(--ac-canary); color: var(--ac-on-canary); }
-.badge-gray { background: var(--ac-surface-container); color: var(--text-dim); }
+.timeline-dot { width: 8px; height: 8px; border-radius: 50%; }
 
 .timeline-content {
   flex: 1;
@@ -907,9 +1041,37 @@ tbody tr:hover { background: var(--bg-hover); }
 
 /* ------------------------------------------------------------ toolbar */
 
+/* job_discovery_1: sticky search bar + pill filter chips row. */
 .toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 14px; }
-.toolbar input[type="search"] { max-width: 240px; }
-.toolbar select { width: auto; min-width: 100px; }
+.toolbar input[type="search"] { max-width: 260px; padding: 10px 12px; }
+.toolbar select { width: auto; min-width: 100px; border-radius: 999px; padding: 7px 12px; font-size: 12px; font-weight: 600; color: var(--text-dim); }
+.toolbar .check { font-size: 12px; font-weight: 600; color: var(--text-dim); }
+.toolbar .seg { border-radius: 999px; }
+.toolbar .seg button { border-radius: 0; }
+.toolbar .seg button:first-child { border-radius: 999px 0 0 999px; }
+.toolbar .seg button:last-child { border-radius: 0 999px 999px 0; }
+
+/* job_discovery_1 filter chips (pill row under the search). */
+.ac-chip-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+.ac-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--ac-outline-variant);
+  background: var(--ac-surface);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+}
+.ac-chip.is-active {
+  border-color: var(--ac-primary);
+  background: var(--ac-primary-fixed);
+  color: var(--ac-on-primary-fixed, var(--ac-primary));
+}
 
 /* ------------------------------------------------------------ pagination */
 .pagination { display: flex; justify-content: space-between; align-items: center; margin-top: 16px; padding: 12px 0; border-top: 1px solid var(--border); }
@@ -1280,28 +1442,8 @@ details > summary:hover { color: var(--text); }
 .auth-foot a { color: var(--ac-primary); font-weight: 600; text-decoration: none; }
 .auth-foot a:hover { text-decoration: underline; }
 
-/* The mockup is a light design; keep it recognisable for dark-scheme users
- * rather than flashing a white card at them. */
-@media (prefers-color-scheme: dark) {
-  .auth-page {
-    --ac-surface: #101014;
-    --ac-surface-card: #17171d;
-    --ac-on-surface: #ecebf0;
-    --ac-on-surface-variant: #a9a4b8;
-    --ac-outline-variant: #383247;
-    --ac-primary: #8b5cf6;
-    --ac-primary-hover: #a78bfa;
-    --ac-primary-fixed: #241a3d;
-    --ac-error-container: #3a0d0d;
-    --ac-on-error-container: #ffb4ab;
-    background:
-      radial-gradient(circle at 12% 6%, rgba(139, 92, 246, 0.16), transparent 34rem),
-      radial-gradient(circle at 88% 92%, rgba(252, 212, 0, 0.07), transparent 32rem),
-      radial-gradient(circle at 1px 1px, rgba(255, 255, 255, 0.05) 1px, transparent 0) 0 0 / 22px 22px,
-      var(--ac-surface);
-  }
-  .auth-card { border-color: rgba(255, 255, 255, 0.07); box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45); }
-}
+/* The user asked for light mode only — no dark variant is shipped, matching
+ * the reference site's light-mode presentation. */
 
 @media (max-width: 480px) {
   .auth-page { padding: 20px 14px; }
@@ -1333,16 +1475,129 @@ details > summary:hover { color: var(--text); }
   flex-wrap: wrap;
 }
 
+/* ai_interview_studio_1: simplified header — back arrow + wordmark + Live pill. */
+.studio-topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 18px;
+}
+.studio-topbar-left { display: flex; align-items: center; gap: 10px; }
+.studio-back {
+  width: 40px; height: 40px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: var(--text-dim);
+}
+.studio-back:hover { background: var(--bg-hover); color: var(--text); }
+.studio-topbar-title { font-size: 20px; font-weight: 700; color: var(--ac-primary); }
+.studio-live-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: var(--ac-canary);
+  color: var(--ac-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+}
+.studio-intro-wrap { max-width: 720px; }
+
+/* Mockup's 7-bar voice visualizer (primary indigo, staggered pulse). */
+.voice-visualizer {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  height: 64px;
+  margin-bottom: 20px;
+}
+.voice-bar {
+  width: 8px;
+  background: var(--ac-primary);
+  border-radius: 999px;
+  margin: 0 4px;
+  transform-origin: bottom;
+  animation: voice-pulse 1.2s infinite ease-in-out;
+}
+@keyframes voice-pulse {
+  0%, 100% { transform: scaleY(0.3); opacity: 0.7; }
+  50% { transform: scaleY(1); opacity: 1; }
+}
+.voice-bar:nth-child(1) { height: 40px; animation-delay: 0s; }
+.voice-bar:nth-child(2) { height: 70px; animation-delay: 0.1s; }
+.voice-bar:nth-child(3) { height: 100px; animation-delay: 0.2s; }
+.voice-bar:nth-child(4) { height: 120px; animation-delay: 0.3s; }
+.voice-bar:nth-child(5) { height: 90px; animation-delay: 0.4s; }
+.voice-bar:nth-child(6) { height: 60px; animation-delay: 0.5s; }
+.voice-bar:nth-child(7) { height: 30px; animation-delay: 0.6s; }
+
+/* Mockup's soft radial indigo glow behind the stage. */
+.stage-glow {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  opacity: 0.2;
+  pointer-events: none;
+}
+.stage-glow::before {
+  content: "";
+  width: 320px;
+  height: 320px;
+  border-radius: 50%;
+  background: var(--ac-primary);
+  filter: blur(100px);
+}
+
 .studio-stage-hero {
   display: flex;
   flex-direction: column;
   align-items: center;
   text-align: center;
-  padding: 48px 32px 32px;
-  background: var(--ac-surface-card);
+  padding: 40px 32px 32px;
+  background: var(--ac-surface-container-low);
   border-radius: var(--radius-lg);
   position: relative;
   overflow: hidden;
+}
+
+/* Mockup transcript card: frosted surface, floating "AI COACH" pill. */
+.coach-question-card {
+  position: relative;
+  max-width: 680px;
+  background: color-mix(in srgb, var(--ac-surface-card) 80%, transparent);
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--ac-surface-variant);
+  border-radius: 16px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+  padding: 28px 28px 22px;
+  margin-bottom: 24px;
+}
+.coach-question-pill {
+  position: absolute;
+  top: -13px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--ac-primary);
+  color: var(--ac-on-primary);
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  padding: 4px 14px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.coach-question-text {
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1.35;
+  letter-spacing: -0.02em;
+  margin: 8px 0 0;
+  color: var(--text);
 }
 
 .coach-avatar-wrapper {
@@ -1710,10 +1965,59 @@ details > summary:hover { color: var(--text); }
 .trend-label { font-size: 10px; color: var(--text-faint); }
 
 .sensitivity-card {
-  padding: 14px;
+  padding: 16px;
   background: var(--ac-surface-container-low);
-  border-radius: var(--radius);
+  border-radius: var(--ac-radius);
   border: 1px solid var(--border);
+}
+
+/* memory_trends_1 range input: indigo thumb with fixed halo, plain track. */
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  cursor: pointer;
+}
+input[type="range"]::-webkit-slider-runnable-track {
+  height: 4px;
+  background: var(--ac-outline-variant);
+  border-radius: 2px;
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  height: 20px;
+  width: 20px;
+  border-radius: 50%;
+  background: var(--ac-primary);
+  margin-top: -8px;
+  box-shadow: 0 0 0 4px var(--ac-on-primary-container);
+}
+input[type="range"]::-moz-range-track {
+  height: 4px;
+  background: var(--ac-outline-variant);
+  border-radius: 2px;
+}
+input[type="range"]::-moz-range-thumb {
+  height: 20px;
+  width: 20px;
+  border: none;
+  border-radius: 50%;
+  background: var(--ac-primary);
+  box-shadow: 0 0 0 4px var(--ac-on-primary-container);
+}
+
+/* +14% MoM pill on the trend card. */
+.trend-mom-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: var(--ac-primary-container);
+  color: var(--ac-on-primary-container);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
 }
 
 .sensitivity-slider-track {
