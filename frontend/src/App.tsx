@@ -18,12 +18,14 @@ import GuestJobs from "./pages/GuestJobs";
 import Landing from "./pages/Landing";
 import { useAuth } from "./context/AuthContext";
 
-// Side nav items matching desktop design mockups (Home, Discovery, Memory, Profile).
-// Interviews are reached per-job (JobDetail → AI Interview), not from the nav —
-// the earlier duplicate /memory entry made two items highlight at once.
+// Side nav per the design pack (dashboard_1/job_discovery_1 code.html):
+// Home, Discovery, Interview, Memory, Profile — with Material Symbols matching
+// the mockups. Interview routes per-job (JobDetail → AI Interview), so the nav
+// item simply lands on Jobs.
 const NAV = [
-  { to: "/jobs", label: "Home", icon: "home", end: true },
-  { to: "/review", label: "Discovery", icon: "explore" },
+  { to: "/jobs", label: "Home", icon: "dashboard", end: true },
+  { to: "/review", label: "Discovery", icon: "search" },
+  { to: "/jobs", label: "Interview", icon: "record_voice_over", end: true },
   { to: "/memory", label: "Memory", icon: "psychology" },
   { to: "/profile", label: "Profile", icon: "person" },
 ] as const;
@@ -58,6 +60,8 @@ function Dashboard() {
             <div className="brand-sub">AI Career Agent</div>
           </div>
         </div>
+
+        <div className="nav-eyebrow">Navigation</div>
 
         {NAV.map((item) => (
           <NavLink
