@@ -14,6 +14,13 @@ export default function Register() {
   // deployment requires the address to be confirmed first.
   const [awaitingConfirmation, setAwaitingConfirmation] = useState(false);
 
+  // Native validation (required, minLength, email format) blocks the submit
+  // event entirely — only a small browser bubble appears next to the field,
+  // which reads as "nothing happened". Mirror the reason in the banner too.
+  const showValidation = (event: FormEvent<HTMLInputElement>) => {
+    setError(event.currentTarget.validationMessage || "Please check the highlighted fields.");
+  };
+
   async function submit(event: FormEvent) {
     event.preventDefault();
     setError("");
@@ -48,6 +55,7 @@ export default function Register() {
         <input
           id="reg-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)}
           placeholder="name@company.com" autoComplete="username" required autoFocus
+          onInvalid={showValidation}
         />
       </div>
 
@@ -56,6 +64,7 @@ export default function Register() {
         <input
           id="reg-password" type="password" value={password} onChange={(e) => setPassword(e.target.value)}
           placeholder="At least 10 characters" autoComplete="new-password" minLength={10} required
+          onInvalid={showValidation}
         />
       </div>
 
