@@ -356,41 +356,47 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   // Cross-origin (native app): cookies must be requested explicitly or the
   // FastAPI session cookie is never stored by the WebView.
   const crossOrigin = API_BASE !== "" && !API_BASE.includes(window.location.host);
-  const res = await fetch(`${API_BASE}/api${path}`, {
-    ...init,
-    headers,
-    credentials: crossOrigin ? "include" : init?.credentials,
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE}/api${path}`, {
+      ...init,
+      headers,
+      credentials: crossOrigin ? "include" : init?.credentials,
+    });
+  } catch {
+    // fetch only rejects on network-level problems: offline, DNS failure,
+    // mixed-content blocking, or a refused preflight. Say so plainly rather
+    // than letting the browser's opaque "Failed to fetch" reach the UI.
+    throw new ApiError(
+      "Cannot connect to the ApplyCanary server. Check your internet connection and try again.",
+      0,
+    );
+  }
 
   if (!res.ok) {
-    // FastAPI puts the useful message in `detail`; fall back to the status text
-    // so the UI never shows a bare "Error".
-    let message = res.statusText;
+    // Read the body exactly once, as text: an earlier .json() call consumes
+    // the stream, so a later .text() would resolve to "" and the backend's
+    // actual error message would be silently dropped.
+    const text = await res.text().catch(() => "");
+    let message = "";
     try {
-      const body = (await res.json()) as { detail?: unknown };
-      if (typeof body.detail === "string") message = body.detail;
+      const body = JSON.parse(text) as { detail?: unknown; message?: unknown };
+      // FastAPI puts the useful message in `detail`; gateway routers use
+      // `message`. Either way the UI never shows a bare "Error".
+      if (typeof body.detail === "string" && body.detail) message = body.detail;
+      else if (typeof body.message === "string" && body.message) message = body.message;
     } catch {
-      /* non-JSON error body */
+      /* HTML/plain body — fall through to the status text */
     }
-    // Proxy/gateway failures (Vercel→Railway rewrite, Railway's own 404 page)
-    // return JSON like {status:"error", code:404, message:"Application not
-    // found"} or an HTML page. Surface what actually happened rather than a
-    // bare statusText that reads like an app bug.
-    if (res.status === 502 || res.status === 503 || res.status === 504) {
+    // Proxy/gateway failures never carry the app's `detail`: the Vercel→Railway
+    // rewrite returns 5xx on gateway errors, and when the Railway service is
+    // gone its edge router answers 404 {message:"Application not found"}. Both
+    // read like an app bug unless restated as an outage.
+    const railwayGone = res.status === 404 && /application not found/i.test(text);
+    if (res.status === 502 || res.status === 503 || res.status === 504 || railwayGone) {
       message = "Cannot reach the ApplyCanary server. It may be down or redeploying — try again in a minute.";
-    } else if (!message || message === res.statusText) {
-      const text = await res.text().catch(() => "");
-      if (text) {
-        try {
-          const body = JSON.parse(text) as { message?: string; detail?: string };
-          const m = body.message ?? body.detail;
- if (typeof m === "string" && m) message = m;
-        } catch {
-          /* HTML/plain body — keep statusText */
-        }
-      }
     }
-    throw new ApiError(message, res.status);
+    throw new ApiError(message || res.statusText || "Something went wrong. Please try again.", res.status);
   }
 
   if (res.status === 204) return undefined as T;
