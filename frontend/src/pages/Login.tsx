@@ -16,6 +16,13 @@ export default function Login() {
   const [resent, setResent] = useState(false);
   const [busy, setBusy] = useState(false);
 
+  // Native validation blocks the submit event without reaching `submit`, so
+  // mirror the browser's bubble in the banner instead of leaving the click
+  // seemingly unanswered.
+  const showValidation = (event: FormEvent<HTMLInputElement>) => {
+    setError(event.currentTarget.validationMessage || "Please check the highlighted fields.");
+  };
+
   async function submit(event: FormEvent) {
     event.preventDefault();
     setError("");
@@ -79,6 +86,7 @@ export default function Login() {
         <input
           id="login-email" type="text" value={email} onChange={(e) => setEmail(e.target.value)}
           placeholder="name@company.com" autoComplete="username" required autoFocus
+          onInvalid={showValidation}
         />
       </div>
 
@@ -92,6 +100,7 @@ export default function Login() {
         <input
           id="login-password" type="password" value={password} onChange={(e) => setPassword(e.target.value)}
           autoComplete="current-password" required
+          onInvalid={showValidation}
         />
       </div>
 
