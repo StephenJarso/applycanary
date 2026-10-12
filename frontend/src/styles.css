@@ -2521,3 +2521,84 @@ input[type="range"]::-moz-range-thumb {
 }
 .landing-footer-links { display: flex; gap: 16px; }
 .landing-footer-links a:hover { color: var(--text); text-decoration: underline; }
+
+/* ------------------------------------------------------------------------- */
+/* Auth panel embedded in the landing page (mode swap, no separate routes)   */
+/* ------------------------------------------------------------------------- */
+
+/* The hero grid collapses to a centred card when hosting the auth panel, so
+ * the form replaces marketing content at the same spot on the page. */
+.landing-hero-auth {
+  min-height: 70vh;
+  display: grid;
+  place-items: center;
+  padding: 48px 16px;
+}
+
+.auth-panel {
+  position: relative;
+  width: min(420px, 100%);
+  background: var(--ac-surface-card, #fff);
+  border: 1px solid var(--ac-outline-variant, #e3e3e3);
+  border-radius: 16px;
+  padding: 28px 28px 24px;
+  box-shadow: var(--ac-shadow-card, 0 10px 30px rgba(0, 0, 0, .08));
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.auth-panel-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ac-on-surface-variant, #6b6b6b);
+  cursor: pointer;
+}
+.auth-panel-close:hover { background: var(--ac-surface-hover, #f4f4f4); color: var(--ac-on-surface, #272727); }
+
+.auth-panel-title {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--ac-on-surface, #0d0d0d);
+  text-align: center;
+}
+.auth-panel-sub {
+  margin: 0 0 6px;
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--ac-on-surface-variant, #6b6b6b);
+  text-align: center;
+}
+
+/* Inputs inherit the existing .auth-field styles (label + input) already used
+ * by AuthShell pages; only layout tweaks live here. */
+.auth-panel .auth-field input {
+  width: 100%;
+}
+
+.auth-panel-submit {
+  margin-top: 6px;
+  width: 100%;
+}
+
+.auth-panel-switch {
+  border: 0;
+  background: transparent;
+  padding: 6px 0 0;
+  font-size: 13px;
+  color: var(--ac-on-surface-variant, #6b6b6b);
+  cursor: pointer;
+  text-align: center;
+}
+.auth-panel-switch strong { color: var(--ac-primary, #1a73e8); }
+.auth-panel-switch:hover strong { text-decoration: underline; }
