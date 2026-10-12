@@ -18,7 +18,7 @@ import logging
 from sqlalchemy import text
 from sqlmodel import Session, select
 
-from app.db import is_cockroach
+from app.db import is_cockroach, vector_backend
 from app.memory.embeddings import cosine, embed_text
 from app.models import AgentMemory, Job, JobEmbedding, utcnow
 
@@ -125,7 +125,7 @@ async def _search(
     to the WHERE clause — the callers above only pass constants, never user
     input, so string interpolation is safe here.
     """
-    if is_cockroach():
+    if is_cockroach() or vector_backend() == "pgvector":
         return await _search_sql(session, table, vector, limit, exclude_id, extra)
     return _search_python(session, table, vector, limit, exclude_id, extra)
 
@@ -149,29 +149,46 @@ async def _search_sql(
     exclude_id: int | None,
     extra: str,
 ) -> list[tuple[object, float]]:
+    # CockroachDB has the built-in vec_cosine_distance(); vanilla Postgres
+    # (pgvector) has the cosine `<=>` distance operator. The query vector is
+    # interpolated as a quoted literal with an inline `::vector` cast rather
+    # than passed as a bind parameter: pgvector rejects `:q::vector` because
+    # the cast binds to the placeholder, not the value. `lit` comes from
+    # _vector_literal() (repr(float) items, no quotes), so the interpolation
+    # cannot introduce SQL outside a well-formed vector literal.
     lit = _vector_literal(vector)
+    qvec = f"'{lit}'::vector"
     if table == "job_embedding":
+        dist = (
+            f"vec_cosine_distance(e.embedding, {qvec})" if is_cockroach()
+            else f"(e.embedding <=> {qvec})"
+        )
         sql = text(
             "SELECT e.job_id AS ref_id, "
-            "1 - vec_cosine_distance(e.embedding, :q::vector) AS sim "
+            f"1 - {dist} AS sim "
             "FROM job_embedding e JOIN job j ON j.id = e.job_id "
             f"WHERE 1=1 {extra}"
             + (" AND e.job_id != :exclude" if exclude_id is not None else "")
             + " ORDER BY sim DESC LIMIT :limit"
         )
     else:
+        dist = (
+            f"vec_cosine_distance(m.embedding, {qvec})" if is_cockroach()
+            else f"(m.embedding <=> {qvec})"
+        )
         sql = text(
             "SELECT m.id AS ref_id, "
-            "1 - vec_cosine_distance(m.embedding, :q::vector) AS sim "
+            f"1 - {dist} AS sim "
             f"FROM agent_memory m WHERE 1=1 {extra}"
             + (" AND m.id != :exclude" if exclude_id is not None else "")
             + " ORDER BY sim DESC LIMIT :limit"
         )
 
-    params: dict = {"q": lit, "limit": limit}
+    params: dict = {"limit": limit}
     if exclude_id is not None:
         params["exclude"] = exclude_id
-    rows = session.exec(sql, params).all()
+    # sqlmodel's exec() takes params as a keyword-only argument.
+    rows = session.exec(sql, params=params).all()
 
     out: list[tuple[object, float]] = []
     for row in rows:

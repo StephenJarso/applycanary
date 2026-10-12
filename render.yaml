@@ -27,18 +27,18 @@ services:
         value: 8000
       - key: DATA_DIR
         value: /data
-      # Data durability: run scripts/ccloud/provision.sh once (needs
-      # CCLOUD_API_KEY/CCLOUD_API_SECRET), which creates the free CockroachDB
-      # Serverless cluster, database and nightly backups and prints a
-      # connection string. Paste that string at deploy time (`sync: false` —
-      # it contains the DB password and must not live in a committed file).
-      # Format: postgresql://user:password@host:26257/applycanary?sslmode=require
+      # Data durability: sign up at https://neon.com/signup (free forever,
+      # no credit card, 1 GB storage, pgvector supported) and create a
+      # project. Its pooled connection string is pasted at deploy time
+      # (`sync: false` — it contains the DB password and must not live in a
+      # committed file). Format:
+      #   postgresql://user:pass@ep-xxx-pooler.eu-central-1.aws.neon.tech/neondb?sslmode=require
       # Tables are created automatically on first connect.
       #
       # DO NOT fall back to SQLite here: Render's free tier has no persistent
       # volume, so sqlite:////data/applycanary.db would be wiped on every
-      # redeploy/spin-down. If you must run without CockroachDB (paid plan with
-      # a disk), replace this entry with the sqlite value.
+      # redeploy/spin-down. If you must run without a hosted DB (paid plan
+      # with a disk), replace this entry with the sqlite value.
       - key: DATABASE_URL
         sync: false
       # Cron jobs (digest, github refresh, expiry) run on local time;
@@ -66,6 +66,7 @@ services:
       # Optional CockroachDB Cloud ops (agent access; unrelated to DATABASE_URL).
       - key: COCKROACH_MCP_TOKEN
         sync: false
+        # harmless to keep; only used by scripts/ccloud/* tooling
       # Email: on Render's free plan SMTP ports (25/465/587) are blocked, so use
       # RESEND_API_KEY (HTTPS API) rather than SMTP_*. Resend is already wired
       # in and preferred when set (app/config.py).
