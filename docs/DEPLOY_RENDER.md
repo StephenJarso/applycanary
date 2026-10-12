@@ -49,10 +49,13 @@ Postgres. **Neon** is the recommended pick: free forever, no credit card,
    Render prompts for:
    - `PUBLIC_BASE_URL` — your Render URL, e.g. `https://applycanary.onrender.com`
      (needed for the confirm/reset links inside emails; add after the first
-     deploy once the URL is known, then redeploy once).
+     deploy once the URL is known, then redeploy once). REQUIRED before any
+     signup — see the email-verification section below for why.
    - At least one LLM key: `GEMINI_API_KEY` (or `XAI_API_KEY`, `GROQ_API_KEY`,
      `ANTHROPIC_API_KEY`). Without one, scoring falls back to keyword-only.
-   - `RESEND_API_KEY` for email (verification, alerts, digest).
+   - `RESEND_API_KEY` for email (verification, alerts, digest). REQUIRED when
+     `REQUIRE_EMAIL_VERIFICATION` is on — see below for the lockout risk if
+     the gate is on without a mail backend.
 4. Click **Apply**. The first build takes a few minutes (frontend `npm build`
    plus the Python venv); subsequent builds cache layers and are faster.
 
@@ -84,6 +87,32 @@ true}`). `render.yaml` sets `healthCheckPath: /health`, so a deploy is only
 marked live once the scheduler has started. If the health check fails during
 deployment, open the service **Logs** tab: a boot error (bad `DATABASE_URL`,
 missing variable) shows there verbatim.
+
+## Email verification (required by the blueprint)
+
+The blueprint ships `REQUIRE_EMAIL_VERIFICATION=true`: a new signup gets no
+session until the emailed link is clicked (login then 403s with a resend
+prompt). Three rules make this safe — break any one and signups lock out
+silently:
+
+1. **A mail backend must be live.** With the gate on and no mail backend,
+   the verification email is dropped (`email.py` logs `DROPPED`) and no one
+   can ever cross the gate — the resend button fails the same way. Set
+   `RESEND_API_KEY` (free tier: 100/day, no card: resend.com → API Keys).
+2. **`PUBLIC_BASE_URL` must be set before any signup.** The verify/reset
+   links in emails are built from it (an absolute origin in `email.py`'s
+   `_link()`); without it the mail is skipped rather than sent with a dead
+   link. Set it the moment the Render URL exists, redeploy once.
+3. **Test on yourself first.** Register your own address, confirm the
+   verification mail actually arrives and the link works, THEN invite
+   others. resend's default `@resend.dev` sandbox sender only reaches the
+   inbox that owns the Resend account; verify a custom domain at
+   resend.com/domains and set `EMAIL_FROM` before sending to strangers.
+
+To turn the gate off (open signup without email confirmation), set
+`REQUIRE_EMAIL_VERIFICATION=false` in the Render environment — never commit
+that change in `render.yaml` unless you also drop the mail-backend
+requirement with it.
 
 ## Bootstrap the first admin
 
