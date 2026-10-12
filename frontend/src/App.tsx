@@ -23,7 +23,6 @@ import { useAuth } from "./context/AuthContext";
 const NAV = [
   { to: "/jobs", label: "Home", icon: "dashboard", end: true },
   { to: "/review", label: "Discovery", icon: "search" },
-  { to: "/jobs", label: "Interview", icon: "record_voice_over", end: true },
   { to: "/memory", label: "Memory", icon: "psychology" },
   { to: "/profile", label: "Profile", icon: "person" },
 ] as const;
