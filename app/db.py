@@ -23,7 +23,7 @@ import logging
 from collections.abc import Iterator
 from contextlib import contextmanager
 
-from sqlalchemy import event
+from sqlalchemy import event, text
 from sqlalchemy.engine import Engine
 from sqlalchemy.types import UserDefinedType
 from sqlmodel import Session, SQLModel, create_engine
@@ -53,9 +53,67 @@ engine: Engine = create_engine(
 )
 
 
+_is_cockroach: bool | None = None
+
+
 def is_cockroach() -> bool:
-    """True when the engine speaks the Postgres wire protocol (CockroachDB)."""
-    return engine.dialect.name == "postgresql"
+    """True when the server is actually CockroachDB, not vanilla Postgres.
+
+    Both speak the postgres dialect, so the dialect name alone cannot tell
+    them apart (this once sent Neon down the CockroachDB code path and died
+    on `USING vec_cosine_ops`). CockroachDB reports a `crdb_version` server
+    setting that Postgres lacks; probe it once and cache the answer.
+    """
+    global _is_cockroach  # noqa: PLW0603
+    if _is_cockroach is None:
+        if engine.dialect.name != "postgresql":
+            _is_cockroach = False
+        else:
+            try:
+                with engine.connect() as conn:
+                    row = conn.execute(text(
+                        "SELECT EXISTS (SELECT 1 FROM pg_settings "
+                        "WHERE name = 'crdb_version')"
+                    )).scalar()
+                _is_cockroach = bool(row)
+            except Exception:  # noqa: BLE001 - probe failure => assume vanilla
+                _is_cockroach = False
+    return _is_cockroach
+
+
+# Which vector strategy the current engine supports, discovered lazily:
+#   "cockroach" — native VECTOR + vec_cosine_ops (CockroachDB Cloud)
+#   "pgvector"  — vanilla Postgres with the pgvector extension (e.g. Neon)
+#   "python"    — embeddings as JSON, distances computed in Python (SQLite)
+_vector_backend: str | None = None
+
+
+def vector_backend() -> str:
+    """Resolve (once) which embedding storage/distance backend is in use.
+
+    Plain Postgres without pgvector degrades to "python": the columns stay
+    JSON and search runs in-process, exactly like SQLite — correct, just not
+    index-accelerated. This keeps a random free Postgres (no extension perms)
+    from breaking boot.
+    """
+    global _vector_backend  # noqa: PLW0603
+    if _vector_backend is None:
+        if engine.dialect.name == "sqlite":
+            _vector_backend = "python"
+        elif is_cockroach():
+            _vector_backend = "cockroach"
+        else:
+            try:
+                with engine.begin() as conn:
+                    conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
+                _vector_backend = "pgvector"
+            except Exception:  # noqa: BLE001 - no permission / old Postgres
+                log.warning(
+                    "postgres detected but pgvector unavailable — "
+                    "falling back to in-Python vector search"
+                )
+                _vector_backend = "python"
+    return _vector_backend
 
 
 if _url.startswith("sqlite"):
@@ -72,13 +130,14 @@ if _url.startswith("sqlite"):
 
 
 class VectorType(UserDefinedType):
-    """A float-array column backed by CockroachDB's native VECTOR type.
+    """A float-array column backed by the engine's native vector type.
 
-    On CockroachDB/Postgres this emits `VECTOR(dims)` and supports the built-in
-    distance operators (`vec_cosine_distance`, ...). On SQLite — which has no
-    vector type — values are stored as JSON text and distance is computed in
-    Python by `app.memory.vectors`. The application never needs to know which
-    strategy is in play.
+    CockroachDB emits `VECTOR(dims)`; vanilla Postgres with pgvector emits
+    `vector(dims)` (same literal syntax — both accept the `'[1,2,...]'` string
+    form, and pgvector's cosine distance is the `<=>` operator). Engines with
+    no vector type (SQLite, or Postgres without the extension) store JSON text
+    and get in-Python distances from `app.memory.vectors`. The application
+    never needs to know which strategy is in play.
     """
 
     cache_ok = True
@@ -87,8 +146,8 @@ class VectorType(UserDefinedType):
         self.dims = dims
 
     def get_col_spec(self, **kw: object) -> str:  # noqa: ARG002
-        if is_cockroach():
-            return f"VECTOR({self.dims})"
+        if vector_backend() in ("cockroach", "pgvector"):
+            return f"VECTOR({self.dims})" if is_cockroach() else f"vector({self.dims})"
         return "JSON"
 
     def bind_processor(self, dialect: object) -> object:  # noqa: ARG001
@@ -97,8 +156,8 @@ class VectorType(UserDefinedType):
                 return None
             if isinstance(value, str):
                 return value
-            if is_cockroach():
-                # CockroachDB accepts the array-literal string form.
+            if vector_backend() in ("cockroach", "pgvector"):
+                # Both accept the array-literal string form.
                 return "[" + ",".join(repr(float(v)) for v in value) + "]"
             return json.dumps(value)
 
@@ -133,27 +192,38 @@ def init_db() -> None:
 
 
 def _ensure_vector_indexes() -> None:
-    """Create the distributed vector index on CockroachDB when missing.
+    """Create the approximate-nearest-neighbour index for the active backend.
 
-    SQLite has no vector index (search falls back to Python distance). The
-    index enables approximate nearest-neighbour search in the database; without
-    it, semantic queries over millions of rows would degrade to sequential
-    scans. Both tables' embedding columns get one.
+    ``vec_cosine_ops`` on CockroachDB, ``hnsw`` + ``vector_cosine_ops`` on
+    pgvector (vanilla Postgres/Neon), and nothing on the Python fallback —
+    SQLite has no vector index, and in-process cosine is fast enough at small
+    row counts. Without an ANN index, semantic queries would degrade to
+    sequential scans. Both tables' embedding columns get one.
     """
-    if not is_cockroach():
-        return
     from sqlalchemy import text
 
-    with engine.begin() as conn:
-        conn.execute(text(
-            "CREATE INDEX IF NOT EXISTS ix_job_embedding_vec "
-            "ON job_embedding USING vec_cosine_ops (embedding)"
-        ))
-        conn.execute(text(
-            "CREATE INDEX IF NOT EXISTS ix_agent_memory_vec "
-            "ON agent_memory USING vec_cosine_ops (embedding)"
-        ))
-    log.info("cockroachdb: vector indexes ensured")
+    if is_cockroach():
+        with engine.begin() as conn:
+            conn.execute(text(
+                "CREATE INDEX IF NOT EXISTS ix_job_embedding_vec "
+                "ON job_embedding USING vec_cosine_ops (embedding)"
+            ))
+            conn.execute(text(
+                "CREATE INDEX IF NOT EXISTS ix_agent_memory_vec "
+                "ON agent_memory USING vec_cosine_ops (embedding)"
+            ))
+        log.info("cockroachdb: vector indexes ensured")
+    elif vector_backend() == "pgvector":
+        with engine.begin() as conn:
+            conn.execute(text(
+                "CREATE INDEX IF NOT EXISTS ix_job_embedding_vec "
+                "ON job_embedding USING hnsw (embedding vector_cosine_ops)"
+            ))
+            conn.execute(text(
+                "CREATE INDEX IF NOT EXISTS ix_agent_memory_vec "
+                "ON agent_memory USING hnsw (embedding vector_cosine_ops)"
+            ))
+        log.info("pgvector: hnsw cosine indexes ensured")
 
 
 # SQLite types for the column kinds the models actually use. Anything unmapped

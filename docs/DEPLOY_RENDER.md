@@ -24,12 +24,19 @@ Before deploying, know the three free-plan limitations that ApplyCanary hits
 3. **Outbound SMTP ports (25/465/587) are blocked.** Use an HTTP email API —
    the app already prefers Resend (`RESEND_API_KEY`) over SMTP when set.
 
-For durable data on the free plan, pair the web service with a managed
-database. The repo is already wired for CockroachDB Cloud (free tier):
+For durable data on the free plan, pair the web service with a hosted
+Postgres. **Neon** is the recommended pick: free forever, no credit card,
+1 GB storage per project, and pgvector support for job embeddings:
 
-```bash
-scripts/ccloud/provision.sh   # prints a DATABASE_URL — paste it in Render variables
-```
+1. Sign up at [neon.com/signup](https://neon.com/signup) and create a project.
+2. Copy the connection string — it looks like:
+
+   ```text
+   postgresql://user:password@ep-xxxx.eu-central-1.aws.neon.tech/neondb?sslmode=require
+   ```
+
+   Tip: use the **pooled** connection string (with `-pooler` in the host)
+   — Render's ephemeral workers create many short-lived connections.
 
 ## Create the service
 
@@ -49,34 +56,26 @@ scripts/ccloud/provision.sh   # prints a DATABASE_URL — paste it in Render var
 4. Click **Apply**. The first build takes a few minutes (frontend `npm build`
    plus the Python venv); subsequent builds cache layers and are faster.
 
-## Data durability: point at CockroachDB (required on free)
+## Data durability: point at Neon (required on free)
 
 Render's free tier has no persistent disk, so the SQLite file under `/data`
 would be wiped on every redeploy and spin-down. The blueprint therefore marks
 `DATABASE_URL` as `sync: false` — Render prompts for it at deploy time and you
-paste the CockroachDB connection string:
+paste the Neon connection string from the signup step above:
 
-1. Provision the cluster once (needs the `ccloud` CLI and a CockroachDB Cloud
-   service account; the free Serverless tier includes nightly backups):
-
-   ```bash
-   export CCLOUD_API_KEY=... CCLOUD_API_SECRET=...
-   ./scripts/ccloud/provision.sh
-   ```
-
-   This creates the `applycanary` cluster + database, enables nightly
-   backups, and prints the connection string to use as `DATABASE_URL`:
-
-   ```text
-   postgresql://user:password@host:26257/applycanary?sslmode=require
-   ```
-
-2. Paste that string when Render prompts for `DATABASE_URL` during blueprint
+1. Paste that string when Render prompts for `DATABASE_URL` during blueprint
    apply (or afterwards under **Environment**), then deploy. Tables are
    created automatically on first connect — no migration step is needed.
 
+2. On Neon's free plan note the two soft limits: scale-to-zero after 5 idle
+   minutes (first query after a nap costs ~0.5–1 s wake-up) and 1 GB storage
+   per project — plenty for this app's data, but uploaded resume files live
+   in `/data` on Render's ephemeral disk and still vanish on redeploy.
+
 Because the database lives outside the container, deployments and spin-downs
-no longer touch your data.
+no longer touch your **relational** data (jobs, scores, applications,
+users). File artifacts (resumes, generated CVs) are not durable on free —
+move to S3 (`S3_BUCKET` via `AWS_*`) if that becomes a problem.
 
 ## Health check
 
@@ -101,7 +100,7 @@ On the free plan there is no shell access, so run the same command against a
 local checkout that points at the same database:
 
 ```bash
-DATABASE_URL=postgresql://user:password@host:26257/applycanary?sslmode=require \
+DATABASE_URL=postgresql://user:password@ep-xxxx-pooler.eu-central-1.aws.neon.tech/neondb?sslmode=require \
 BOOTSTRAP_EMAIL=you@example.com \
 BOOTSTRAP_PASSWORD="use-a-long-password" \
 .venv/bin/python scripts/bootstrap_admin.py
@@ -114,9 +113,10 @@ additional invite links.
 ## Deploy updates & keep-warm
 
 - Every push to the connected branch auto-deploys.
-- To stop spin-downs, point a free uptime pinger at `https://<your-url>/health`
-  every 10 minutes. Watch the **Monthly Free Instance Hours** meter in the
-  dashboard: one always-on service is ~744 h/month against a 750 h allowance.
+- To stop spin-downs, point a free uptime pinger such as cron-job.org at
+  `https://<your-url>/health` every 10 minutes. Watch the **Monthly Free
+  Instance Hours** meter in the dashboard: one always-on service is ~744
+  h/month against a 750 h allowance.
 - Verify after each deploy:
 
   ```bash
