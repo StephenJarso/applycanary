@@ -2527,17 +2527,23 @@ input[type="range"]::-moz-range-thumb {
 /* ------------------------------------------------------------------------- */
 
 /* The hero grid collapses to a centred card when hosting the auth panel, so
- * the form replaces marketing content at the same spot on the page. */
+ * the form replaces marketing content at the same spot on the page. Base
+ * `.landing-hero` is overridden wholesale here so the panel is truly centred
+ * in both axes regardless of the marketing grid's two-column sizing. */
 .landing-hero-auth {
-  min-height: 70vh;
-  display: grid;
-  place-items: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 78vh;
   padding: 48px 16px;
+  margin: 0;
+  max-width: none;
 }
 
 .auth-panel {
   position: relative;
   width: min(420px, 100%);
+  margin: 0 auto;
   background: var(--ac-surface-card, #fff);
   border: 1px solid var(--ac-outline-variant, #e3e3e3);
   border-radius: 16px;
