@@ -1,0 +1,78 @@
+# Render Blueprint — ApplyCanary
+#
+# Deploy with: Dashboard → New → Blueprint → pick this repo
+# (or `render blueprint launch` from the CLI). See docs/DEPLOY_RENDER.md.
+#
+# The service runs the repo's multi-stage Dockerfile, which builds the React
+# bundle and the Python venv and serves both from one process — same image as
+# docker-compose.yml and the Railway setup. No explicit port config is needed:
+# Render detects the listening port from the PORT env var automatically.
+#
+# NOTE on the free plan: Free web services cannot attach persistent disks and
+# spin down after 15 idle minutes. Point DATABASE_URL at a managed database
+# (CockroachDB Cloud free tier) so data survives; the scheduler sleeps while
+# the service is spun down unless you keep it warm (see DEPLOY_RENDER.md).
+
+services:
+  - type: web
+    name: applycanary
+    runtime: docker
+    plan: free
+    healthCheckPath: /health
+    # Dockerfile is auto-detected at the repo root; nothing to override.
+    envVars:
+      - key: HOST
+        value: 0.0.0.0
+      - key: PORT
+        value: 8000
+      - key: DATA_DIR
+        value: /data
+      # Data durability: run scripts/ccloud/provision.sh once (needs
+      # CCLOUD_API_KEY/CCLOUD_API_SECRET), which creates the free CockroachDB
+      # Serverless cluster, database and nightly backups and prints a
+      # connection string. Paste that string at deploy time (`sync: false` —
+      # it contains the DB password and must not live in a committed file).
+      # Format: postgresql://user:password@host:26257/applycanary?sslmode=require
+      # Tables are created automatically on first connect.
+      #
+      # DO NOT fall back to SQLite here: Render's free tier has no persistent
+      # volume, so sqlite:////data/applycanary.db would be wiped on every
+      # redeploy/spin-down. If you must run without CockroachDB (paid plan with
+      # a disk), replace this entry with the sqlite value.
+      - key: DATABASE_URL
+        sync: false
+      # Cron jobs (digest, github refresh, expiry) run on local time;
+      # containers default to UTC.
+      - key: TZ
+        value: Africa/Nairobi
+      # Redeploys regenerate the cookie-nonce and log every user out when this
+      # changes. generateValue creates a random secret once and keeps it.
+      - key: SECRET_KEY
+        generateValue: true
+      - key: ENABLE_SCHEDULER
+        value: "true"
+      # Safety gate stays off until dry-run submissions have been reviewed.
+      - key: ENABLE_AUTO_SUBMIT
+        value: "false"
+      # Links inside emails (verify/reset) need an absolute origin. Set this to
+      # your Render URL (e.g. https://applycanary.onrender.com) after the first
+      # deploy, then redeploy once so it takes effect.
+      - key: PUBLIC_BASE_URL
+        sync: false
+      # LLM provider for scoring/tailoring — at least one is needed for smart
+      # scoring (GEMINI_API_KEY, XAI_API_KEY, GROQ_API_KEY, ANTHROPIC_API_KEY…).
+      - key: GEMINI_API_KEY
+        sync: false
+      # Optional CockroachDB Cloud ops (agent access; unrelated to DATABASE_URL).
+      - key: COCKROACH_MCP_TOKEN
+        sync: false
+      # Email: on Render's free plan SMTP ports (25/465/587) are blocked, so use
+      # RESEND_API_KEY (HTTPS API) rather than SMTP_*. Resend is already wired
+      # in and preferred when set (app/config.py).
+      - key: RESEND_API_KEY
+        sync: false
+      - key: EMAIL_FROM
+        value: ApplyCanary@resend.dev
+      # Optional: prefill a shared signup code while on open registration.
+      - key: DEFAULT_INVITE_CODE
+        sync: false
