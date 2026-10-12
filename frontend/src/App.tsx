@@ -9,8 +9,6 @@ import Review from "./pages/Review";
 import Applications from "./pages/Applications";
 import Sources from "./pages/Sources";
 import ProfilePage from "./pages/Profile";
-import Login from "./pages/Login";
-import Register from "./pages/Register";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import VerifyEmail from "./pages/VerifyEmail";
@@ -156,11 +154,14 @@ export default function App() {
   const { user, loading } = useAuth();
   if (loading) return <div className="empty">Loading session…</div>;
   return <Routes>
-    {/* Signed-out visitors get the marketing page at /, not a login wall. */}
+    {/* Signed-out visitors get the marketing page at /, not a login wall.
+        Login and Register are now inline panels of that page (mode chosen via
+        ?mode=); the standalone pages keep their routes as redirects so old
+        links, bookmarks and emailed tokens keep landing on the same spot. */}
     <Route path="/" element={user ? <Navigate to="/jobs" replace /> : <Landing />} />
-    <Route path="/login" element={user ? <Navigate to="/jobs" replace /> : <Login />} />
+    <Route path="/login" element={<Navigate to="/?mode=login" replace />} />
     <Route path="/guest" element={<GuestJobs />} />
-    <Route path="/register" element={user ? <Navigate to="/jobs" replace /> : <Register />} />
+    <Route path="/register" element={<Navigate to="/?mode=register" replace />} />
     {/* Public regardless of session: these are opened from an email, and the
         link must not be swallowed by a redirect to /login. Confirming an
         address is also something a signed-in user does. */}

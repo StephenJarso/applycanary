@@ -1,17 +1,24 @@
-import { Link } from "react-router-dom";
+import { useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
+import AuthPanel, { type AuthMode } from "./AuthPanel";
 
 /**
- * Public marketing page — rebuilt against the "landing_page/screen.png" design
- * pack mockup (canary-career-spark.lovable.app). Signed-out visitors land here
- * instead of a login wall. Layout:
+ * Public marketing page with an embedded auth panel. Signed-out visitors land
+ * here instead of a login wall; clicking Login / Sign-Up swaps the hero for an
+ * inline auth form on THIS same route (mode state, no navigation). Modes:
+ *
+ *   marketing (default)  — nav/hero/CTA/footer, buttons open a panel
+ *   ?mode=login          — login form inline
+ *   ?mode=register       — registration form inline
+ *
+ * Old /login and /register URLs redirect here in App.tsx (with ?mode=), so
+ * bookmarks and emailed links keep working. Layout in marketing mode:
  *
  *   1. Top nav      — brand + anchor links + login/signup
  *   2. Hero         — yellow "Powered by Advanced AI" pill, headline, CTA
  *   3. Bento grid   — Find Jobs / Tailor CVs / Score Roles / AI Interview Studio
  *   4. Infrastructure — "Powered by CockroachDB" + distributed-vector blurb
  *   5. Footer
- *
- * Everything links into the existing auth routes; no state, no fetches.
  */
 
 const NAV_ANCHORS = [
@@ -21,6 +28,13 @@ const NAV_ANCHORS = [
 ] as const;
 
 export default function Landing() {
+  // The nav's Login / Sign-Up buttons swap the page between marketing mode
+  // and an embedded auth panel (same URL). ?mode=login|register deep-links
+  // into a panel from anywhere (old /login bookmarks land on /?mode=login).
+  const [params] = useSearchParams();
+  const initial = params.get("mode") === "register" ? "register" : params.get("mode") === "login" ? "login" : null;
+  const [panel, setPanel] = useState<AuthMode | null>(initial);
+
   return (
     <div className="landing">
       <header className="landing-nav">
@@ -34,13 +48,30 @@ export default function Landing() {
             ))}
           </nav>
           <div className="landing-nav-actions">
-            <Link to="/login" className="landing-login">Login</Link>
-            <Link to="/register" className="btn-primary landing-signup">Sign Up</Link>
+            {panel === null ? (
+              <>
+                <button type="button" className="landing-login" onClick={() => setPanel("login")}>Login</button>
+                <button type="button" className="btn-primary landing-signup" onClick={() => setPanel("register")}>Sign Up</button>
+              </>
+            ) : (
+              <button type="button" className="landing-login" onClick={() => setPanel(null)}>Back</button>
+            )}
           </div>
         </div>
       </header>
 
       <main>
+        {/* ------------------------------------------------ Auth panel mode */}
+        {panel !== null ? (
+          <section className="landing-hero landing-hero-auth">
+            <AuthPanel
+              mode={panel}
+              onModeChange={(m) => setPanel(m)}
+              onClose={() => setPanel(null)}
+            />
+          </section>
+        ) : (
+        <>
         {/* ------------------------------------------------ Hero */}
         <section className="landing-hero">
           <div className="landing-hero-copy">
@@ -60,10 +91,10 @@ export default function Landing() {
               it with market demands, and proactively secures interviews for roles
               you actually want.
             </p>
-            <Link to="/register" className="btn-primary landing-cta">
+            <button type="button" className="btn-primary landing-cta" onClick={() => setPanel("register")}>
               Get Started
               <span className="material-symbols-outlined" aria-hidden="true">arrow_forward</span>
-            </Link>
+            </button>
           </div>
 
           {/* Static recreation of the mockup's hero art: a glowing neural
@@ -214,25 +245,30 @@ export default function Landing() {
           </div>
         </section>
 
-        {/* ------------------------------------------------ Closing CTA */}
+        {/* Closing CTA swaps panel instead of linking away */}
         <section className="landing-closing">
           <h2>Your next interview is already posted.</h2>
           <p>Let the canary find it — and get you ready to sing.</p>
           <div className="landing-cta-row landing-cta-row-center">
-            <Link to="/register" className="btn-ai landing-cta">Create free account</Link>
+            <button type="button" className="btn-ai landing-cta" onClick={() => setPanel("register")}>
+              Create free account
+            </button>
             <Link to="/guest" className="landing-cta-secondary landing-cta-secondary-dark">
               Browse jobs as guest
               <span className="material-symbols-outlined" aria-hidden="true">arrow_forward</span>
             </Link>
           </div>
         </section>
+        </>
+        )
+        }
       </main>
 
       <footer className="landing-footer">
         <span>© {new Date().getFullYear()} ApplyCanary. Professional Career Agent.</span>
         <span className="landing-footer-links">
-          <Link to="/login">Sign in</Link>
-          <Link to="/register">Create account</Link>
+          <Link to="/?mode=login">Sign in</Link>
+          <Link to="/?mode=register">Create account</Link>
           <Link to="/guest">Guest mode</Link>
         </span>
       </footer>
