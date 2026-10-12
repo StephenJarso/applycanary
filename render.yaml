@@ -54,11 +54,23 @@ services:
       # Safety gate stays off until dry-run submissions have been reviewed.
       - key: ENABLE_AUTO_SUBMIT
         value: "false"
-      # Links inside emails (verify/reset) need an absolute origin. Set this to
-      # your Render URL (e.g. https://applycanary.onrender.com) after the first
-      # deploy, then redeploy once so it takes effect.
+      # Links inside emails (verify/reset) need an absolute origin. Set this
+      # to your Render URL (e.g. https://applycanary.onrender.com) after the
+      # first deploy, then redeploy once so it takes effect. Since
+      # REQUIRE_EMAIL_VERIFICATION below is on, this MUST be set before any
+      # signup happens — without it the verification email is skipped rather
+      # than sent with a dead link, and the pinned signup is stuck at the
+      # gate (that failure is silent).
       - key: PUBLIC_BASE_URL
         sync: false
+      # Require a verified email before any sign-in gets a session (register
+      # returns session_started=false; login 403s with a resend prompt until
+      # the emailed link is clicked). Turning this on REQUIRES a mail backend
+      # (RESEND_API_KEY or SMTP): with the gate on and no mail backend, every
+      # signup is locked out and the resend path fails silently. Verify a
+      # confirmation mail arrives for your own address before inviting others.
+      - key: REQUIRE_EMAIL_VERIFICATION
+        value: "true"
       # LLM provider for scoring/tailoring — at least one is needed for smart
       # scoring (GEMINI_API_KEY, XAI_API_KEY, GROQ_API_KEY, ANTHROPIC_API_KEY…).
       - key: GEMINI_API_KEY
@@ -68,12 +80,15 @@ services:
         sync: false
         # harmless to keep; only used by scripts/ccloud/* tooling
       # Email: on Render's free plan SMTP ports (25/465/587) are blocked, so use
-      # RESEND_API_KEY (HTTPS API) rather than SMTP_*. Resend is already wired
-      # in and preferred when set (app/config.py).
+      # RESEND_API_KEY (HTTPS API) rather than SMTP_*. Required when
+      # REQUIRE_EMAIL_VERIFICATION is on (see that block above).
       - key: RESEND_API_KEY
         sync: false
       - key: EMAIL_FROM
         value: ApplyCanary@resend.dev
+        # For production deliveries: verify a domain at resend.com/domains and
+        # change this to a real sender, e.g. "ApplyCanary <noreply@your-domain>".
+        # The default @resend.dev sandbox sender only reaches YOUR inbox.
       # Optional: prefill a shared signup code while on open registration.
       - key: DEFAULT_INVITE_CODE
         sync: false
