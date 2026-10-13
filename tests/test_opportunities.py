@@ -11,6 +11,8 @@ endpoint test, and the parser tests are pure functions over fixtures.
 
 from __future__ import annotations
 
+import asyncio
+import time
 from datetime import UTC, datetime, timedelta, timezone
 
 import pytest
@@ -296,3 +298,62 @@ def test_feed_failure_never_fails_the_endpoint(client, monkeypatch):
     assert body["events_live"] is False
     assert body["items"], "paid programs must survive a total feed outage"
     assert {i["kind"] for i in body["items"]} == {"Paid program"}
+
+
+def test_endpoint_waits_at_most_bounded_for_a_slow_feed(client, monkeypatch):
+    """A stalled third-party feed degrades the response instead of pinning the page.
+
+    Render learned this the hard way: from a US datacenter the whole cold
+    fetch (index timeout + detail waves) outlasted the platform's request
+    patience, and the visitor watched the page spin until the browser gave
+    up. The request side must cap its wait and answer with the programs and
+    `events_live=False` instead.
+    """
+    monkeypatch.setattr("app.opportunities._feed", Feed())
+    monkeypatch.setattr("app.opportunities.COLD_WAIT", 0.5)
+
+    async def stall() -> tuple[list[dict], datetime]:
+        await asyncio.sleep(60)
+        raise AssertionError("must not complete")  # pragma: no cover
+
+    monkeypatch.setattr("app.opportunities._fetch_feed", stall)
+
+    started = time.monotonic()
+    res = client.get("/api/public/opportunities")
+    elapsed = time.monotonic() - started
+
+    assert res.status_code == 200
+    assert res.json()["events_live"] is False
+    assert res.json()["items"], "programs still serve while events are unknown"
+    assert elapsed < 5
+
+
+def test_a_timed_out_fetch_gates_followup_requests(client, monkeypatch):
+    """The attempt is stamped at fetch start, so retries share the TTL.
+
+    Otherwise every page view during an outage would restart a doomed cold
+    fetch and burn the COLD_WAIT cap once more.
+    """
+    monkeypatch.setattr("app.opportunities._feed", Feed())
+    monkeypatch.setattr("app.opportunities.COLD_WAIT", 0.5)
+
+    async def stall() -> tuple[list[dict], datetime]:
+        await asyncio.sleep(60)
+        raise AssertionError("must not complete")  # pragma: no cover
+
+    monkeypatch.setattr("app.opportunities._fetch_feed", stall)
+
+    started = time.monotonic()
+    res1 = client.get("/api/public/opportunities")
+    after_first = time.monotonic() - started
+
+    again = time.monotonic()
+    res2 = client.get("/api/public/opportunities")
+    second_cost = time.monotonic() - again
+
+    assert res1.status_code == res2.status_code == 200
+    assert res2.json()["events_live"] is False
+    assert after_first < 5
+    # The fast path answers from memory in milliseconds; a restarted slow
+    # fetch would cost the full (capped) 0.5 s wait.
+    assert second_cost < 0.45
