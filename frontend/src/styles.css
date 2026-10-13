@@ -2508,24 +2508,23 @@ input[type="range"]::-moz-range-thumb {
 .landing-footer-links a:hover { color: var(--text); text-decoration: underline; }
 
 /* ------------------------------------------------------------------------- */
-/* Auth panel floating over the landing page (mode swap, no separate routes) */
+/* Auth panel embedded in the hero (mode swap, no separate routes)           */
 /* ------------------------------------------------------------------------- */
 
-/* A backdrop dims the marketing page while the form floats above it, pinned
- * top-left just below the sticky nav — the visitor still sees the page they
- * were reading (this is one page, not a route change), and the Login/Sign-Up
- * buttons that opened the panel sit right beside it. */
-.landing-auth-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 60; /* above the nav's z-10; the close button and a backdrop click are the way back */
-  background: rgba(10, 10, 12, 0.45);
+/* The auth card takes the hero's copy slot — top-left, beside the computer
+ * art — and is part of the page flow: no backdrop, no floating popup. The
+ * page below the hero (features, infrastructure, footer) is ordinary
+ * marketing content either way. */
+.landing-hero-auth {
   display: flex;
-  align-items: flex-start;
   justify-content: flex-start;
-  /* Clears the sticky nav (~60px tall incl. border): the card anchors below
-     it, not over it. The nav itself dims under the backdrop. */
-  padding: 68px 24px 24px;
+  align-items: flex-start;
+  padding: 12px 0;
+}
+@media (max-width: 900px) {
+  /* On the collapsed single-column hero the art would sit between the form
+     and the features below it; hide it while the form is open. */
+  .landing-hero-auth ~ .landing-hero-art { display: none; }
 }
 
 .auth-panel {
