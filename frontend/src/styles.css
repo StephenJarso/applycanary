@@ -2538,22 +2538,6 @@ input[type="range"]::-moz-range-thumb {
   gap: 10px;
 }
 
-.auth-panel-close {
-  position: absolute;
-  top: 12px;
-  right: 12px;
-  width: 32px;
-  height: 32px;
-  display: grid;
-  place-items: center;
-  border: 0;
-  border-radius: 8px;
-  background: transparent;
-  color: var(--ac-on-surface-variant, #6b6b6b);
-  cursor: pointer;
-}
-.auth-panel-close:hover { background: var(--ac-surface-hover, #f4f4f4); color: var(--ac-on-surface, #272727); }
-
 .auth-panel-title {
   margin: 0;
   font-size: 24px;
