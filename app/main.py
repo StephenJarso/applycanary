@@ -173,8 +173,6 @@ def create_app() -> FastAPI:
                 "/api/auth/verify-email-change",
             )
             or path.startswith("/assets/")
-            or path == "/guest"
-            or path.startswith("/guest/")
             # Public pages linked from the landing page: they carry no user
             # data, so a signed-out visitor must reach them instead of being
             # bounced to the login wall (their data comes from /api/public/*).

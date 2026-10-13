@@ -12,7 +12,6 @@ import ProfilePage from "./pages/Profile";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import VerifyEmail from "./pages/VerifyEmail";
-import GuestJobs from "./pages/GuestJobs";
 import Landing from "./pages/Landing";
 import Opportunities from "./pages/Opportunities";
 import { useAuth } from "./context/AuthContext";
@@ -163,7 +162,6 @@ export default function App() {
         links, bookmarks and emailed tokens keep landing on the same spot. */}
     <Route path="/" element={user ? <Navigate to="/jobs" replace /> : <Landing />} />
     <Route path="/login" element={<Navigate to="/?mode=login" replace />} />
-    <Route path="/guest" element={<GuestJobs />} />
     <Route path="/register" element={<Navigate to="/?mode=register" replace />} />
     {/* Public regardless of session, like the landing page: the design's
         events & paid programs screen carries its own header and back link,
