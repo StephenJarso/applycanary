@@ -11,7 +11,7 @@ endpoint test, and the parser tests are pure functions over fixtures.
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta, timezone
 
 import pytest
 from fastapi.testclient import TestClient
@@ -211,7 +211,7 @@ def test_endpoint_serves_events_and_programs_sorted_by_deadline(client, monkeypa
         return Feed(
             items=[event],
             fetched_at=1.0,
-            fetched_at_wall=datetime(2026, 10, 13, 9, 0, tzinfo=timezone.utc),
+            fetched_at_wall=datetime(2026, 10, 13, 9, 0, tzinfo=UTC),
             attempted_at=1.0,
             ok=True,
         )
@@ -259,7 +259,7 @@ def test_endpoint_flags_a_stale_event_list(client, monkeypatch):
         return Feed(
             items=[_event_item()],
             fetched_at=1.0,
-            fetched_at_wall=datetime(2026, 10, 12, 9, 0, tzinfo=timezone.utc),
+            fetched_at_wall=datetime(2026, 10, 12, 9, 0, tzinfo=UTC),
             attempted_at=2.0,
             ok=False,
         )
