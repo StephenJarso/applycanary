@@ -3,10 +3,10 @@ import { Link, useSearchParams } from "react-router-dom";
 import AuthPanel, { type AuthMode } from "./AuthPanel";
 
 /**
- * Public marketing page with a floating auth card. Signed-out visitors land
- * here instead of a login wall; clicking Login / Sign-Up floats the auth form
- * over THIS same page, pinned top-left (mode state, no navigation, marketing
- * content stays visible underneath). Modes:
+ * Public marketing page with an embedded auth form. Signed-out visitors land
+ * here instead of a login wall; clicking Login / Sign-Up swaps the hero's
+ * copy slot for the auth form — in the page flow next to the hero art, on
+ * THIS same route (mode state, no navigation, no popup). Modes:
  *
  *   marketing (default)  — nav/hero/CTA/footer, buttons float the panel
  *   ?mode=login          — login card over the landing page
@@ -64,6 +64,19 @@ export default function Landing() {
       <main>
         {/* ------------------------------------------------ Hero */}
         <section className="landing-hero">
+          {/* The hero's left slot swaps the marketing copy for the auth card
+              while Login/Sign-Up is open: the form lives in the page flow,
+              beside the computer art — part of the landing page, not a
+              popup or overlay over it. */}
+          {panel !== null ? (
+          <div className="landing-hero-auth">
+            <AuthPanel
+              mode={panel}
+              onModeChange={(m) => setPanel(m)}
+              onClose={() => setPanel(null)}
+            />
+          </div>
+          ) : (
           <div className="landing-hero-copy">
             <span className="landing-eyebrow">
               <span className="material-symbols-outlined" aria-hidden="true">graphic_eq</span>
@@ -94,6 +107,7 @@ export default function Landing() {
               </Link>
             </div>
           </div>
+          )}
 
           {/* Static recreation of the mockup's hero art: a glowing neural
               "memory" core orbiting a laptop, on a soft stage. */}
@@ -254,23 +268,6 @@ export default function Landing() {
           </div>
         </section>
 
-        {/* ------------------------------------------------ Auth overlay
-
-            The panel floats over this same page instead of replacing it:
-            marketing stays rendered underneath (dimmed by the backdrop), so
-            opening Login/Sign-Up is a state change, not a new page. */}
-        {panel !== null && (
-          <div
-            className="landing-auth-overlay"
-            onClick={(e) => { if (e.target === e.currentTarget) setPanel(null); }}
-          >
-            <AuthPanel
-              mode={panel}
-              onModeChange={(m) => setPanel(m)}
-              onClose={() => setPanel(null)}
-            />
-          </div>
-        )}
       </main>
 
       <footer className="landing-footer">
