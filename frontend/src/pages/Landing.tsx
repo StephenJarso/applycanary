@@ -134,6 +134,36 @@ export default function Landing() {
           )}
         </section>
 
+        {/* ------------------------------------------------ How it works
+
+            Real anchor target for the nav's "How it Works" link: the hero
+            CTA promised it and the marketing copy described it, but no such
+            section existed, so the link did nothing. Three steps, plain
+            cards so the whole strip stacks cleanly on a phone. */}
+        <section className="landing-section" id="how-it-works" aria-labelledby="landing-how-h">
+          <h2 id="landing-how-h" className="landing-section-title">How it works</h2>
+          <p className="landing-section-sub">
+            Three steps from browsing to interview-ready.
+          </p>
+          <div className="landing-steps">
+            <article className="landing-step">
+              <span className="landing-step-no" aria-hidden="true">1</span>
+              <h3>Connect your profile</h3>
+              <p>Drop in your resume and target roles — the canary learns what you want.</p>
+            </article>
+            <article className="landing-step">
+              <span className="landing-step-no" aria-hidden="true">2</span>
+              <h3>Get matched &amp; tailored</h3>
+              <p>Postings are scored against your resume, and your CV is rewritten per job.</p>
+            </article>
+            <article className="landing-step">
+              <span className="landing-step-no" aria-hidden="true">3</span>
+              <h3>Practice &amp; land it</h3>
+              <p>Run AI mock interviews with real speech, then apply with confidence.</p>
+            </article>
+          </div>
+        </section>
+
         {/* ------------------------------------------------ Features (bento) */}
         <section className="landing-section" id="features" aria-labelledby="landing-features-h">
           <h2 id="landing-features-h" className="landing-section-title">Intelligent Features</h2>
