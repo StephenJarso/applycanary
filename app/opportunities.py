@@ -572,7 +572,7 @@ async def _fetch_feed() -> tuple[list[dict], datetime]:
         results = await asyncio.gather(*(enrich(card) for card in cards))
         items = [
             _to_item(card, detail if isinstance(detail, DetailEvent) else None)
-            for card, detail in zip(cards, results)
+            for card, detail in zip(cards, results, strict=True)
         ]
     return items, datetime.now().astimezone()
 
