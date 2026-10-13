@@ -261,10 +261,6 @@ export default function Landing() {
             <button type="button" className="btn-ai landing-cta" onClick={() => setPanel("register")}>
               Create free account
             </button>
-            <Link to="/guest" className="landing-cta-secondary landing-cta-secondary-dark">
-              Browse jobs as guest
-              <span className="material-symbols-outlined" aria-hidden="true">arrow_forward</span>
-            </Link>
           </div>
         </section>
         </>
@@ -278,7 +274,6 @@ export default function Landing() {
           <Link to="/opportunities">Events &amp; programs</Link>
           <Link to="/?mode=login">Sign in</Link>
           <Link to="/?mode=register">Create account</Link>
-          <Link to="/guest">Guest mode</Link>
         </span>
       </footer>
     </div>
