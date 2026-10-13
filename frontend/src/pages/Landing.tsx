@@ -36,6 +36,15 @@ export default function Landing() {
   const [params] = useSearchParams();
   const initial = params.get("mode") === "register" ? "register" : params.get("mode") === "login" ? "login" : null;
   const [panel, setPanel] = useState<AuthMode | null>(initial);
+  // The card lives in the hero at the top of the page. The nav is sticky, so
+  // it stays visible when the visitor has scrolled down — but the form does
+  // not. Every open/switch therefore scrolls the window back up so the
+  // auth form is actually in view wherever the click came from. The card
+  // itself has no close affordance: it stays open until sign-in.
+  const openPanel = (mode: AuthMode) => {
+    setPanel(mode);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
 
   return (
     <div className="landing">
@@ -50,14 +59,10 @@ export default function Landing() {
             ))}
           </nav>
           <div className="landing-nav-actions">
-            {panel === null ? (
-              <>
-                <button type="button" className="landing-login" onClick={() => setPanel("login")}>Login</button>
-                <button type="button" className="btn-primary landing-signup" onClick={() => setPanel("register")}>Sign Up</button>
-              </>
-            ) : (
-              <button type="button" className="landing-login" onClick={() => setPanel(null)}>Back</button>
-            )}
+            {/* Always shown — no Back state: clicking an already-open mode
+                just scrolls the visitor back up to the form. */}
+            <button type="button" className="landing-login" onClick={() => openPanel("login")}>Login</button>
+            <button type="button" className="btn-primary landing-signup" onClick={() => openPanel("register")}>Sign Up</button>
           </div>
         </div>
       </header>
@@ -83,7 +88,7 @@ export default function Landing() {
               you actually want.
             </p>
             <div className="landing-cta-row">
-              <button type="button" className="btn-primary landing-cta" onClick={() => setPanel("register")}>
+              <button type="button" className="btn-primary landing-cta" onClick={() => openPanel("register")}>
                 Get Started
                 <span className="material-symbols-outlined" aria-hidden="true">arrow_forward</span>
               </button>
@@ -103,8 +108,7 @@ export default function Landing() {
           <div className="landing-hero-auth">
             <AuthPanel
               mode={panel}
-              onModeChange={(m) => setPanel(m)}
-              onClose={() => setPanel(null)}
+              onModeChange={(m) => openPanel(m)}
             />
           </div>
           ) : (
@@ -260,7 +264,7 @@ export default function Landing() {
           <h2>Your next interview is already posted.</h2>
           <p>Let the canary find it — and get you ready to sing.</p>
           <div className="landing-cta-row landing-cta-row-center">
-            <button type="button" className="btn-ai landing-cta" onClick={() => setPanel("register")}>
+            <button type="button" className="btn-ai landing-cta" onClick={() => openPanel("register")}>
               Create free account
             </button>
           </div>

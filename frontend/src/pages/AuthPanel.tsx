@@ -19,11 +19,9 @@ interface Props {
   mode: AuthMode;
   /** Flip between login and register without leaving the page. */
   onModeChange: (mode: AuthMode) => void;
-  /** Close the panel and show marketing again. */
-  onClose: () => void;
 }
 
-export default function AuthPanel({ mode, onModeChange, onClose }: Props) {
+export default function AuthPanel({ mode, onModeChange }: Props) {
   const { login, register } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -88,9 +86,6 @@ export default function AuthPanel({ mode, onModeChange, onClose }: Props) {
   if (awaitingConfirmation) {
     return (
       <div className="auth-panel">
-        <button type="button" className="auth-panel-close" onClick={onClose} aria-label="Back to page">
-          <span className="material-symbols-outlined">close</span>
-        </button>
         <div className="auth-mark" aria-hidden="true">✉</div>
         <h1 className="auth-panel-title">Check your inbox</h1>
         <p className="auth-panel-sub">
@@ -109,10 +104,6 @@ export default function AuthPanel({ mode, onModeChange, onClose }: Props) {
 
   return (
     <form className="auth-panel auth-inline" onSubmit={submit}>
-      <button type="button" className="auth-panel-close" onClick={onClose} aria-label="Back to page">
-        <span className="material-symbols-outlined">close</span>
-      </button>
-
       <div className="auth-mark" aria-hidden="true">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <rect x="2" y="7" width="20" height="14" rx="2" />
