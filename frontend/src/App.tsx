@@ -14,15 +14,19 @@ import ResetPassword from "./pages/ResetPassword";
 import VerifyEmail from "./pages/VerifyEmail";
 import GuestJobs from "./pages/GuestJobs";
 import Landing from "./pages/Landing";
+import Opportunities from "./pages/Opportunities";
 import { useAuth } from "./context/AuthContext";
 
 // Side nav per the design pack (dashboard_1/job_discovery_1 code.html):
 // Home, Discovery, Interview, Memory, Profile — with Material Symbols matching
 // the mockups. Interview routes per-job (JobDetail → AI Interview), so the nav
-// item simply lands on Jobs.
+// item simply lands on Jobs. Opportunities is the public events & paid
+// programs page, so it lives outside the shell (see App() below) but is still
+// one click away from here.
 const NAV = [
   { to: "/jobs", label: "Home", icon: "dashboard", end: true },
   { to: "/review", label: "Discovery", icon: "search" },
+  { to: "/opportunities", label: "Programs", icon: "event", end: true },
   { to: "/memory", label: "Memory", icon: "psychology" },
   { to: "/profile", label: "Profile", icon: "person" },
 ] as const;
@@ -161,6 +165,11 @@ export default function App() {
     <Route path="/login" element={<Navigate to="/?mode=login" replace />} />
     <Route path="/guest" element={<GuestJobs />} />
     <Route path="/register" element={<Navigate to="/?mode=register" replace />} />
+    {/* Public regardless of session, like the landing page: the design's
+        events & paid programs screen carries its own header and back link,
+        so it renders outside the dashboard shell (signed-in users reach it
+        from the sidebar). */}
+    <Route path="/opportunities" element={<Opportunities />} />
     {/* Public regardless of session: these are opened from an email, and the
         link must not be swallowed by a redirect to /login. Confirming an
         address is also something a signed-in user does. */}

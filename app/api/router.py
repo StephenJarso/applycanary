@@ -107,6 +107,38 @@ class ReviewListOut(BaseModel):
     total: int
 
 
+class OpportunityOut(BaseModel):
+    """One listing on the public Events & paid programs page.
+
+    Mirrors the dicts `app/opportunities.py` builds: live events from the TGK
+    calendar plus the curated paid programs. `kind` decides whether the card
+    counts down to an event date or to an application deadline.
+    """
+
+    kind: Literal["Event", "Paid program"]
+    title: str
+    org: str
+    when: str
+    city: str
+    tags: list[str] = Field(default_factory=list)
+    source: str
+    url: str
+    desc: str = ""
+    date: str = ""  # ISO event date; "" when only a printed date was available
+    opens: str | None = None  # application window, paid programs only
+    closes: str | None = None
+    steps: list[str] | None = None
+    stipend: str | None = None
+
+
+class OpportunitiesOut(BaseModel):
+    items: list[OpportunityOut]
+    # False when the live event feed could not be refreshed: the items are the
+    # last good list (or programs only), and the UI should say so.
+    events_live: bool
+    events_updated_at: datetime | None = None
+
+
 class ProfileOut(BaseModel):
     full_name: str = ""
     email: str = ""
@@ -383,6 +415,20 @@ def public_jobs(
             "posted_at": job.posted_at, "first_seen_at": job.first_seen_at,
         } for job in rows], "total": len(rows), "sources": sources,
     }
+
+@router.get("/public/opportunities", response_model=OpportunitiesOut)
+async def public_opportunities() -> OpportunitiesOut:
+    """Live events + curated paid programs for the public Opportunities page.
+
+    Public like /public/jobs: the page is linked from the landing page and
+    carries no user data, so it must answer before anyone signs in. The event
+    feed is cached upstream in `app.opportunities` and degrades to the last
+    good list rather than failing the request.
+    """
+    from app.opportunities import get_opportunities
+
+    return OpportunitiesOut(**await get_opportunities())
+
 
 @router.get("/jobs", response_model=JobListOut)
 def list_jobs(
