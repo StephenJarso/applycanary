@@ -2516,15 +2516,12 @@ input[type="range"]::-moz-range-thumb {
  * page below the hero (features, infrastructure, footer) is ordinary
  * marketing content either way. */
 .landing-hero-auth {
+  /* Occupies the hero's right (art) column; the card sits on the copy's
+     midline so the swap reads as an even trade of content. */
   display: flex;
   justify-content: flex-start;
-  align-items: flex-start;
-  padding: 12px 0;
-}
-@media (max-width: 900px) {
-  /* On the collapsed single-column hero the art would sit between the form
-     and the features below it; hide it while the form is open. */
-  .landing-hero-auth ~ .landing-hero-art { display: none; }
+  align-items: center;
+  padding: 0;
 }
 
 .auth-panel {
