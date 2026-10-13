@@ -48,6 +48,13 @@ STALE_TTL = 24 * 3600.0      # how long a broken feed keeps serving old events
 ENRICH_CONCURRENCY = 4       # parallel detail requests; be a polite guest
 REQUEST_TIMEOUT = 20.0
 MAX_EVENTS = 40
+# Worst case for one cold fetch: a 20 s index timeout + ceil(MAX_EVENTS/4)
+# waves of 20 s detail timeouts ≈ 3.5 min. No visitor waits inside that — a
+# first page load verifies the cache cold for at most COLD_WAIT and then
+# serves the programs with a degraded banner while the fetch completes in
+# the background (boot warm-up + the 15-min scheduler job). Render's edge
+# and browsers both cut stalled responses well before one minute.
+COLD_WAIT = 15.0
 
 
 # ------------------------------------------------------------- paid programs
@@ -592,6 +599,18 @@ async def refresh_events(force: bool = False) -> Feed:
             and now - _feed.attempted_at < CACHE_TTL
         ):
             return _feed
+        # Mark the attempt before the network work starts, not only at the
+        # end: while a cold fetch is in flight (or was cancelled by the
+        # request-side COLD_WAIT cap) the TTL must already be ticking, so
+        # that page loads during a TGK outage answer instantly instead of
+        # each one restarting a doomed fetch.
+        _feed = Feed(
+            items=_feed.items,
+            fetched_at=_feed.fetched_at,
+            fetched_at_wall=_feed.fetched_at_wall,
+            attempted_at=now,
+            ok=False,
+        )
         try:
             items, wall = await _fetch_feed()
         except Exception as exc:  # noqa: BLE001 - a broken feed must not 500
@@ -635,8 +654,20 @@ def _sort_key(item: dict) -> float:
 
 
 async def get_opportunities() -> dict:
-    """The payload for ``GET /api/public/opportunities``."""
-    feed = await refresh_events()
+    """The payload for ``GET /api/public/opportunities``.
+
+    A warm cache answers instantly. A cold one waits at most COLD_WAIT for
+    the in-flight fetch, then serves whatever is cached (often just the
+    paid programs) with ``events_live=False`` — a stalled third-party feed
+    must degrade on the response instead of pinning the page in a loading
+    state until the browser or the platform's proxy gives up.
+    """
+    try:
+        feed = await asyncio.wait_for(refresh_events(), timeout=COLD_WAIT)
+    except TimeoutError:  # (asyncio.TimeoutError is an alias in 3.12)
+        # wait_for cancels the waiter only; the scheduler still refreshes on
+        # its own schedule and the next request reuses a warm cache.
+        feed = _feed
     items = [*feed.items, *PAID_PROGRAMS]
     items.sort(key=_sort_key)
     return {

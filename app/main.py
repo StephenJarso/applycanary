@@ -10,6 +10,7 @@ in run.py before exposing it.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import time
 from collections import defaultdict, deque
@@ -78,6 +79,21 @@ async def lifespan(app: FastAPI):  # noqa: ANN201, ARG001
     else:
         log.info("scheduler disabled (ENABLE_SCHEDULER=false)")
 
+    # Warm the public Opportunities cache without blocking startup or the
+    # first page load: the scheduler's 15-minute interval would not fire for
+    # a quarter hour on a fresh boot, and one inline TGK fetch (some 25
+    # requests with tool timeouts) can exceed platform/browser request
+    # limits on a cold deploy. Runs concurrently; get_opportunities caps
+    # how long any request waits on it.
+    warm = None
+
+    async def warm_opportunities() -> None:
+        from app.opportunities import refresh_events
+
+        await refresh_events()
+
+    warm = asyncio.create_task(warm_opportunities())
+
     try:
         yield
     finally:
@@ -85,6 +101,8 @@ async def lifespan(app: FastAPI):  # noqa: ANN201, ARG001
             from app import scheduler as sched
 
             sched.shutdown()
+        if warm is not None:
+            warm.cancel()
 
 
 def create_app() -> FastAPI:
