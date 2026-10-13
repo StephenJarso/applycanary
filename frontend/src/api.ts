@@ -403,6 +403,34 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return (await res.json()) as T;
 }
 
+/** One listing on the public Events & paid programs page. */
+export interface Opportunity {
+  kind: "Event" | "Paid program";
+  title: string;
+  org: string;
+  /** Human-readable timing: "15 Oct 2026 · 08:00–11:00", "Coding May–Aug". */
+  when: string;
+  city: string;
+  tags: string[];
+  source: string;
+  url: string;
+  desc: string;
+  /** ISO event date ("" when unknown). Events count down to it. */
+  date: string;
+  /** Application window, paid programs only. */
+  opens: string | null;
+  closes: string | null;
+  steps: string[] | null;
+  stipend: string | null;
+}
+
+export interface Opportunities {
+  items: Opportunity[];
+  /** False when the live event feed could not be refreshed (items are cached). */
+  events_live: boolean;
+  events_updated_at: string | null;
+}
+
 const qs = (filters: object): string => {
   const params = new URLSearchParams();
   for (const [key, value] of Object.entries(filters)) {
@@ -441,6 +469,7 @@ export const api = {
   status: () => request<Status>("/status"),
   jobs: (filters: JobFilters = {}) => request<JobList>(`/jobs${qs(filters)}`),
   publicJobs: (filters: { q?: string; source?: string; remote_only?: boolean; sort?: "newest" | "oldest" } = {}) => request<PublicJobList>(`/public/jobs${qs(filters as JobFilters)}`),
+  opportunities: () => request<Opportunities>("/public/opportunities"),
   job: (id: number) => request<JobDetail>(`/jobs/${id}`),
   review: (params: { limit?: number; offset?: number } = {}) => request<ReviewList>(`/review${qs(params)}`),
   applications: () => request<Job[]>("/applications"),

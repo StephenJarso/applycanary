@@ -2202,6 +2202,8 @@ input[type="range"]::-moz-range-thumb {
 .landing-cta-row { display: flex; align-items: center; gap: 16px; margin-top: 28px; flex-wrap: wrap; }
 .landing-cta-row-center { justify-content: center; }
 .landing-cta { padding: 12px 24px; font-size: 14.5px; border-radius: 999px; margin-top: 28px; }
+/* Inside a .landing-cta-row the row itself owns the top margin. */
+.landing-cta-row .landing-cta { margin-top: 0; }
 .landing-cta-secondary {
   display: inline-flex;
   align-items: center;
@@ -2608,3 +2610,178 @@ input[type="range"]::-moz-range-thumb {
 }
 .auth-panel-switch strong { color: var(--ac-primary, #1a73e8); }
 .auth-panel-switch:hover strong { text-decoration: underline; }
+
+/* ------------------------------------------------------------ opportunities
+ *
+ * Public "Events & paid programs" screen from the design pack
+ * (canary-career-spark.lovable.app/opportunities): header band, filter rail,
+ * and a card grid sorted by nearest deadline. The pack's accent for paid
+ * programs is canary on dark ink — our --ac-canary / --ac-on-canary — so the
+ * "Paid program" badge is the one yellow chip in the list.
+ */
+
+.opp-page {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--ac-surface);
+  color: var(--text);
+}
+
+.opp-header { border-bottom: 1px solid var(--border); background: var(--ac-surface-container-low); }
+.opp-header-inner {
+  max-width: 1160px;
+  margin: 0 auto;
+  padding: 40px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.opp-back {
+  width: fit-content;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+.opp-back:hover { color: var(--text); text-decoration: none; }
+.opp-header h1 {
+  margin: 0;
+  font-size: clamp(28px, 4vw, 36px);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+}
+.opp-header p { margin: 0; max-width: 62ch; color: var(--text-dim); }
+
+.opp-layout {
+  width: 100%;
+  max-width: 1160px;
+  margin: 0 auto;
+  padding: 40px 24px 72px;
+  display: grid;
+  gap: 32px;
+  grid-template-columns: 260px minmax(0, 1fr);
+  align-items: start;
+}
+@media (max-width: 1000px) { .opp-layout { grid-template-columns: 1fr; } }
+
+.opp-filters { display: flex; flex-direction: column; gap: 24px; }
+.opp-filter-group { display: flex; flex-direction: column; gap: 8px; }
+.opp-filter-label {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+.opp-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.opp-chip {
+  border-radius: 999px;
+  padding: 5px 12px;
+  font-size: 13px;
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  color: var(--text);
+}
+.opp-chip:hover:not(:disabled) { background: var(--bg-hover); border-color: var(--text-faint); }
+.opp-chip[aria-pressed="true"] {
+  background: var(--ac-primary);
+  border-color: var(--ac-primary);
+  color: var(--ac-on-primary);
+}
+.opp-clear {
+  align-self: flex-start;
+  padding: 0;
+  background: none;
+  border: none;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-dim);
+  text-decoration: underline;
+}
+.opp-clear:hover:not(:disabled) { background: none; border: none; color: var(--text); }
+
+.opp-results { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.opp-count { margin: 0; font-size: 13px; color: var(--text-dim); }
+.opp-empty {
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-lg);
+  padding: 40px 20px;
+  text-align: center;
+  color: var(--text-dim);
+}
+
+.opp-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+@media (max-width: 767px) { .opp-grid { grid-template-columns: 1fr; } }
+
+.opp-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 20px;
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.opp-card:hover {
+  border-color: color-mix(in srgb, var(--text) 30%, transparent);
+  box-shadow: 0 6px 24px rgba(25, 28, 29, 0.08);
+}
+
+.opp-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 11px;
+}
+.opp-kind {
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 700;
+  background: var(--ac-surface-container);
+  color: var(--ac-on-surface-variant);
+  white-space: nowrap;
+}
+.opp-kind-program { background: var(--ac-canary); color: var(--ac-on-canary); }
+.opp-source { color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.opp-card h3 { margin: 0; font-size: 17px; font-weight: 700; letter-spacing: -0.01em; line-height: 1.3; }
+.opp-meta { margin: 2px 0 0; font-size: 13px; color: var(--text-dim); }
+.opp-desc { margin: 0; font-size: 13.5px; line-height: 1.55; }
+.opp-stipend { margin: 0; font-size: 13px; font-weight: 700; }
+
+.opp-timeline {
+  background: var(--ac-surface-container-low);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px;
+  font-size: 13px;
+}
+.opp-timeline p { margin: 0; }
+.opp-steps {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0 0 0 12px;
+  border-left: 2px solid var(--ac-canary);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.opp-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: auto; }
+.opp-tag {
+  background: var(--ac-surface-container);
+  border-radius: 4px;
+  padding: 2px 8px;
+  font-size: 11px;
+  color: var(--text-dim);
+}

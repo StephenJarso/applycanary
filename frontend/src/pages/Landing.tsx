@@ -91,10 +91,18 @@ export default function Landing() {
               it with market demands, and proactively secures interviews for roles
               you actually want.
             </p>
-            <button type="button" className="btn-primary landing-cta" onClick={() => setPanel("register")}>
-              Get Started
-              <span className="material-symbols-outlined" aria-hidden="true">arrow_forward</span>
-            </button>
+            <div className="landing-cta-row">
+              <button type="button" className="btn-primary landing-cta" onClick={() => setPanel("register")}>
+                Get Started
+                <span className="material-symbols-outlined" aria-hidden="true">arrow_forward</span>
+              </button>
+              {/* Design pack home links out to the public events & paid
+                  programs screen from here. */}
+              <Link to="/opportunities" className="landing-cta-secondary">
+                Explore events &amp; paid programs
+                <span className="material-symbols-outlined" aria-hidden="true">arrow_forward</span>
+              </Link>
+            </div>
           </div>
 
           {/* Static recreation of the mockup's hero art: a glowing neural
@@ -267,6 +275,7 @@ export default function Landing() {
       <footer className="landing-footer">
         <span>© {new Date().getFullYear()} ApplyCanary. Professional Career Agent.</span>
         <span className="landing-footer-links">
+          <Link to="/opportunities">Events &amp; programs</Link>
           <Link to="/?mode=login">Sign in</Link>
           <Link to="/?mode=register">Create account</Link>
           <Link to="/guest">Guest mode</Link>

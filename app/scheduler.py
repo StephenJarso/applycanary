@@ -328,6 +328,24 @@ async def job_expire_stale() -> None:
             log.info("expired %d stale jobs", len(stale))
 
 
+async def job_refresh_opportunities() -> None:
+    """Keep the public Opportunities page's event cache warm.
+
+    The endpoint refreshes lazily on its own, so this job is an optimisation
+    rather than a requirement: it means a page load serves memory instead of
+    waiting on Tech Group Kenya, and a broken feed shows up in the logs on a
+    schedule rather than whenever a visitor happens to arrive.
+    """
+    from app.opportunities import refresh_events
+
+    feed = await refresh_events()
+    log.info(
+        "opportunities: %d events (live=%s)",
+        len(feed.items),
+        feed.ok,
+    )
+
+
 # ---------------------------------------------------------------- wiring
 
 
@@ -367,6 +385,9 @@ def build_scheduler() -> AsyncIOScheduler:
         ("digest", CronTrigger(hour=8, minute=3), job_digest),
         ("expire_stale", CronTrigger(hour=4, minute=23), job_expire_stale),
         ("embed_new", IntervalTrigger(minutes=15, jitter=120), job_embed_new),
+        # The public Opportunities page reads a cached TGK event list; keep it
+        # warm so page loads never wait on a third-party fetch.
+        ("refresh_opportunities", IntervalTrigger(minutes=15, jitter=60), job_refresh_opportunities),
     ]
 
     for name, trigger, fn in specs:
