@@ -2508,23 +2508,24 @@ input[type="range"]::-moz-range-thumb {
 .landing-footer-links a:hover { color: var(--text); text-decoration: underline; }
 
 /* ------------------------------------------------------------------------- */
-/* Auth panel embedded in the landing page (mode swap, no separate routes)   */
+/* Auth panel floating over the landing page (mode swap, no separate routes) */
 /* ------------------------------------------------------------------------- */
 
-/* The hero grid collapses to a single card pinned to the top-left when
- * hosting the auth panel, so the form replaces marketing content without
- * recentring the page: the visitor keeps their reading position, and the
- * nav's Login/Sign-Up buttons sit right next to the panel they opened.
- * Base `.landing-hero` is overridden wholesale here regardless of the
- * marketing grid's two-column sizing. */
-.landing-hero-auth {
+/* A backdrop dims the marketing page while the form floats above it, pinned
+ * top-left just below the sticky nav — the visitor still sees the page they
+ * were reading (this is one page, not a route change), and the Login/Sign-Up
+ * buttons that opened the panel sit right beside it. */
+.landing-auth-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60; /* above the nav's z-10; the close button and a backdrop click are the way back */
+  background: rgba(10, 10, 12, 0.45);
   display: flex;
   align-items: flex-start;
   justify-content: flex-start;
-  min-height: 60vh;
-  padding: 48px 24px;
-  margin: 0;
-  max-width: none;
+  /* Clears the sticky nav (~60px tall incl. border): the card anchors below
+     it, not over it. The nav itself dims under the backdrop. */
+  padding: 68px 24px 24px;
 }
 
 .auth-panel {

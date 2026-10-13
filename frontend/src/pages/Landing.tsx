@@ -3,13 +3,14 @@ import { Link, useSearchParams } from "react-router-dom";
 import AuthPanel, { type AuthMode } from "./AuthPanel";
 
 /**
- * Public marketing page with an embedded auth panel. Signed-out visitors land
- * here instead of a login wall; clicking Login / Sign-Up swaps the hero for an
- * inline auth form on THIS same route (mode state, no navigation). Modes:
+ * Public marketing page with a floating auth card. Signed-out visitors land
+ * here instead of a login wall; clicking Login / Sign-Up floats the auth form
+ * over THIS same page, pinned top-left (mode state, no navigation, marketing
+ * content stays visible underneath). Modes:
  *
- *   marketing (default)  — nav/hero/CTA/footer, buttons open a panel
- *   ?mode=login          — login form inline
- *   ?mode=register       — registration form inline
+ *   marketing (default)  — nav/hero/CTA/footer, buttons float the panel
+ *   ?mode=login          — login card over the landing page
+ *   ?mode=register       — registration card over the landing page
  *
  * Old /login and /register URLs redirect here in App.tsx (with ?mode=), so
  * bookmarks and emailed links keep working. Layout in marketing mode:
@@ -61,17 +62,6 @@ export default function Landing() {
       </header>
 
       <main>
-        {/* ------------------------------------------------ Auth panel mode */}
-        {panel !== null ? (
-          <section className="landing-hero landing-hero-auth">
-            <AuthPanel
-              mode={panel}
-              onModeChange={(m) => setPanel(m)}
-              onClose={() => setPanel(null)}
-            />
-          </section>
-        ) : (
-        <>
         {/* ------------------------------------------------ Hero */}
         <section className="landing-hero">
           <div className="landing-hero-copy">
@@ -263,9 +253,24 @@ export default function Landing() {
             </button>
           </div>
         </section>
-        </>
-        )
-        }
+
+        {/* ------------------------------------------------ Auth overlay
+
+            The panel floats over this same page instead of replacing it:
+            marketing stays rendered underneath (dimmed by the backdrop), so
+            opening Login/Sign-Up is a state change, not a new page. */}
+        {panel !== null && (
+          <div
+            className="landing-auth-overlay"
+            onClick={(e) => { if (e.target === e.currentTarget) setPanel(null); }}
+          >
+            <AuthPanel
+              mode={panel}
+              onModeChange={(m) => setPanel(m)}
+              onClose={() => setPanel(null)}
+            />
+          </div>
+        )}
       </main>
 
       <footer className="landing-footer">
