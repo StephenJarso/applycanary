@@ -104,11 +104,11 @@ function Dashboard() {
           <div className="spacer" />
           <button onClick={() => poll.mutate()} disabled={busy} className="btn-ghost">
             {poll.isPending ? <span className="spinner" /> : <span className="material-symbols-outlined" aria-hidden="true">sync</span>}
-            Poll sources
+            <span className="topbar-btn-label">Poll sources</span>
           </button>
           <button onClick={() => score.mutate()} disabled={busy} className="btn-ghost">
             {score.isPending ? <span className="spinner" /> : <span className="material-symbols-outlined" aria-hidden="true">insights</span>}
-            Score pending
+            <span className="topbar-btn-label">Score pending</span>
           </button>
         </header>
 
