@@ -11,8 +11,9 @@ client has something real to mirror.
 
 from __future__ import annotations
 
+import asyncio
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Literal
 
@@ -339,6 +340,13 @@ def _counts(session: Session, user: User) -> dict[str, int]:
         .group_by(UserJob.status)
     ).all()
     counts = {str(status): n for status, n in rows}
+    # Always expose the dashboard's keys so the UI never falls back to made-up
+    # placeholder numbers when a user has no rows in a given status.
+    counts.setdefault(str(JobStatus.APPLIED), 0)
+    counts.setdefault(str(JobStatus.QUEUED), 0)
+    counts["preps"] = session.exec(
+        select(func.count(InterviewPrep.id)).where(InterviewPrep.user_id == user.id)
+    ).one()
 
     live_jobs = session.exec(
         select(func.count(Job.id)).where(Job.expired_at.is_(None))
@@ -452,6 +460,8 @@ def list_jobs(
     source: str = "",
     min_score: int = Query(0, ge=0, le=100),
     remote_only: bool = False,
+    prep_only: bool = False,
+    posted_within: int = Query(0, ge=0, le=3650),
     sort: Literal["score", "newest", "oldest"] = "score",
     limit: int = Query(100, ge=1, le=500),
     offset: int = Query(0, ge=0),
@@ -497,6 +507,17 @@ def list_jobs(
         stmt = stmt.where(Job.source == source)
     if remote_only:
         stmt = stmt.where(Job.is_remote == True)  # noqa: E712 - SQL, not Python
+    if prep_only:
+        stmt = stmt.where(
+            Job.id.in_(
+                select(InterviewPrep.job_id).where(InterviewPrep.user_id == user.id)
+            )
+        )
+    if posted_within:
+        cutoff = utcnow() - timedelta(days=posted_within)
+        # Fall back to first_seen for connectors that do not publish a date, so
+        # a freshness filter never silently drops the whole source.
+        stmt = stmt.where(func.coalesce(Job.posted_at, Job.first_seen_at) >= cutoff)
     if q:
         stmt = _apply_text_search(stmt, q)
     if min_score:
@@ -1062,20 +1083,28 @@ async def trigger_poll(
     from app.pipeline.ingest import poll_broad, poll_careers, poll_curated
     from app.pipeline.score import score_pending
 
-    curated = await poll_curated()
-    careers = await poll_careers()
-    broad = await poll_broad()
+    # The three groups are independent; running them in parallel keeps a manual
+    # poll inside the proxy timeout instead of stacking their slowest sources.
+    curated, careers, broad = await asyncio.gather(
+        poll_curated(), poll_careers(), poll_broad()
+    )
     runs = (curated, careers, broad)
     found = sum(r.found for r in runs)
     new = sum(r.new for r in runs)
-    scored = await score_pending(session, user_id=user.id, limit=50)
+    failed = sum(r.sources_failed for r in runs)
+    # Score a small first batch so new matches appear promptly; the scheduler
+    # continues scoring in the background rather than holding this request open.
+    scored = await score_pending(session, user_id=user.id, limit=10)
+    message = f"Found {found} postings, {new} new; scored {scored} for your profile."
+    if failed:
+        message += f" {failed} source(s) failed."
     return ActionResult(
         ok=True,
-        message=f"Found {found} postings, {new} new; scored {scored} for your profile.",
+        message=message,
         detail={
             "found": found, "new": new, "scored": scored,
             "duplicates": sum(r.duplicates for r in runs),
-            "failed_sources": sum(r.sources_failed for r in runs),
+            "failed_sources": failed,
             "errors": [e for r in runs for e in r.errors],
         },
     )

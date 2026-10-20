@@ -25,8 +25,8 @@ from app.sources.base import DEFAULT_TIMEOUT, USER_AGENT, BaseSource
 log = logging.getLogger(__name__)
 
 # A slow board must not hold the cycle open indefinitely.
-PER_SOURCE_TIMEOUT = 90.0
-MAX_CONCURRENT_SOURCES = 6
+PER_SOURCE_TIMEOUT = 45.0
+MAX_CONCURRENT_SOURCES = 8
 
 CONFIG_PATH = Path("companies.yaml")
 
@@ -190,9 +190,15 @@ async def run_sources(sources: list[BaseSource]) -> IngestSummary:
             continue
         active.append((src, label))
 
-    results = await asyncio.gather(*(fetch_one(s) for s, _ in active))
+    async def fetch_and_record(src: BaseSource, label: str) -> None:
+        """Persist each source the moment it finishes.
 
-    for (_src, label), (_, raw_jobs, error, elapsed_ms) in zip(active, results, strict=True):
+        Polling used to gather every source first and only then write. A manual
+        poll that outlived the proxy timeout was cancelled mid-gather, so even
+        the sources that had already answered left no jobs behind. Recording
+        incrementally makes partial cycles useful and visible.
+        """
+        _, raw_jobs, error, elapsed_ms = await fetch_one(src)
         summary.sources_run += 1
         new_count = dup_count = 0
 
@@ -227,6 +233,9 @@ async def run_sources(sources: list[BaseSource]) -> IngestSummary:
                  label, len(raw_jobs), new_count, dup_count, elapsed_ms,
                  f" ERROR: {error}" if error else "")
 
+    # No awaits between fetches and their synchronous writes, so records stay
+    # serialised on the event loop while completion order drives persistence.
+    await asyncio.gather(*(fetch_and_record(src, label) for src, label in active))
     return summary
 
 

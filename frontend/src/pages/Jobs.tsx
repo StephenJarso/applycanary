@@ -1,10 +1,10 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { api, type JobFilters } from "../api";
 import { useAuth } from "../context/AuthContext";
 import {
-  Chips, Empty, ErrorBox, TableSkeleton, formatSalary,
+  Chips, Empty, ErrorBox, TableSkeleton, formatSalary, relTime,
 } from "../components";
 
 const SORTS = [
@@ -15,8 +15,12 @@ const SORTS = [
 const PAGE_SIZE = 50;
 
 export default function Jobs() {
+  const [params] = useSearchParams();
   const [page, setPage] = useState(0);
-  const [filters, setFilters] = useState<JobFilters>({ sort: "score" });
+  const [filters, setFilters] = useState<JobFilters>({
+    sort: "score",
+    prep_only: params.get("prep") === "1",
+  });
   const [search, setSearch] = useState("");
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -53,7 +57,7 @@ export default function Jobs() {
           {/* dashboard_1: agent line with the gradient-highlighted count. */}
           <p className="dashboard-subtext ac-headline-md">
             <span className="material-symbols-outlined icon-fill" style={{ color: "var(--ac-canary)", fontSize: 22 }}>auto_awesome</span>{" "}
-            Your agent found <span className="gradient-text" style={{ fontWeight: 700 }}>{data?.counts.total ?? 12} new roles</span> today.
+            Your agent found <span className="gradient-text" style={{ fontWeight: 700 }}>{data?.counts.total ?? 0} live roles</span> today.
           </p>
         </div>
         <div className="dashboard-agent-status card glass-card">
@@ -63,7 +67,7 @@ export default function Jobs() {
           <div>
             <strong>Agent active</strong>
             <div style={{ fontSize: 12, color: "var(--text-dim)" }}>
-              Scanned {data?.total ?? 1432} listings
+              Scanned {data?.total ?? 0} listings
             </div>
           </div>
         </div>
@@ -76,19 +80,24 @@ export default function Jobs() {
           <span className="material-symbols-outlined" style={{ color: "var(--text-faint)" }}>query_stats</span>
         </div>
         <div className="stat-row" style={{ marginBottom: 0 }}>
-          <div className="ac-metric">
-            <span className="ac-metric-value" style={{ color: "var(--ac-primary)" }}>{data?.counts.applied ?? 47}</span>
+          <Link to="/applications" className="ac-metric ac-metric-link">
+            <span className="ac-metric-value" style={{ color: "var(--ac-primary)" }}>{data?.counts.applied ?? 0}</span>
             <span className="ac-metric-label">Total Applications</span>
-          </div>
-          <div className="ac-metric">
-            <span className="ac-metric-value" style={{ color: "var(--ac-tertiary-container)" }}>{data?.counts.queued ?? 12}</span>
+          </Link>
+          <Link to="/review" className="ac-metric ac-metric-link">
+            <span className="ac-metric-value" style={{ color: "var(--ac-tertiary-container)" }}>{data?.counts.queued ?? 0}</span>
             <span className="ac-metric-label">Pending Reviews</span>
-          </div>
-          <div className="ac-metric" style={{ position: "relative", overflow: "hidden" }}>
+          </Link>
+          <Link
+            to="/jobs?prep=1"
+            onClick={() => set("prep_only", true)}
+            className="ac-metric ac-metric-link"
+            style={{ position: "relative", overflow: "hidden" }}
+          >
             <div style={{ position: "absolute", inset: 0, background: "var(--ac-primary-container)", opacity: 0.1 }} />
-            <span className="ac-metric-value" style={{ position: "relative", color: "var(--ac-primary)" }}>2</span>
-            <span className="ac-metric-label" style={{ position: "relative" }}>Interviews Prep</span>
-          </div>
+            <span className="ac-metric-value" style={{ position: "relative", color: "var(--ac-primary)" }}>{data?.counts.preps ?? 0}</span>
+            <span className="ac-metric-label" style={{ position: "relative" }}>Interview Preps</span>
+          </Link>
         </div>
       </div>
 
@@ -119,6 +128,19 @@ export default function Jobs() {
           onChange={(e) => setSearch(e.target.value)}
           aria-label="Search jobs"
         />
+
+        <select
+          value={String(filters.posted_within ?? 0)}
+          onChange={(e) => set("posted_within", Number(e.target.value) || undefined)}
+          aria-label="Filter by posting date"
+        >
+          <option value="0">Any time</option>
+          <option value="1">Past 24 hours</option>
+          <option value="3">Past 3 days</option>
+          <option value="7">Past week</option>
+          <option value="30">Past month</option>
+          <option value="90">Past 3 months</option>
+        </select>
 
         <select
           value={filters.source ?? ""}
@@ -160,6 +182,15 @@ export default function Jobs() {
           Remote Only
         </label>
 
+        <label className="check" style={{ margin: 0 }}>
+          <input
+            type="checkbox"
+            checked={filters.prep_only ?? false}
+            onChange={(e) => set("prep_only", e.target.checked)}
+          />
+          Interview prep ready
+        </label>
+
         <div className="seg" role="group" aria-label="Sort order">
           {SORTS.map((s) => (
             <button
@@ -179,8 +210,10 @@ export default function Jobs() {
 
       {data && data.jobs.length === 0 && (
         <Empty
-          title="No jobs match"
-          hint='Try clearing filters, or use "Poll sources" above to fetch new postings.'
+          title={filters.prep_only ? "No interview preps yet" : "No jobs match"}
+          hint={filters.prep_only
+            ? "Open a job and generate its interview prep to see it here."
+            : 'Try clearing filters, or use "Poll sources" above to fetch new postings.'}
         />
       )}
 
@@ -237,6 +270,15 @@ export default function Jobs() {
 
                   <div className="discovery-card-bottom">
                     <div className="job-card-meta">
+                      {(() => {
+                        const age = relTime(job.posted_at ?? job.first_seen_at);
+                        return (
+                          <span className="job-card-age">
+                            <span className="material-symbols-outlined" aria-hidden="true">schedule</span>
+                            {age === "now" ? "Posted just now" : `Posted ${age} ago`}
+                          </span>
+                        );
+                      })()}
                       {salary && <span className="chip chip-accent">{salary}</span>}
                       {job.score?.matched_keywords.length ? (
                         <Chips items={job.score.matched_keywords} variant="hit" max={3} />

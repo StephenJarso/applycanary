@@ -25,7 +25,7 @@ import { useAuth } from "./context/AuthContext";
 const NAV = [
   { to: "/jobs", label: "Home", icon: "dashboard", end: true },
   { to: "/review", label: "Discovery", icon: "search" },
-  { to: "/internships", label: "Internships & Opportunities", icon: "school", end: true },
+  { to: "/internships", label: "Internships & Opportunities", short: "Internships", icon: "school", end: true },
   { to: "/opportunities", label: "Programs", icon: "event", end: true },
   { to: "/memory", label: "Memory", icon: "psychology" },
   { to: "/profile", label: "Profile", icon: "person" },
@@ -72,7 +72,8 @@ function Dashboard({ page }: { page?: "internships" | "programs" }) {
             className="nav-link"
           >
             <span className="material-symbols-outlined" aria-hidden="true">{item.icon}</span>
-            <span className="nav-label">{item.label}</span>
+            <span className="nav-label nav-label-full">{item.label}</span>
+            <span className="nav-label nav-label-short">{"short" in item ? item.short : item.label}</span>
           </NavLink>
         ))}
 

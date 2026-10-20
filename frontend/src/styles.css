@@ -223,6 +223,20 @@ a { color: inherit; text-decoration: none; }
   background: var(--ac-surface-container-lowest);
   border: 1px solid var(--border);
 }
+.ac-metric-link {
+  color: inherit;
+  text-decoration: none;
+  transition: border-color 120ms ease, transform 120ms ease;
+}
+.ac-metric-link:hover {
+  border-color: var(--ac-primary);
+  transform: translateY(-1px);
+  text-decoration: none;
+}
+.ac-metric-link:focus-visible {
+  outline: 2px solid var(--ac-primary);
+  outline-offset: 2px;
+}
 .ac-metric-value {
   font-size: 32px;
   font-weight: 700;
@@ -309,6 +323,8 @@ a { color: inherit; text-decoration: none; }
 .nav-link[aria-current="page"] .material-symbols-outlined {
   font-variation-settings: "FILL" 1, "wght" 400, "GRAD" 0, "opsz" 24;
 }
+
+.nav-label-short { display: none; }
 
 .nav-eyebrow {
   font-size: 11px;
@@ -441,14 +457,20 @@ a { color: inherit; text-decoration: none; }
     background: var(--ac-surface);
   }
   .brand, .nav-eyebrow, .sidebar-foot { display: none; }
-  .nav-label { display: block; font-size: 11px; font-weight: 600; }
+  .nav-label { display: block; font-size: 10px; font-weight: 600; line-height: 1.15; }
+  .nav-label-full { display: none; }
+  .nav-label-short { display: block; }
   .nav-link {
+    flex: 1 1 0;
+    min-width: 0;
     flex-direction: column;
     gap: 2px;
     border-radius: 16px;
-    padding: 6px 14px;
-    font-size: 11px;
+    padding: 6px 4px;
+    font-size: 10px;
+    text-align: center;
   }
+  .nav-link .material-symbols-outlined { font-size: 22px; }
   .nav-link[aria-current="page"] { transform: scale(0.94); }
   /* Topbar: long text actions crowd a phone; keep just the icons. */
   .topbar { padding: 10px 12px; gap: 8px; }
@@ -2836,4 +2858,57 @@ input[type="range"]::-moz-range-thumb {
   padding: 2px 8px;
   font-size: 11px;
   color: var(--text-dim);
+}
+
+
+/* ------------------------------------------------------------ phone polish
+ *
+ * Most of the app is used from a phone, so the dashboard gets the same
+ * treatment as the marketing page: thumb-sized targets, no iOS input zoom,
+ * and a shorter scan path through filters and cards. Scoped to 720px so the
+ * desktop information density is untouched.
+ */
+@media (max-width: 720px) {
+  /* iOS zooms any focused control below 16px. Keeping controls at 16px
+     prevents the page jumping sideways when a filter is tapped. */
+  input[type="text"], input[type="email"], input[type="password"],
+  input[type="number"], input[type="search"], select, textarea {
+    font-size: 16px;
+    min-height: 44px;
+  }
+  button, .btn { min-height: 40px; }
+  .btn-sm { min-height: 36px; padding: 6px 12px; }
+
+  .dashboard-hero { gap: 12px; }
+  .dashboard-agent-status { width: 100%; }
+  .stat-row { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+  .ac-metric { padding: 10px 6px; }
+  .ac-metric-value { font-size: 24px; }
+  .ac-metric-label { font-size: 10px; line-height: 1.2; }
+  .stat-panel-head { margin-bottom: 10px; padding-bottom: 10px; }
+
+  .feed-head { align-items: flex-start; }
+  .toolbar { gap: 10px; }
+  .toolbar input[type="search"] { flex: 1 1 100%; max-width: none; }
+  .toolbar select { flex: 1 1 calc(50% - 5px); min-width: 0; width: auto; }
+  .toolbar .check { flex: 1 1 auto; min-height: 36px; }
+  .toolbar .seg { flex: 1 1 100%; }
+  .toolbar .seg button { flex: 1 1 0; min-height: 38px; }
+
+  .discovery-card { padding: 14px; }
+  .discovery-card-top { gap: 8px; }
+  .job-card-company { align-items: flex-start; gap: 8px; }
+  .company-logo-placeholder { width: 36px; height: 36px; font-size: 16px; }
+  .match-badge { font-size: 11px; padding: 3px 9px; }
+  .discovery-card-actions { width: 100%; }
+  .discovery-card-actions .btn { flex: 1 1 0; justify-content: center; }
+
+  .opp-header-inner { padding: 22px 16px; }
+  .opp-layout { padding: 18px 16px 96px; gap: 18px; }
+  .opp-filters { gap: 16px; }
+  .opp-count { font-size: 12px; }
+
+  .pagination { flex-direction: column; align-items: flex-start; gap: 8px; }
+  .pagination-controls { flex-wrap: wrap; }
+  .pagination-page { margin: 0 4px; }
 }

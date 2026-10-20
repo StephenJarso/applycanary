@@ -12,6 +12,8 @@ live app, not the suite.
 
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
+
 import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import Session, select
@@ -19,7 +21,7 @@ from sqlmodel import Session, select
 from app.auth import hash_password
 from app.db import engine, init_db
 from app.main import create_app
-from app.models import Job, JobStatus, Profile, User
+from app.models import InterviewPrep, Job, JobStatus, Profile, User
 from app.pipeline.discover import build_queries
 
 
@@ -28,6 +30,8 @@ def db():
     init_db()
     with Session(engine) as session:
         for row in session.exec(select(Profile)).all():
+            session.delete(row)
+        for row in session.exec(select(InterviewPrep)).all():
             session.delete(row)
         for row in session.exec(select(Job)).all():
             session.delete(row)
@@ -121,6 +125,54 @@ def test_public_search_is_tokenized_too():
     res = client.get("/api/public/jobs", params={"q": "golang backend"})
     assert res.status_code == 200
     assert any("Golang" in j["title"] for j in res.json()["jobs"])
+
+
+def test_posted_within_hides_stale_listings():
+    with Session(engine) as session:
+        stale = session.exec(select(Job).where(Job.title == "Senior Golang Engineer")).one()
+        stale.posted_at = datetime.now(UTC) - timedelta(days=400)
+        session.add(stale)
+        session.commit()
+
+    client = _client()
+    fresh = client.get("/api/jobs", params={"q": "golang", "posted_within": 30, "limit": 100})
+    assert fresh.status_code == 200
+    assert "Senior Golang Engineer" not in _titles(fresh.json())
+
+    any_time = client.get("/api/jobs", params={"q": "golang", "limit": 100})
+    assert "Senior Golang Engineer" in _titles(any_time.json())
+
+
+def test_counts_always_expose_dashboard_keys_and_prep_count():
+    client = _client()
+    res = client.get("/api/jobs", params={"sort": "newest"})
+    assert res.status_code == 200
+    counts = res.json()["counts"]
+    assert counts["applied"] == 0
+    assert counts["queued"] == 0
+    assert counts["preps"] == 0
+
+    with Session(engine) as session:
+        user = session.exec(select(User)).one()
+        job = session.exec(select(Job).where(Job.title == "Senior Golang Engineer")).one()
+        session.add(InterviewPrep(user_id=user.id, job_id=job.id))
+        session.commit()
+
+    counts = client.get("/api/jobs", params={"sort": "newest"}).json()["counts"]
+    assert counts["preps"] == 1
+
+
+def test_prep_only_filters_to_jobs_with_interview_prep():
+    client = _client()
+    with Session(engine) as session:
+        user = session.exec(select(User)).one()
+        job = session.exec(select(Job).where(Job.title == "Senior Golang Engineer")).one()
+        session.add(InterviewPrep(user_id=user.id, job_id=job.id))
+        session.commit()
+
+    res = client.get("/api/jobs", params={"prep_only": True, "q": "golang", "limit": 100})
+    assert res.status_code == 200
+    assert _titles(res.json()) == ["Senior Golang Engineer"]
 
 
 def test_discover_requires_profile_terms():
