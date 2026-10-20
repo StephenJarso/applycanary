@@ -20,7 +20,8 @@ import {
  * no frontend change.
  */
 
-const TYPES = ["All", "Event", "Paid program"] as const;
+const ALL_TYPES = ["All", "Event", "Paid program"] as const;
+const EVENT_TYPES = ["All", "Event"] as const;
 const STATUSES = ["All", "Open now", "Opening soon", "Rolling", "Upcoming event"] as const;
 /** Cities the design ships with; kept even when the feed has no event there. */
 const BASE_LOCATIONS = ["Nairobi", "Kisumu", "Eldoret", "Kenya", "Online"];
@@ -42,7 +43,11 @@ export default function Opportunities({ embedded = false }: { embedded?: boolean
     staleTime: 5 * 60_000,
   });
 
-  const items = data?.items ?? [];
+  const allItems = data?.items ?? [];
+  // The signed-in Programs tab is the events calendar; paid programs live on
+  // the Internships & Opportunities tab. Visitors still get both here.
+  const items = embedded ? allItems.filter((o) => o.kind === "Event") : allItems;
+  const types = embedded ? EVENT_TYPES : ALL_TYPES;
   const [query, setQuery] = useState("");
   const [type, setType] = useState("All");
   const [statusFilter, setStatusFilter] = useState("All");
@@ -83,7 +88,12 @@ export default function Opportunities({ embedded = false }: { embedded?: boolean
     setStatusFilter("All");
   };
 
-  const blurb = (
+  const blurb = embedded ? (
+    <>
+      Tech events near you in Kenya, sorted by nearest date. Use Internships
+      &amp; Opportunities for paid programs and placements.
+    </>
+  ) : (
     <>
       Tech events near you in Kenya and programs that pay you to learn, with
       application timelines sorted by nearest deadline. Program dates are
@@ -95,7 +105,7 @@ export default function Opportunities({ embedded = false }: { embedded?: boolean
     <div className={`opp-page${embedded ? " opp-embedded" : ""}`}>
       {embedded ? (
         <div className="page-intro">
-          <h2 className="page-title">Programs</h2>
+          <h2 className="page-title">Events</h2>
           <p className="page-sub">{blurb}</p>
         </div>
       ) : (
@@ -117,14 +127,14 @@ export default function Opportunities({ embedded = false }: { embedded?: boolean
             type="search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search events, programs…"
-            aria-label="Search events and programs"
+            placeholder={embedded ? "Search events…" : "Search events, programs…"}
+            aria-label={embedded ? "Search events" : "Search events and programs"}
           />
 
           <div className="opp-filter-group">
             <p className="opp-filter-label" id="opp-type">Type</p>
             <div className="opp-chips" role="group" aria-labelledby="opp-type">
-              {TYPES.map((t) => (
+              {types.map((t) => (
                 <Chip key={t} on={type === t} onClick={() => setType(t)}>{t}</Chip>
               ))}
             </div>
@@ -163,7 +173,7 @@ export default function Opportunities({ embedded = false }: { embedded?: boolean
         </aside>
 
         <section className="opp-results" aria-live="polite">
-          {isPending && <Loading label="Loading events &amp; programs" />}
+          {isPending && <Loading label={embedded ? "Loading events" : "Loading events &amp; programs"} />}
           {error && <ErrorBox error={error} />}
 
           {data && !data.events_live && (

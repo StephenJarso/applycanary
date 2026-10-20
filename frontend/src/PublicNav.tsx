@@ -1,9 +1,9 @@
 import { Link, NavLink } from "react-router-dom";
 
 /**
- * Sticky public top bar shared by the marketing page and the public
- * Internships / Programs screens. Signed-out visitors can jump between the
- * landing sections and either feed without losing the header navigation.
+ * Sticky public top bar shared by the marketing page and the public Programs
+ * screen. Signed-out visitors can jump between the landing sections and the
+ * feed without losing the header navigation.
  */
 const SECTIONS = [
   { href: "#how-it-works", label: "How it Works" },
@@ -11,10 +11,7 @@ const SECTIONS = [
   { href: "#infrastructure", label: "Infrastructure" },
 ] as const;
 
-const PAGES = [
-  { to: "/internships", label: "Internships" },
-  { to: "/opportunities", label: "Programs" },
-] as const;
+const PAGES = [{ to: "/opportunities", label: "Programs" }] as const;
 
 type Props = {
   /** Landing itself scrolls in-place; other pages route back to its anchors. */

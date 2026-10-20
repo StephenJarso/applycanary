@@ -17,17 +17,37 @@ import {
  */
 
 const STATUSES = ["All", "Open now", "Opening soon", "Rolling"] as const;
+const TYPES = ["All", "Internship", "Paid program"] as const;
 const BASE_LOCATIONS = ["Tokyo", "Kenya", "Online"];
 
 export default function Internships({ embedded = false }: { embedded?: boolean }) {
-  const { data, isPending, error } = useQuery({
+  const internships = useQuery({
     queryKey: ["internships"],
     queryFn: api.internships,
     staleTime: 5 * 60_000,
   });
+  // Signed-in users get paid programs here too; visitors only see placements.
+  const opportunities = useQuery({
+    queryKey: ["opportunities"],
+    queryFn: api.opportunities,
+    staleTime: 5 * 60_000,
+    enabled: embedded,
+  });
 
-  const items = data?.items ?? [];
+  const data = internships.data;
+  const isPending = internships.isPending || (embedded && opportunities.isPending);
+  const error = internships.error ?? (embedded ? opportunities.error : null);
+
+  const items = useMemo(() => {
+    const placements = internships.data?.items ?? [];
+    const programs = embedded
+      ? (opportunities.data?.items ?? []).filter((o) => o.kind === "Paid program")
+      : [];
+    return [...placements, ...programs];
+  }, [internships.data, opportunities.data, embedded]);
+
   const [query, setQuery] = useState("");
+  const [type, setType] = useState("All");
   const [statusFilter, setStatusFilter] = useState("All");
   const [city, setCity] = useState("All");
   const [tags, setTags] = useState<string[]>([]);
@@ -46,28 +66,37 @@ export default function Internships({ embedded = false }: { embedded?: boolean }
     const q = query.trim().toLowerCase();
     return items.filter(
       (o) =>
+        (type === "All" || o.kind === type) &&
         (city === "All" || o.city === city) &&
         (statusFilter === "All" || status(o) === statusFilter) &&
         (tags.length === 0 || tags.some((t) => o.tags.includes(t))) &&
         (!q || `${o.title} ${o.org} ${o.desc} ${o.tags.join(" ")}`.toLowerCase().includes(q)),
     ).sort((a, b) => deadline(a) - deadline(b));
-  }, [items, query, city, tags, statusFilter]);
+  }, [items, query, type, city, tags, statusFilter]);
 
   const toggleTag = (tag: string) =>
     setTags((old) => (old.includes(tag) ? old.filter((t) => t !== tag) : [...old, tag]));
 
-  const filtersOn = tags.length > 0 || city !== "All" || statusFilter !== "All" || query !== "";
+  const filtersOn = tags.length > 0 || city !== "All" || statusFilter !== "All" || type !== "All" || query !== "";
   const clearAll = () => {
     setTags([]);
     setCity("All");
+    setType("All");
     setQuery("");
     setStatusFilter("All");
   };
 
-  const paid = items.filter((o) => o.stipend?.startsWith("Paid:")).length;
-  const unpaid = items.filter((o) => o.stipend?.startsWith("Unpaid")).length;
+  const paid = items.filter((o) => o.kind === "Internship" && o.stipend?.startsWith("Paid:")).length;
+  const unpaid = items.filter((o) => o.kind === "Internship" && o.stipend?.startsWith("Unpaid")).length;
+  const programs = items.filter((o) => o.kind === "Paid program").length;
 
-  const blurb = (
+  const blurb = embedded ? (
+    <>
+      Internships and paid programs in one place, with compensation, location
+      and application steps stated upfront. Deadlines are estimated from past
+      cycles — confirm on the official site.
+    </>
+  ) : (
     <>
       Paid, unpaid-with-benefits and free internships, with compensation,
       location and application steps stated upfront. Deadlines are estimated
@@ -79,7 +108,7 @@ export default function Internships({ embedded = false }: { embedded?: boolean }
     <div className={`opp-page${embedded ? " opp-embedded" : ""}`}>
       {embedded ? (
         <div className="page-intro">
-          <h2 className="page-title">Internships</h2>
+          <h2 className="page-title">Internships &amp; Opportunities</h2>
           <p className="page-sub">{blurb}</p>
         </div>
       ) : (
@@ -101,9 +130,28 @@ export default function Internships({ embedded = false }: { embedded?: boolean }
             type="search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search internships…"
-            aria-label="Search internships"
+            placeholder={embedded ? "Search internships and programs…" : "Search internships…"}
+            aria-label={embedded ? "Search internships and programs" : "Search internships"}
           />
+
+          {embedded && (
+            <div className="opp-filter-group">
+              <p className="opp-filter-label" id="intern-type">Type</p>
+              <div className="opp-chips" role="group" aria-labelledby="intern-type">
+                {TYPES.map((t) => (
+                  <button
+                    key={t}
+                    type="button"
+                    className="opp-chip"
+                    aria-pressed={type === t}
+                    onClick={() => setType(t)}
+                  >
+                    {t}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div className="opp-filter-group">
             <p className="opp-filter-label" id="intern-status">Application status</p>
@@ -162,13 +210,14 @@ export default function Internships({ embedded = false }: { embedded?: boolean }
         </aside>
 
         <section className="opp-results" aria-live="polite">
-          {isPending && <Loading label="Loading internships" />}
+          {isPending && <Loading label={embedded ? "Loading internships and programs" : "Loading internships"} />}
           {error && <ErrorBox error={error} />}
 
-          {data && (
+          {data && !isPending && (
             <>
               <p className="opp-count">
                 {results.length} results · {paid} paid · {unpaid} unpaid with benefits
+                {programs > 0 && ` · ${programs} paid programs`}
               </p>
 
               {results.length === 0 && (

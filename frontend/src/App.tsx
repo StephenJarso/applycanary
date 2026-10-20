@@ -25,13 +25,13 @@ import { useAuth } from "./context/AuthContext";
 const NAV = [
   { to: "/jobs", label: "Home", icon: "dashboard", end: true },
   { to: "/review", label: "Discovery", icon: "search" },
-  { to: "/internships", label: "Internships", icon: "school", end: true },
+  { to: "/internships", label: "Internships & Opportunities", icon: "school", end: true },
   { to: "/opportunities", label: "Programs", icon: "event", end: true },
   { to: "/memory", label: "Memory", icon: "psychology" },
   { to: "/profile", label: "Profile", icon: "person" },
 ] as const;
 
-function Dashboard() {
+function Dashboard({ page }: { page?: "internships" | "programs" }) {
   const { user, logout } = useAuth();
   const qc = useQueryClient();
   const status = useQuery({ queryKey: ["status"], queryFn: api.status });
@@ -133,22 +133,26 @@ function Dashboard() {
             <div key={w} className="banner banner-warn" role="status">{w}</div>
           ))}
 
-          <Routes>
-            <Route path="/jobs" element={<Jobs />} />
-            <Route path="/job/:id" element={<JobDetail />} />
-            <Route path="/job/:id/interview" element={<InterviewStudio />} />
-            <Route path="/memory" element={<Memory />} />
-            <Route path="/review" element={<Review />} />
-            <Route path="/applications" element={<Applications />} />
-            <Route path="/sources" element={<Sources />} />
-            <Route path="/profile" element={<ProfilePage />} />
-            <Route path="/internships" element={<Internships embedded />} />
-            <Route path="/opportunities" element={<Opportunities embedded />} />
-            <Route
-              path="*"
-              element={<div className="empty"><div className="empty-title">Not found</div></div>}
-            />
-          </Routes>
+          {page === "internships" ? (
+            <Internships embedded />
+          ) : page === "programs" ? (
+            <Opportunities embedded />
+          ) : (
+            <Routes>
+              <Route path="/jobs" element={<Jobs />} />
+              <Route path="/job/:id" element={<JobDetail />} />
+              <Route path="/job/:id/interview" element={<InterviewStudio />} />
+              <Route path="/memory" element={<Memory />} />
+              <Route path="/review" element={<Review />} />
+              <Route path="/applications" element={<Applications />} />
+              <Route path="/sources" element={<Sources />} />
+              <Route path="/profile" element={<ProfilePage />} />
+              <Route
+                path="*"
+                element={<div className="empty"><div className="empty-title">Not found</div></div>}
+              />
+            </Routes>
+          )}
         </main>
       </div>
     </div>
@@ -166,10 +170,11 @@ export default function App() {
     <Route path="/" element={user ? <Navigate to="/jobs" replace /> : <Landing />} />
     <Route path="/login" element={<Navigate to="/?mode=login" replace />} />
     <Route path="/register" element={<Navigate to="/?mode=register" replace />} />
-    {/* Internships and Programs are public for visitors, but signed-in users
-        get the same dashboard shell (sidebar + topbar) as every other page. */}
-    <Route path="/opportunities" element={user ? <Dashboard /> : <Opportunities />} />
-    <Route path="/internships" element={user ? <Dashboard /> : <Internships />} />
+    {/* Programs stay public; internships are an account feature now. Both open
+        inside the dashboard shell for signed-in users, with the explicit page
+        prop because a descendant Routes would resolve against this path. */}
+    <Route path="/opportunities" element={user ? <Dashboard page="programs" /> : <Opportunities />} />
+    <Route path="/internships" element={user ? <Dashboard page="internships" /> : <Navigate to="/" replace />} />
     {/* Public regardless of session: these are opened from an email, and the
         link must not be swallowed by a redirect to /login. Confirming an
         address is also something a signed-in user does. */}

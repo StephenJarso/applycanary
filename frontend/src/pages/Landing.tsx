@@ -83,8 +83,8 @@ export default function Landing() {
               </button>
               {/* Design pack home links out to the public events & paid
                   programs screen from here. */}
-              <Link to="/internships" className="landing-cta-secondary">
-                Explore internships
+              <Link to="/opportunities" className="landing-cta-secondary">
+                Explore programs
                 <span className="material-symbols-outlined" aria-hidden="true">arrow_forward</span>
               </Link>
             </div>
