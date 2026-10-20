@@ -1,6 +1,6 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Navigate, NavLink, Route, Routes } from "react-router-dom";
+import { Navigate, NavLink, Route, Routes, useLocation } from "react-router-dom";
 import { api } from "./api";
 import Jobs from "./pages/Jobs";
 import JobDetail from "./pages/JobDetail";
@@ -24,16 +24,21 @@ import { useAuth } from "./context/AuthContext";
 // item simply lands on Jobs. Internships and Programs stay public for visitors
 // but open inside this same shell once someone is signed in.
 const NAV = [
-  { to: "/jobs", label: "Home", icon: "dashboard", end: true },
-  { to: "/review", label: "Discovery", icon: "search" },
+  { to: "/jobs", label: "Home", icon: "dashboard", end: true, mobile: true },
+  { to: "/review", label: "Discovery", icon: "search", mobile: true },
   { to: "/internships", label: "Internships & Opportunities", short: "Internships", icon: "school", end: true },
   { to: "/opportunities", label: "Programs", icon: "event", end: true },
-  { to: "/memory", label: "Memory", icon: "psychology" },
+  { to: "/memory", label: "Memory", icon: "psychology", mobile: true },
   { to: "/profile", label: "Profile", icon: "person" },
 ] as const;
 
+const MOBILE_MORE = NAV.filter((item) => !("mobile" in item && item.mobile));
+const MOBILE_MORE_PATHS = MOBILE_MORE.map((item) => item.to);
+
 function Dashboard({ page }: { page?: "internships" | "programs" }) {
   const { user, logout } = useAuth();
+  const location = useLocation();
+  const [moreOpen, setMoreOpen] = useState(false);
   const qc = useQueryClient();
   const status = useQuery({
     queryKey: ["status"],
@@ -67,6 +72,27 @@ function Dashboard({ page }: { page?: "internships" | "programs" }) {
   });
 
   const busy = poll.isPending || score.isPending;
+  const moreActive = MOBILE_MORE_PATHS.some(
+    (path) => location.pathname === path || location.pathname.startsWith(`${path}/`),
+  );
+
+  useEffect(() => {
+    setMoreOpen(false);
+  }, [location.pathname]);
+
+  useEffect(() => {
+    if (!moreOpen) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setMoreOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [moreOpen]);
 
   return (
     <div className="app">
@@ -88,13 +114,25 @@ function Dashboard({ page }: { page?: "internships" | "programs" }) {
             key={item.label}
             to={item.to}
             end={"end" in item ? item.end : false}
-            className="nav-link"
+            className={`nav-link${"mobile" in item && item.mobile ? "" : " nav-link-secondary"}`}
           >
             <span className="material-symbols-outlined" aria-hidden="true">{item.icon}</span>
             <span className="nav-label nav-label-full">{item.label}</span>
             <span className="nav-label nav-label-short">{"short" in item ? item.short : item.label}</span>
           </NavLink>
         ))}
+
+        <button
+          type="button"
+          className="nav-link nav-more"
+          onClick={() => setMoreOpen(true)}
+          aria-expanded={moreOpen}
+          aria-controls="mobile-more-menu"
+          aria-current={moreActive ? "page" : undefined}
+        >
+          <span className="material-symbols-outlined" aria-hidden="true">menu</span>
+          <span className="nav-label">More</span>
+        </button>
 
         <div className="sidebar-foot">
           <button
@@ -120,6 +158,50 @@ function Dashboard({ page }: { page?: "internships" | "programs" }) {
           </div>
         </div>
       </nav>
+
+      {moreOpen && (
+        <div className="mobile-more-backdrop" onClick={() => setMoreOpen(false)}>
+          <aside
+            id="mobile-more-menu"
+            className="mobile-more-panel"
+            role="dialog"
+            aria-modal="true"
+            aria-label="More navigation"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="mobile-more-head">
+              <div>
+                <div className="mobile-more-eyebrow">ApplyCanary</div>
+                <h2 className="mobile-more-title">More</h2>
+              </div>
+              <button
+                type="button"
+                className="btn-ghost mobile-more-close"
+                onClick={() => setMoreOpen(false)}
+                aria-label="Close menu"
+                autoFocus
+              >
+                <span className="material-symbols-outlined" aria-hidden="true">close</span>
+              </button>
+            </div>
+
+            <nav className="mobile-more-links" aria-label="More pages">
+              {MOBILE_MORE.map((item) => (
+                <NavLink
+                  key={item.label}
+                  to={item.to}
+                  end={"end" in item ? item.end : false}
+                  className="mobile-more-link"
+                >
+                  <span className="material-symbols-outlined" aria-hidden="true">{item.icon}</span>
+                  <span>{item.label}</span>
+                  <span className="material-symbols-outlined mobile-more-arrow" aria-hidden="true">chevron_right</span>
+                </NavLink>
+              ))}
+            </nav>
+          </aside>
+        </div>
+      )}
 
       <div className="main">
         <header className="topbar">
