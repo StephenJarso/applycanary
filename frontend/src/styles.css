@@ -1110,6 +1110,7 @@ tbody tr:hover { background: var(--bg-hover); }
 .chip-hit { border-color: color-mix(in srgb, var(--ok) 40%, transparent); color: var(--ok); background: var(--ok-bg); }
 .chip-miss { border-color: color-mix(in srgb, var(--bad) 40%, transparent); color: var(--bad); background: var(--bad-bg); }
 .chip-accent { border-color: color-mix(in srgb, var(--accent) 40%, transparent); color: var(--accent); background: var(--accent-bg); }
+.chip-warn { border-color: color-mix(in srgb, var(--warn) 40%, transparent); color: var(--warn); background: var(--warn-bg); }
 .chips { display: flex; flex-wrap: wrap; gap: 4px; }
 
 .dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
