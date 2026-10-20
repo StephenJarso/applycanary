@@ -2,14 +2,14 @@
 
 The page is fed by two very different kinds of data:
 
-* **Events** are fetched live from Tech Group Kenya's public calendar — the
-  source the design's listings came from. The index page is server-rendered
-  HTML carrying one ``event-card`` anchor per event, and each event's own page
-  carries a schema.org/Event JSON-LD block with its description, ISO start
-  time, organiser, city and ticket price. Their JSON endpoint exists but is
-  key-gated, so HTML it is; the fetch stays deliberately polite — one index
-  request per refresh, each event's detail page cached for hours, concurrency
-  capped, and a real User-Agent.
+* **Events** come from two public calendars. Tech Group Kenya's site is
+  server-rendered HTML carrying one ``event-card`` anchor per event, and each
+  event's page carries schema.org/Event JSON-LD with description, ISO start
+  time, organiser, city and ticket price. Their JSON endpoint is key-gated, so
+  HTML it is. GDG chapters publish through Bevy's public API, which catches
+  events (like DevFest Kisumu) that never reach the TGK calendar. Both fetches
+  are polite and independently fault-tolerant; a failure in one does not
+  erase the other.
 
 * **Paid programs and internships** have no public API anywhere: application
   windows and compensation are published as prose on each site. They are
@@ -32,13 +32,28 @@ import logging
 import re
 import time
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import UTC, datetime, timedelta, timezone
 
 import httpx
 
 log = logging.getLogger(__name__)
 
 INDEX_URL = "https://events.techgroupkenya.co.ke/events/"
+GDG_API = "https://gdg.community.dev/api/event_slim/for_chapter/{chapter}/"
+# Chapter ids are stable in Bevy URLs; city is used when the slim payload has
+# no venue. Add a chapter here to widen the feed.
+GDG_CHAPTERS: dict[int, tuple[str, str]] = {
+    841: ("GDG Kisumu", "Kisumu"),
+    826: ("GDG Nairobi", "Nairobi"),
+    816: ("GDG Eldoret", "Eldoret"),
+    554: ("GDG Kisii", "Kisii"),
+}
+GDG_FIELDS = (
+    "title,start_date,end_date,url,description,description_short,"
+    "chapter_title,event_type_title,cohost_registration_url"
+)
+GDG_SOURCE = "GDG Community"
+EAT = timezone(timedelta(hours=3))
 # Identify the client honestly, as the job connectors do.
 USER_AGENT = "applycanary/0.1 (personal job search agent; +https://github.com)"
 SOURCE_NAME = "TGK Events"
@@ -610,26 +625,142 @@ async def _detail_for(client: httpx.AsyncClient, card: CardEvent) -> DetailEvent
     return detail
 
 
+async def _fetch_tgk(client: httpx.AsyncClient) -> list[dict]:
+    """One index request plus cached detail pages from the TGK calendar."""
+    cards = parse_event_cards(await _get(client, INDEX_URL))[:MAX_EVENTS]
+    semaphore = asyncio.Semaphore(ENRICH_CONCURRENCY)
+
+    async def enrich(card: CardEvent) -> DetailEvent | None:
+        async with semaphore:
+            return await _detail_for(client, card)
+
+    results = await asyncio.gather(*(enrich(card) for card in cards))
+    return [
+        _to_item(card, detail if isinstance(detail, DetailEvent) else None)
+        for card, detail in zip(cards, results, strict=True)
+    ]
+
+
+def _api_dt(value: object) -> datetime | None:
+    if not isinstance(value, str):
+        return None
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return parsed if parsed.tzinfo else parsed.replace(tzinfo=UTC)
+
+
+def _gdg_item(event: dict, chapter: str, city: str) -> dict | None:
+    """One Bevy event-slim row → the same shape as a TGK event."""
+    title = str(event.get("title") or "").strip()
+    url = str(event.get("url") or event.get("cohost_registration_url") or "").strip()
+    start = _api_dt(event.get("start_date"))
+    if not title or not url or start is None:
+        return None
+
+    start_local = start.astimezone(EAT)
+    end = _api_dt(event.get("end_date"))
+    end_local = end.astimezone(EAT) if end else None
+    when = f"{start_local:%d %b %Y} · {start_local:%H:%M}"
+    if end_local and end_local.date() == start_local.date():
+        when += f"–{end_local:%H:%M}"
+
+    raw_desc = str(event.get("description_short") or event.get("description") or "")
+    desc = re.sub(r"\s+", " ", html_lib.unescape(re.sub(r"<[^>]+>", " ", raw_desc))).strip()
+    desc = re.sub(r"\s+([.,;:!?])", r"\1", desc)
+    fee = str(event.get("event_type_title") or "").strip()
+
+    return {
+        "kind": "Event",
+        "title": title,
+        "org": chapter,
+        "date": start_local.date().isoformat(),
+        "when": when,
+        "city": city,
+        "tags": ["GDG", "Community"],
+        "source": GDG_SOURCE,
+        "url": url,
+        "stipend": fee if "free" in fee.lower() else None,
+        "opens": None,
+        "closes": None,
+        "steps": None,
+        "desc": desc[:2000],
+    }
+
+
+async def _fetch_gdg(client: httpx.AsyncClient) -> list[dict]:
+    """Upcoming events from the curated GDG chapters' public Bevy API."""
+    now = datetime.now(UTC)
+
+    async def one(chapter_id: int, chapter: str, city: str) -> list[dict]:
+        try:
+            resp = await client.get(
+                GDG_API.format(chapter=chapter_id),
+                params={"status": "Published", "fields": GDG_FIELDS},
+                headers={"Accept": "application/json"},
+                timeout=REQUEST_TIMEOUT,
+            )
+            resp.raise_for_status()
+            payload = resp.json()
+        except Exception as exc:  # noqa: BLE001 - one chapter must not sink the feed
+            log.debug("opportunities: GDG chapter %s failed: %s", chapter, exc)
+            return []
+        items: list[dict] = []
+        for event in payload.get("results") or []:
+            if not isinstance(event, dict):
+                continue
+            item = _gdg_item(event, chapter, city)
+            start = _api_dt(event.get("start_date"))
+            if item and start and start >= now - timedelta(hours=12):
+                items.append(item)
+        return items
+
+    groups = await asyncio.gather(
+        *(one(chapter_id, chapter, city) for chapter_id, (chapter, city) in GDG_CHAPTERS.items())
+    )
+    return [item for group in groups for item in group]
+
+
+def _dedupe_events(items: list[dict]) -> list[dict]:
+    """TGK wins over a GDG duplicate (it carries the venue detail)."""
+    seen: set[tuple[str, str]] = set()
+    out: list[dict] = []
+    for item in items:
+        key = (str(item.get("title") or "").strip().lower(), str(item.get("date") or ""))
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(item)
+    return out
+
+
 async def _fetch_feed() -> tuple[list[dict], datetime]:
-    """One index request plus cached detail pages → opportunity dicts."""
+    """Both calendars in parallel, each isolated; stale data survives one outage."""
     async with httpx.AsyncClient(
         timeout=REQUEST_TIMEOUT,
         headers={"User-Agent": USER_AGENT, "Accept": "text/html"},
         follow_redirects=True,
     ) as client:
-        cards = parse_event_cards(await _get(client, INDEX_URL))[:MAX_EVENTS]
-        semaphore = asyncio.Semaphore(ENRICH_CONCURRENCY)
+        tgk_result, gdg_result = await asyncio.gather(
+            _fetch_tgk(client), _fetch_gdg(client), return_exceptions=True
+        )
 
-        async def enrich(card: CardEvent) -> DetailEvent | None:
-            async with semaphore:
-                return await _detail_for(client, card)
+    if isinstance(tgk_result, Exception):
+        log.warning("opportunities: TGK feed failed: %s", tgk_result)
+        tgk_items = [i for i in _feed.items if i.get("source") == SOURCE_NAME]
+    else:
+        tgk_items = tgk_result
+    if isinstance(gdg_result, Exception):
+        log.warning("opportunities: GDG feed failed: %s", gdg_result)
+        gdg_items = [i for i in _feed.items if i.get("source") == GDG_SOURCE]
+    else:
+        gdg_items = gdg_result
 
-        results = await asyncio.gather(*(enrich(card) for card in cards))
-        items = [
-            _to_item(card, detail if isinstance(detail, DetailEvent) else None)
-            for card, detail in zip(cards, results, strict=True)
-        ]
-    return items, datetime.now().astimezone()
+    if isinstance(tgk_result, Exception) and isinstance(gdg_result, Exception):
+        raise tgk_result
+
+    return _dedupe_events([*tgk_items, *gdg_items]), datetime.now().astimezone()
 
 
 async def refresh_events(force: bool = False) -> Feed:

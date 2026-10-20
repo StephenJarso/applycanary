@@ -15,6 +15,7 @@ import asyncio
 import time
 from datetime import UTC, datetime, timedelta, timezone
 
+import httpx
 import pytest
 from fastapi.testclient import TestClient
 
@@ -24,6 +25,10 @@ from app.opportunities import (
     PAID_PROGRAMS,
     CardEvent,
     Feed,
+    _dedupe_events,
+    _fetch_feed,
+    _fetch_gdg,
+    _gdg_item,
     _to_item,
     parse_card_date,
     parse_event_cards,
@@ -176,6 +181,99 @@ def test_event_item_falls_back_to_the_card_when_detail_is_missing():
     assert item["when"] == "Oct 15, 2026"
     assert item["org"] == "Tech Group Kenya"
     assert item["desc"] == ""
+
+
+def test_gdg_item_uses_east_africa_time_and_flags_free_registration():
+    item = _gdg_item(
+        {
+            "title": "Devfest Kisumu 2026",
+            "start_date": "2026-11-21T05:00:00Z",
+            "end_date": "2026-11-21T14:30:00Z",
+            "url": "https://gdg.community.dev/events/details/devfest-kisumu/",
+            "description_short": "Devfest Kisumu invites <b>tech enthusiasts</b>.",
+            "event_type_title": "Free registration",
+        },
+        "GDG Kisumu",
+        "Kisumu",
+    )
+    assert item is not None
+    assert item["date"] == "2026-11-21"
+    assert item["when"] == "21 Nov 2026 · 08:00–17:30"
+    assert item["city"] == "Kisumu"
+    assert item["org"] == "GDG Kisumu"
+    assert item["source"] == "GDG Community"
+    assert item["stipend"] == "Free registration"
+    assert item["desc"] == "Devfest Kisumu invites tech enthusiasts."
+
+
+def test_gdg_item_requires_title_url_and_start():
+    good = {"title": "Devfest", "start_date": "2026-11-21T05:00:00Z"}
+    assert _gdg_item({**good, "url": "https://gdg.community.dev/e/1"}, "GDG", "Kisumu")
+    assert _gdg_item({**good, "url": "https://gdg.community.dev/e/1", "title": ""}, "GDG", "Kisumu") is None
+    assert _gdg_item({**good, "title": "Devfest"}, "GDG", "Kisumu") is None
+    assert _gdg_item({"title": "Devfest", "url": "https://gdg.community.dev/e/1"}, "GDG", "Kisumu") is None
+
+
+def test_fetch_gdg_keeps_future_events_and_ignores_a_failing_chapter(monkeypatch):
+    future = (datetime.now(UTC) + timedelta(days=10)).isoformat().replace("+00:00", "Z")
+    past = (datetime.now(UTC) - timedelta(days=10)).isoformat().replace("+00:00", "Z")
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if "841" in request.url.path:
+            return httpx.Response(
+                200,
+                json={
+                    "results": [
+                        {"title": "Past meetup", "start_date": past, "url": "https://gdg.community.dev/e/past"},
+                        {"title": "Devfest Kisumu 2026", "start_date": future,
+                         "url": "https://gdg.community.dev/e/devfest"},
+                    ]
+                },
+            )
+        return httpx.Response(500, text="boom")
+
+    monkeypatch.setattr("app.opportunities.GDG_CHAPTERS", {841: ("GDG Kisumu", "Kisumu"), 826: ("GDG Nairobi", "Nairobi")})
+
+    async def run():
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+            return await _fetch_gdg(client)
+
+    items = asyncio.run(run())
+    assert [item["title"] for item in items] == ["Devfest Kisumu 2026"]
+    assert items[0]["city"] == "Kisumu"
+
+
+def test_dedupe_events_prefers_the_tgk_copy():
+    tgk = {"title": "DevFest Kisii 2026", "date": "2026-10-31", "source": "TGK Events"}
+    gdg = {"title": "devfest kisii 2026", "date": "2026-10-31", "source": "GDG Community"}
+    other = {"title": "Devfest Kisumu 2026", "date": "2026-11-21", "source": "GDG Community"}
+    assert _dedupe_events([tgk, gdg, other]) == [tgk, other]
+
+
+def test_feed_merges_both_calendars_and_keeps_stale_tgk_on_outage(monkeypatch):
+    stale = {"title": "Old TGK event", "date": "2026-01-01", "source": "TGK Events"}
+    monkeypatch.setattr("app.opportunities._feed", Feed(items=[stale]))
+
+    async def broken_tgk(client):
+        raise RuntimeError("tag down")
+
+    async def gdg(client):
+        return [{"title": "Devfest Kisumu 2026", "date": "2026-11-21", "source": "GDG Community"}]
+
+    monkeypatch.setattr("app.opportunities._fetch_tgk", broken_tgk)
+    monkeypatch.setattr("app.opportunities._fetch_gdg", gdg)
+    items, _ = asyncio.run(_fetch_feed())
+    assert [item["title"] for item in items] == ["Old TGK event", "Devfest Kisumu 2026"]
+
+
+def test_feed_raises_only_when_both_calendars_fail(monkeypatch):
+    async def boom(client):
+        raise RuntimeError("down")
+
+    monkeypatch.setattr("app.opportunities._fetch_tgk", boom)
+    monkeypatch.setattr("app.opportunities._fetch_gdg", boom)
+    with pytest.raises(RuntimeError, match="down"):
+        asyncio.run(_fetch_feed())
 
 
 def test_online_event_is_bucketed_under_online():
