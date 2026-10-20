@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
-import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../api";
+import PublicNav from "../PublicNav";
 import { ErrorBox, Loading, relTime } from "../components";
 import {
   OpportunityCard,
@@ -34,7 +34,7 @@ function Chip({ on, onClick, children }: { on: boolean; onClick: () => void; chi
   );
 }
 
-export default function Opportunities() {
+export default function Opportunities({ embedded = false }: { embedded?: boolean }) {
   const { data, isPending, error } = useQuery({
     queryKey: ["opportunities"],
     queryFn: api.opportunities,
@@ -83,23 +83,35 @@ export default function Opportunities() {
     setStatusFilter("All");
   };
 
+  const blurb = (
+    <>
+      Tech events near you in Kenya and programs that pay you to learn, with
+      application timelines sorted by nearest deadline. Program dates are
+      estimated from past cycles — confirm on the official site.
+    </>
+  );
+
   return (
-    <div className="opp-page">
-      <a className="skip-link" href="#main">Skip to content</a>
-
-      <header className="opp-header">
-        <div className="opp-header-inner">
-          <Link to="/" className="opp-back">← ApplyCanary</Link>
-          <h1>Events &amp; paid programs</h1>
-          <p>
-            Tech events near you in Kenya and programs that pay you to learn, with
-            application timelines sorted by nearest deadline. Program dates are
-            estimated from past cycles — confirm on the official site.
-          </p>
+    <div className={`opp-page${embedded ? " opp-embedded" : ""}`}>
+      {embedded ? (
+        <div className="page-intro">
+          <h2 className="page-title">Programs</h2>
+          <p className="page-sub">{blurb}</p>
         </div>
-      </header>
+      ) : (
+        <>
+          <PublicNav />
+          <a className="skip-link" href="#main">Skip to content</a>
+          <header className="opp-header">
+            <div className="opp-header-inner">
+              <h1>Events &amp; paid programs</h1>
+              <p>{blurb}</p>
+            </div>
+          </header>
+        </>
+      )}
 
-      <main id="main" className="opp-layout">
+      <main id={embedded ? undefined : "main"} className="opp-layout">
         <aside className="opp-filters" aria-label="Filters">
           <input
             type="search"

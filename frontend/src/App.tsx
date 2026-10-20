@@ -20,9 +20,8 @@ import { useAuth } from "./context/AuthContext";
 // Side nav per the design pack (dashboard_1/job_discovery_1 code.html):
 // Home, Discovery, Interview, Memory, Profile — with Material Symbols matching
 // the mockups. Interview routes per-job (JobDetail → AI Interview), so the nav
-// item simply lands on Jobs. Internships and Programs are public pages, so
-// they live outside the shell (see App() below) but are still one click away
-// from here.
+// item simply lands on Jobs. Internships and Programs stay public for visitors
+// but open inside this same shell once someone is signed in.
 const NAV = [
   { to: "/jobs", label: "Home", icon: "dashboard", end: true },
   { to: "/review", label: "Discovery", icon: "search" },
@@ -143,6 +142,8 @@ function Dashboard() {
             <Route path="/applications" element={<Applications />} />
             <Route path="/sources" element={<Sources />} />
             <Route path="/profile" element={<ProfilePage />} />
+            <Route path="/internships" element={<Internships embedded />} />
+            <Route path="/opportunities" element={<Opportunities embedded />} />
             <Route
               path="*"
               element={<div className="empty"><div className="empty-title">Not found</div></div>}
@@ -165,12 +166,10 @@ export default function App() {
     <Route path="/" element={user ? <Navigate to="/jobs" replace /> : <Landing />} />
     <Route path="/login" element={<Navigate to="/?mode=login" replace />} />
     <Route path="/register" element={<Navigate to="/?mode=register" replace />} />
-    {/* Public regardless of session, like the landing page: the design's
-        events & paid programs screen carries its own header and back link,
-        so it renders outside the dashboard shell (signed-in users reach it
-        from the sidebar). */}
-    <Route path="/opportunities" element={<Opportunities />} />
-    <Route path="/internships" element={<Internships />} />
+    {/* Internships and Programs are public for visitors, but signed-in users
+        get the same dashboard shell (sidebar + topbar) as every other page. */}
+    <Route path="/opportunities" element={user ? <Dashboard /> : <Opportunities />} />
+    <Route path="/internships" element={user ? <Dashboard /> : <Internships />} />
     {/* Public regardless of session: these are opened from an email, and the
         link must not be swallowed by a redirect to /login. Confirming an
         address is also something a signed-in user does. */}

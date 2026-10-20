@@ -1,6 +1,7 @@
-import { useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Link, useLocation, useSearchParams } from "react-router-dom";
 import AuthPanel, { type AuthMode } from "./AuthPanel";
+import PublicNav from "../PublicNav";
 
 /**
  * Public marketing page with an embedded auth form. Signed-out visitors land
@@ -23,17 +24,18 @@ import AuthPanel, { type AuthMode } from "./AuthPanel";
  *   5. Footer
  */
 
-const NAV_ANCHORS = [
-  { href: "#how-it-works", label: "How it Works" },
-  { href: "#features", label: "Features" },
-  { href: "#infrastructure", label: "Infrastructure" },
-] as const;
-
 export default function Landing() {
   // The nav's Login / Sign-Up buttons swap the page between marketing mode
   // and an embedded auth panel (same URL). ?mode=login|register deep-links
   // into a panel from anywhere (old /login bookmarks land on /?mode=login).
   const [params] = useSearchParams();
+  const location = useLocation();
+  // "How it Works" etc. from a public feed page routes back here with a hash;
+  // React Router does not scroll to it for us.
+  useEffect(() => {
+    if (!location.hash) return;
+    document.getElementById(location.hash.slice(1))?.scrollIntoView({ behavior: "smooth" });
+  }, [location.hash]);
   const initial = params.get("mode") === "register" ? "register" : params.get("mode") === "login" ? "login" : null;
   const [panel, setPanel] = useState<AuthMode | null>(initial);
   // The card lives in the hero at the top of the page. The nav is sticky, so
@@ -48,24 +50,11 @@ export default function Landing() {
 
   return (
     <div className="landing">
-      <header className="landing-nav">
-        <div className="landing-nav-inner">
-          <Link to="/" className="brand" aria-label="ApplyCanary home">
-            <span className="brand-name">ApplyCanary</span>
-          </Link>
-          <nav className="landing-nav-links" aria-label="Sections">
-            {NAV_ANCHORS.map((a) => (
-              <a key={a.href} href={a.href}>{a.label}</a>
-            ))}
-          </nav>
-          <div className="landing-nav-actions">
-            {/* Always shown — no Back state: clicking an already-open mode
-                just scrolls the visitor back up to the form. */}
-            <button type="button" className="landing-login" onClick={() => openPanel("login")}>Login</button>
-            <button type="button" className="btn-primary landing-signup" onClick={() => openPanel("register")}>Sign Up</button>
-          </div>
-        </div>
-      </header>
+      <PublicNav
+        localSections
+        onLogin={() => openPanel("login")}
+        onSignup={() => openPanel("register")}
+      />
 
       <main>
         {/* ------------------------------------------------ Hero */}

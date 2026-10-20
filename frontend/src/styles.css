@@ -2146,7 +2146,8 @@ input[type="range"]::-moz-range-thumb {
   font-weight: 600;
   color: var(--text-dim);
 }
-.landing-nav-links a:hover { color: var(--text); background: var(--bg-hover); }
+.landing-nav-links a:hover,
+.landing-nav-links a.active { color: var(--text); background: var(--bg-hover); }
 .landing-nav-actions { margin-left: auto; display: flex; align-items: center; gap: 14px; }
 .landing-login { font-size: 13.5px; font-weight: 700; color: var(--text); }
 .landing-login:hover { color: var(--accent); }
@@ -2673,6 +2674,11 @@ input[type="range"]::-moz-range-thumb {
   color: var(--text);
 }
 
+.opp-embedded { min-height: 0; background: transparent; }
+.opp-embedded .opp-layout {
+  max-width: none;
+  padding: 8px 0 40px;
+}
 .opp-header { border-bottom: 1px solid var(--border); background: var(--ac-surface-container-low); }
 .opp-header-inner {
   max-width: 1160px;

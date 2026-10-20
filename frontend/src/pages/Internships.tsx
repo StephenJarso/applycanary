@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
-import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../api";
+import PublicNav from "../PublicNav";
 import { ErrorBox, Loading } from "../components";
 import {
   OpportunityCard,
@@ -19,7 +19,7 @@ import {
 const STATUSES = ["All", "Open now", "Opening soon", "Rolling"] as const;
 const BASE_LOCATIONS = ["Tokyo", "Kenya", "Online"];
 
-export default function Internships() {
+export default function Internships({ embedded = false }: { embedded?: boolean }) {
   const { data, isPending, error } = useQuery({
     queryKey: ["internships"],
     queryFn: api.internships,
@@ -67,23 +67,35 @@ export default function Internships() {
   const paid = items.filter((o) => o.stipend?.startsWith("Paid:")).length;
   const unpaid = items.filter((o) => o.stipend?.startsWith("Unpaid")).length;
 
+  const blurb = (
+    <>
+      Paid, unpaid-with-benefits and free internships, with compensation,
+      location and application steps stated upfront. Deadlines are estimated
+      from past cycles — confirm on the official site.
+    </>
+  );
+
   return (
-    <div className="opp-page">
-      <a className="skip-link" href="#main">Skip to content</a>
-
-      <header className="opp-header">
-        <div className="opp-header-inner">
-          <Link to="/" className="opp-back">← ApplyCanary</Link>
-          <h1>Internships</h1>
-          <p>
-            Paid, unpaid-with-benefits and free internships, with compensation,
-            location and application steps stated upfront. Deadlines are
-            estimated from past cycles — confirm on the official site.
-          </p>
+    <div className={`opp-page${embedded ? " opp-embedded" : ""}`}>
+      {embedded ? (
+        <div className="page-intro">
+          <h2 className="page-title">Internships</h2>
+          <p className="page-sub">{blurb}</p>
         </div>
-      </header>
+      ) : (
+        <>
+          <PublicNav />
+          <a className="skip-link" href="#main">Skip to content</a>
+          <header className="opp-header">
+            <div className="opp-header-inner">
+              <h1>Internships</h1>
+              <p>{blurb}</p>
+            </div>
+          </header>
+        </>
+      )}
 
-      <main id="main" className="opp-layout">
+      <main id={embedded ? undefined : "main"} className="opp-layout">
         <aside className="opp-filters" aria-label="Filters">
           <input
             type="search"
