@@ -1,6 +1,6 @@
 """Settings-level tests for LLM enablement, email backend, and warnings."""
 
-from app.config import Settings
+from app.config import Settings, in_container
 
 # The provider chain in app.llm.client._build_provider_order accepts xAI,
 # Gemini, OpenRouter, Groq, Ollama, Anthropic and Bedrock. `llm_enabled` must
@@ -83,3 +83,37 @@ def test_email_warning_when_disabled() -> None:
 def test_no_email_warning_when_resend_configured() -> None:
     s = Settings(resend_api_key="re_test")
     assert not any("No email backend" in w for w in s.startup_warnings())
+
+
+# ---------------------------------------------------------------------------
+# Bind-address and GitHub warnings: noise control for managed platforms.
+# ---------------------------------------------------------------------------
+
+
+def test_render_env_is_detected_as_container(monkeypatch) -> None:
+    in_container.cache_clear()
+    monkeypatch.setenv("RENDER", "true")
+    try:
+        assert in_container()
+    finally:
+        in_container.cache_clear()
+
+
+def test_host_warning_on_non_container(monkeypatch) -> None:
+    monkeypatch.setattr("app.config.in_container", lambda: False)
+    s = Settings(host="0.0.0.0", secret_key="x" * 40)
+    assert any("HOST is 0.0.0.0" in w for w in s.startup_warnings())
+
+
+def test_no_host_warning_in_container_with_real_secret(monkeypatch) -> None:
+    monkeypatch.setattr("app.config.in_container", lambda: True)
+    s = Settings(host="0.0.0.0", secret_key="x" * 40)
+    assert not any(w.startswith("HOST is") for w in s.startup_warnings())
+
+
+def test_github_warning_says_profile_values_still_work() -> None:
+    s = Settings(github_username="")
+    assert any(
+        "GITHUB_USERNAME is unset" in w and "Profiles with their own" in w
+        for w in s.startup_warnings()
+    )

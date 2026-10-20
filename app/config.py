@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from functools import lru_cache
 from pathlib import Path
 
@@ -23,6 +24,11 @@ def in_container() -> bool:
     Podman and Kubernetes, where that file is absent.
     """
     if Path("/.dockerenv").exists() or Path("/run/.containerenv").exists():
+        return True
+    # Managed platforms run containers but often hide /.dockerenv and use cgroup
+    # v2, whose /proc/1/cgroup has no "docker" tag. Their own env marker is the
+    # reliable signal, and this only affects how a warning is phrased.
+    if os.environ.get("RENDER") or os.environ.get("KUBERNETES_SERVICE_HOST"):
         return True
     try:
         cgroup = Path("/proc/1/cgroup").read_text(encoding="utf-8", errors="ignore")
@@ -330,7 +336,8 @@ class Settings(BaseSettings):
             )
         if not self.github_username:
             warnings.append(
-                "GITHUB_USERNAME is unset: CV tailoring has no GitHub evidence to draw on."
+                "GITHUB_USERNAME is unset: no server-side GitHub fallback is "
+                "configured. Profiles with their own GitHub username are unaffected."
             )
         if self.enable_auto_submit:
             warnings.append(
