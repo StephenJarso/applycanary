@@ -1046,22 +1046,24 @@ async def trigger_poll(
     session: Session = Depends(get_session),
     user: User = Depends(current_user),
 ) -> ActionResult:
-    from app.pipeline.ingest import poll_broad, poll_curated
+    from app.pipeline.ingest import poll_broad, poll_careers, poll_curated
     from app.pipeline.score import score_pending
 
     curated = await poll_curated()
+    careers = await poll_careers()
     broad = await poll_broad()
-    found = curated.found + broad.found
-    new = curated.new + broad.new
+    runs = (curated, careers, broad)
+    found = sum(r.found for r in runs)
+    new = sum(r.new for r in runs)
     scored = await score_pending(session, user_id=user.id, limit=50)
     return ActionResult(
         ok=True,
         message=f"Found {found} postings, {new} new; scored {scored} for your profile.",
         detail={
             "found": found, "new": new, "scored": scored,
-            "duplicates": curated.duplicates + broad.duplicates,
-            "failed_sources": curated.sources_failed + broad.sources_failed,
-            "errors": [*curated.errors, *broad.errors],
+            "duplicates": sum(r.duplicates for r in runs),
+            "failed_sources": sum(r.sources_failed for r in runs),
+            "errors": [e for r in runs for e in r.errors],
         },
     )
 
