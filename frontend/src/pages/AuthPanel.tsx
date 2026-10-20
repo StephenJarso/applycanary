@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from "react";
+import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { ApiError, api } from "../api";
 
@@ -144,6 +145,11 @@ export default function AuthPanel({ mode, onModeChange }: Props) {
       <div className="auth-field">
         <div className="auth-label-row">
           <label htmlFor="panel-password">Password</label>
+          {mode === "login" && (
+            <Link to="/forgot-password" tabIndex={3}>
+              Forgot password?
+            </Link>
+          )}
         </div>
         <input
           id="panel-password" type="password" value={password}

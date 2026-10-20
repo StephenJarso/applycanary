@@ -38,7 +38,7 @@ export function FeedbackModal({ isOpen, onClose }: Props) {
   if (!isOpen) return null;
 
   return (
-    <div className="mobile-more-backdrop" onClick={onClose} style={{ zIndex: 1200 }}>
+    <div className="modal-backdrop" onClick={onClose}>
       <div
         className="card"
         role="dialog"

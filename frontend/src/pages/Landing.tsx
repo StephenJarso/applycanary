@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
 import AuthPanel, { type AuthMode } from "./AuthPanel";
 import PublicNav from "../PublicNav";
+import { FeedbackModal } from "../FeedbackModal";
 
 /**
  * Public marketing page with an embedded auth form. Signed-out visitors land
@@ -38,6 +39,7 @@ export default function Landing() {
   }, [location.hash]);
   const initial = params.get("mode") === "register" ? "register" : params.get("mode") === "login" ? "login" : null;
   const [panel, setPanel] = useState<AuthMode | null>(initial);
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
   // The card lives in the hero at the top of the page. The nav is sticky, so
   // it stays visible when the visitor has scrolled down — but the form does
   // not. Every open/switch therefore scrolls the window back up so the
@@ -294,12 +296,21 @@ export default function Landing() {
       <footer className="landing-footer">
         <span>© {new Date().getFullYear()} ApplyCanary. Professional Career Agent.</span>
         <span className="landing-footer-links">
+          <button
+            type="button"
+            className="landing-footer-link"
+            onClick={() => setFeedbackOpen(true)}
+            style={{ background: "none", border: "none", color: "inherit", font: "inherit", cursor: "pointer", padding: 0 }}
+          >
+            Contact / Feedback
+          </button>
           <Link to="/internships">Internships</Link>
           <Link to="/opportunities">Events &amp; programs</Link>
           <Link to="/?mode=login">Sign in</Link>
           <Link to="/?mode=register">Create account</Link>
         </span>
       </footer>
+      <FeedbackModal isOpen={feedbackOpen} onClose={() => setFeedbackOpen(false)} />
     </div>
   );
 }
