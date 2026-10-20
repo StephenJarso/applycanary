@@ -11,9 +11,12 @@ The page is fed by two very different kinds of data:
   request per refresh, each event's detail page cached for hours, concurrency
   capped, and a real User-Agent.
 
-* **Paid programs** have no public API anywhere: application windows are
-  published as prose on each program's site. They are curated here, server
-  side, so adding one is a backend change rather than a frontend rebuild.
+* **Paid programs and internships** have no public API anywhere: application
+  windows and compensation are published as prose on each site. They are
+  curated here, server side, so adding one is a backend change rather than a
+  frontend rebuild. Compensation is stated explicitly ("Paid:", "Unpaid +
+  benefits:") and tagged, and internships are split out under their own kind
+  for the dedicated tab.
 
 A failed fetch never fails the request. The last good event list keeps being
 served for ``STALE_TTL`` and ``events_live`` reports the difference, so the UI
@@ -99,8 +102,8 @@ PAID_PROGRAMS: list[dict] = [
             "Internship May–Aug",
         ],
         "city": "Online",
-        "tags": ["Open source", "Women in tech", "Beginners"],
-        "stipend": "USD 7,000",
+        "tags": ["Paid", "Open source", "Women in tech", "Beginners"],
+        "stipend": "Paid: USD 7,000 stipend",
         "source": "Official",
         "url": "https://www.outreachy.org/",
         "desc": "Remote, 3-month open-source internships for people underrepresented in tech. Kenyans eligible.",
@@ -119,8 +122,8 @@ PAID_PROGRAMS: list[dict] = [
             "Internship Dec–Mar",
         ],
         "city": "Online",
-        "tags": ["Open source", "Women in tech", "Beginners"],
-        "stipend": "USD 7,000",
+        "tags": ["Paid", "Open source", "Women in tech", "Beginners"],
+        "stipend": "Paid: USD 7,000 stipend",
         "source": "Official",
         "url": "https://www.outreachy.org/",
         "desc": "Second yearly Outreachy cohort, same remote format and stipend.",
@@ -169,8 +172,8 @@ PAID_PROGRAMS: list[dict] = [
         "closes": "2027-02-28",
         "steps": ["Apply ~Jan → Feb", "Skill test & proposals Mar–Apr", "Internship May–Aug"],
         "city": "Online",
-        "tags": ["Bitcoin", "Open source", "Students"],
-        "stipend": "USD 3,000",
+        "tags": ["Paid", "Bitcoin", "Open source", "Students"],
+        "stipend": "Paid: USD 3,000 stipend",
         "source": "Official",
         "url": "https://www.summerofbitcoin.org/",
         "desc": "Global summer internship in Bitcoin open-source development for university students.",
@@ -269,8 +272,8 @@ PAID_PROGRAMS: list[dict] = [
             "1 year across MDAs & partner institutions",
         ],
         "city": "Kenya",
-        "tags": ["Careers", "Students", "Government"],
-        "stipend": "Government stipend (1 year)",
+        "tags": ["Paid", "Careers", "Students", "Government"],
+        "stipend": "Paid: government stipend (1 year)",
         "source": "Official",
         "url": "https://ict.go.ke/presidential-digital-talent-program-pdtp",
         "desc": "Kenya's paid digital internship: unemployed youth aged 21–29 spend a year in public and partner institutions, with a government stipend.",
@@ -310,6 +313,51 @@ PAID_PROGRAMS: list[dict] = [
         "url": "https://github.com/education/students/campus-expert",
         "desc": "Student leaders get free training, resources and funding to run tech communities at their institution.",
     },
+]
+
+# Curated entries can be internships as well as pay-to-learn programs. Keeping
+# the same shape lets the page reuse one card component; the dedicated
+# Internship tab is just a `kind` filter. Compensation is stated explicitly —
+# "Paid:", "Unpaid + benefits:" — and tagged, so paying and unpaid placements
+# are distinguishable at a glance.
+_INTERNSHIP_TITLES = {
+    "Outreachy (May 2027 cohort)",
+    "Outreachy (Dec 2027 cohort)",
+    "Summer of Bitcoin",
+    "Presidential Digital Talent Programme",
+}
+
+INTERNSHIPS: list[dict] = [
+    {**program, "kind": "Internship"}
+    for program in PAID_PROGRAMS
+    if program["title"] in _INTERNSHIP_TITLES
+]
+INTERNSHIPS.append(
+    {
+        "kind": "Internship",
+        "title": "HENNGE Global Internship Program (GIP)",
+        "org": "HENNGE K.K.",
+        "when": "4–6 weeks · rolling batches",
+        "opens": None,
+        "closes": None,
+        "steps": [
+            "Register and verify your email",
+            "Solve the coding challenge, submit CV + cover letter",
+            "HR interview, then a technical interview",
+            "Pick a Full-Stack or Front-End pathway and join a batch",
+        ],
+        "city": "Tokyo",
+        "tags": ["Unpaid", "Benefits", "Japan", "Go", "Students", "On-site"],
+        "stipend": "Unpaid + benefits: monthly subsidy, round-trip airfare, medical insurance, mobile, visa support",
+        "source": "Official",
+        "url": "https://recruit.hennge.com/en/gip/",
+        "desc": "On-site, English-speaking software engineering internship in Tokyo. Full-Stack pathway uses Python, Go or TypeScript (React/Vue), front-end on TypeScript, with AWS and DevOps training. Slots are first-come, first-served, and outstanding interns may be offered full-time roles.",
+    },
+)
+
+# Programs are what remains; the moved entries are now served by INTERNSHIPS.
+PAID_PROGRAMS = [
+    program for program in PAID_PROGRAMS if program["title"] not in _INTERNSHIP_TITLES
 ]
 
 
@@ -668,7 +716,7 @@ async def get_opportunities() -> dict:
         # wait_for cancels the waiter only; the scheduler still refreshes on
         # its own schedule and the next request reuses a warm cache.
         feed = _feed
-    items = [*feed.items, *PAID_PROGRAMS]
+    items = [*feed.items, *PAID_PROGRAMS, *INTERNSHIPS]
     items.sort(key=_sort_key)
     return {
         "items": items,

@@ -15,7 +15,7 @@ import { ErrorBox, Loading, relTime } from "../components";
  * no frontend change.
  */
 
-const TYPES = ["All", "Event", "Paid program"] as const;
+const TYPES = ["All", "Event", "Internship", "Paid program"] as const;
 const STATUSES = ["All", "Open now", "Opening soon", "Rolling", "Upcoming event"] as const;
 /** Cities the design ships with; kept even when the feed has no event there. */
 const BASE_LOCATIONS = ["Nairobi", "Kisumu", "Eldoret", "Kenya", "Online"];
@@ -158,11 +158,12 @@ export default function Opportunities() {
       <header className="opp-header">
         <div className="opp-header-inner">
           <Link to="/" className="opp-back">← ApplyCanary</Link>
-          <h1>Events &amp; paid programs</h1>
+          <h1>Events, internships &amp; paid programs</h1>
           <p>
-            Tech events near you in Kenya and programs that pay you to learn, with
-            application timelines sorted by nearest deadline. Program dates are
-            estimated from past cycles — confirm on the official site.
+            Tech events near you in Kenya plus internships and programs — paid,
+            unpaid-with-benefits or free — with application timelines sorted by
+            nearest deadline. Dates are estimated from past cycles; confirm on
+            the official site.
           </p>
         </div>
       </header>
@@ -248,7 +249,13 @@ export default function Opportunities() {
                     rel="noreferrer"
                   >
                     <div className="opp-card-top">
-                      <span className={`opp-kind${item.kind === "Paid program" ? " opp-kind-program" : ""}`}>
+                      <span
+                        className={
+                          "opp-kind" +
+                          (item.kind === "Paid program" ? " opp-kind-program"
+                            : item.kind === "Internship" ? " opp-kind-intern" : "")
+                        }
+                      >
                         {item.kind}
                       </span>
                       <span className="opp-source">via {item.source}</span>

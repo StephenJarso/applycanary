@@ -405,7 +405,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 /** One listing on the public Events & paid programs page. */
 export interface Opportunity {
-  kind: "Event" | "Paid program";
+  kind: "Event" | "Paid program" | "Internship";
   title: string;
   org: string;
   /** Human-readable timing: "15 Oct 2026 · 08:00–11:00", "Coding May–Aug". */

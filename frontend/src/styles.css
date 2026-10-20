@@ -2795,6 +2795,7 @@ input[type="range"]::-moz-range-thumb {
   white-space: nowrap;
 }
 .opp-kind-program { background: var(--ac-canary); color: var(--ac-on-canary); }
+.opp-kind-intern { background: var(--ac-primary); color: var(--ac-on-primary); }
 .opp-source { color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 .opp-card h3 { margin: 0; font-size: 17px; font-weight: 700; letter-spacing: -0.01em; line-height: 1.3; }

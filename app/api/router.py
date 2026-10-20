@@ -111,11 +111,12 @@ class OpportunityOut(BaseModel):
     """One listing on the public Events & paid programs page.
 
     Mirrors the dicts `app/opportunities.py` builds: live events from the TGK
-    calendar plus the curated paid programs. `kind` decides whether the card
-    counts down to an event date or to an application deadline.
+    calendar plus the curated paid programs and internships. `kind` decides
+    whether the card counts down to an event date or to an application
+    deadline.
     """
 
-    kind: Literal["Event", "Paid program"]
+    kind: Literal["Event", "Paid program", "Internship"]
     title: str
     org: str
     when: str
@@ -418,7 +419,7 @@ def public_jobs(
 
 @router.get("/public/opportunities", response_model=OpportunitiesOut)
 async def public_opportunities() -> OpportunitiesOut:
-    """Live events + curated paid programs for the public Opportunities page.
+    """Live events plus curated programs and internships for the public page.
 
     Public like /public/jobs: the page is linked from the landing page and
     carries no user data, so it must answer before anyone signs in. The event

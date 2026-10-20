@@ -95,7 +95,7 @@ export default function Landing() {
               {/* Design pack home links out to the public events & paid
                   programs screen from here. */}
               <Link to="/opportunities" className="landing-cta-secondary">
-                Explore events &amp; paid programs
+                Explore events, internships &amp; programs
                 <span className="material-symbols-outlined" aria-hidden="true">arrow_forward</span>
               </Link>
             </div>
@@ -305,7 +305,7 @@ export default function Landing() {
       <footer className="landing-footer">
         <span>© {new Date().getFullYear()} ApplyCanary. Professional Career Agent.</span>
         <span className="landing-footer-links">
-          <Link to="/opportunities">Events &amp; programs</Link>
+          <Link to="/opportunities">Events, internships &amp; programs</Link>
           <Link to="/?mode=login">Sign in</Link>
           <Link to="/?mode=register">Create account</Link>
         </span>
