@@ -1,8 +1,13 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { api, type Opportunity } from "../api";
+import { api } from "../api";
 import { ErrorBox, Loading, relTime } from "../components";
+import {
+  OpportunityCard,
+  opportunityDeadline as deadline,
+  opportunityStatus as status,
+} from "../OpportunityCard";
 
 /**
  * Public "Events & paid programs" screen — the standalone page from the design
@@ -15,16 +20,10 @@ import { ErrorBox, Loading, relTime } from "../components";
  * no frontend change.
  */
 
-const TYPES = ["All", "Event", "Internship", "Paid program"] as const;
+const TYPES = ["All", "Event", "Paid program"] as const;
 const STATUSES = ["All", "Open now", "Opening soon", "Rolling", "Upcoming event"] as const;
 /** Cities the design ships with; kept even when the feed has no event there. */
 const BASE_LOCATIONS = ["Nairobi", "Kisumu", "Eldoret", "Kenya", "Online"];
-
-const daysUntil = (iso: string) =>
-  Math.ceil((new Date(iso).getTime() - Date.now()) / 86_400_000);
-
-const fmtDate = (iso: string) =>
-  new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
 
 /** Filter chip — single-select for type/status/location, toggle for interests. */
 function Chip({ on, onClick, children }: { on: boolean; onClick: () => void; children: string }) {
@@ -32,73 +31,6 @@ function Chip({ on, onClick, children }: { on: boolean; onClick: () => void; chi
     <button type="button" className="opp-chip" aria-pressed={on} onClick={onClick}>
       {children}
     </button>
-  );
-}
-
-/** Status shown in the box at the bottom of each card. */
-function status(o: Opportunity): string {
-  if (o.kind === "Event") return o.date && daysUntil(o.date) < 0 ? "Closed" : "Upcoming event";
-  if (!o.opens || !o.closes) return "Rolling";
-  if (daysUntil(o.closes) < 0) return "Closed";
-  return daysUntil(o.opens) <= 0 ? "Open now" : "Opening soon";
-}
-
-/** Programs with a deadline sort first, then events by date; rolling entries last. */
-const deadline = (o: Opportunity) =>
-  o.closes ? new Date(o.closes).getTime()
-  : o.date ? new Date(o.date).getTime()
-  : 9e15;
-
-function Timeline({ item }: { item: Opportunity }) {
-  if (item.kind === "Event") {
-    return (
-      <>
-        {item.date ? (
-          <p>
-            📅 Register before <b>{fmtDate(item.date)}</b> ·{" "}
-            {daysUntil(item.date) >= 0 ? `in ${daysUntil(item.date)} days` : "passed"}
-          </p>
-        ) : (
-          <p>📅 Check the calendar for new dates</p>
-        )}
-        <Steps item={item} />
-      </>
-    );
-  }
-
-  if (item.opens && item.closes) {
-    return (
-      <>
-        <p>
-          {daysUntil(item.opens) > 0 ? (
-            <>
-              ⏳ Opens <b>{fmtDate(item.opens)}</b> (in {daysUntil(item.opens)} days)
-            </>
-          ) : (
-            <>🟢 Open now</>
-          )}{" "}
-          · Deadline <b>{fmtDate(item.closes)}</b>
-          {daysUntil(item.closes) >= 0 && <> ({daysUntil(item.closes)} days left)</>}
-        </p>
-        <Steps item={item} />
-      </>
-    );
-  }
-
-  return (
-    <>
-      <p>🔁 Rolling / cohort-based — apply any time or when announced</p>
-      <Steps item={item} />
-    </>
-  );
-}
-
-function Steps({ item }: { item: Opportunity }) {
-  if (!item.steps) return null;
-  return (
-    <ol className="opp-steps">
-      {item.steps.map((step) => <li key={step}>{step}</li>)}
-    </ol>
   );
 }
 
@@ -158,12 +90,11 @@ export default function Opportunities() {
       <header className="opp-header">
         <div className="opp-header-inner">
           <Link to="/" className="opp-back">← ApplyCanary</Link>
-          <h1>Events, internships &amp; paid programs</h1>
+          <h1>Events &amp; paid programs</h1>
           <p>
-            Tech events near you in Kenya plus internships and programs — paid,
-            unpaid-with-benefits or free — with application timelines sorted by
-            nearest deadline. Dates are estimated from past cycles; confirm on
-            the official site.
+            Tech events near you in Kenya and programs that pay you to learn, with
+            application timelines sorted by nearest deadline. Program dates are
+            estimated from past cycles — confirm on the official site.
           </p>
         </div>
       </header>
@@ -241,44 +172,7 @@ export default function Opportunities() {
 
               <div className="opp-grid">
                 {results.map((item) => (
-                  <a
-                    key={`${item.kind}:${item.title}`}
-                    className="opp-card"
-                    href={item.url}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    <div className="opp-card-top">
-                      <span
-                        className={
-                          "opp-kind" +
-                          (item.kind === "Paid program" ? " opp-kind-program"
-                            : item.kind === "Internship" ? " opp-kind-intern" : "")
-                        }
-                      >
-                        {item.kind}
-                      </span>
-                      <span className="opp-source">via {item.source}</span>
-                    </div>
-
-                    <div>
-                      <h3>{item.title}</h3>
-                      <p className="opp-meta">{item.org} · {item.city} · {item.when}</p>
-                    </div>
-
-                    {item.desc && <p className="opp-desc">{item.desc}</p>}
-                    {item.stipend && <p className="opp-stipend">💰 {item.stipend}</p>}
-
-                    <div className="opp-timeline">
-                      <Timeline item={item} />
-                    </div>
-
-                    <div className="opp-tags">
-                      {item.tags.map((tag) => (
-                        <span key={tag} className="opp-tag">{tag}</span>
-                      ))}
-                    </div>
-                  </a>
+                  <OpportunityCard key={`${item.kind}:${item.title}`} item={item} />
                 ))}
               </div>
             </>

@@ -716,10 +716,24 @@ async def get_opportunities() -> dict:
         # wait_for cancels the waiter only; the scheduler still refreshes on
         # its own schedule and the next request reuses a warm cache.
         feed = _feed
-    items = [*feed.items, *PAID_PROGRAMS, *INTERNSHIPS]
+    items = [*feed.items, *PAID_PROGRAMS]
     items.sort(key=_sort_key)
     return {
         "items": items,
         "events_live": feed.ok,
         "events_updated_at": feed.fetched_at_wall,
+    }
+
+
+def get_internships() -> dict:
+    """The payload for ``GET /api/public/internships``.
+
+    Internships are curated, so this is synchronous and cannot fail the way the
+    live event feed can. The response reuses the opportunities shape so the
+    frontend can share one card component.
+    """
+    return {
+        "items": sorted(INTERNSHIPS, key=_sort_key),
+        "events_live": True,
+        "events_updated_at": None,
     }

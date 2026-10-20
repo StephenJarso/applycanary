@@ -403,7 +403,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return (await res.json()) as T;
 }
 
-/** One listing on the public Events & paid programs page. */
+/** One listing on the public events, programs or internships pages. */
 export interface Opportunity {
   kind: "Event" | "Paid program" | "Internship";
   title: string;
@@ -470,6 +470,7 @@ export const api = {
   jobs: (filters: JobFilters = {}) => request<JobList>(`/jobs${qs(filters)}`),
   publicJobs: (filters: { q?: string; source?: string; remote_only?: boolean; sort?: "newest" | "oldest" } = {}) => request<PublicJobList>(`/public/jobs${qs(filters as JobFilters)}`),
   opportunities: () => request<Opportunities>("/public/opportunities"),
+  internships: () => request<Opportunities>("/public/internships"),
   job: (id: number) => request<JobDetail>(`/jobs/${id}`),
   review: (params: { limit?: number; offset?: number } = {}) => request<ReviewList>(`/review${qs(params)}`),
   applications: () => request<Job[]>("/applications"),

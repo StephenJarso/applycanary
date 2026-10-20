@@ -229,9 +229,10 @@ def test_endpoint_serves_events_and_programs_sorted_by_deadline(client, monkeypa
     assert body["events_updated_at"] is not None
     titles = [i["title"] for i in body["items"]]
 
-    # Every curated program and internship rides along with the live events.
+    # Every curated program rides along with the live events; internships have
+    # their own endpoint and tab.
     assert {p["title"] for p in PAID_PROGRAMS} <= set(titles)
-    assert {i["title"] for i in INTERNSHIPS} <= set(titles)
+    assert not ({i["title"] for i in INTERNSHIPS} & set(titles))
 
     # Nearest deadline first: the dated event precedes the 2027 program
     # deadlines, and rolling programs (no dates at all) sort last.
@@ -239,10 +240,7 @@ def test_endpoint_serves_events_and_programs_sorted_by_deadline(client, monkeypa
     gsoc = titles.index("Google Summer of Code")
     rolling = titles.index("MLH Fellowship")
     assert gsoc < rolling
-    assert all(
-        item["kind"] in ("Event", "Paid program", "Internship")
-        for item in body["items"]
-    )
+    assert all(item["kind"] in ("Event", "Paid program") for item in body["items"])
 
 
 def test_endpoint_still_serves_programs_when_the_feed_is_down(client, monkeypatch):
@@ -257,7 +255,7 @@ def test_endpoint_still_serves_programs_when_the_feed_is_down(client, monkeypatc
 
     assert body["events_live"] is False
     assert body["items"], "paid programs must survive an event-feed outage"
-    assert {i["kind"] for i in body["items"]} == {"Paid program", "Internship"}
+    assert {i["kind"] for i in body["items"]} == {"Paid program"}
 
 
 def test_endpoint_flags_a_stale_event_list(client, monkeypatch):
@@ -302,7 +300,7 @@ def test_feed_failure_never_fails_the_endpoint(client, monkeypatch):
     body = res.json()
     assert body["events_live"] is False
     assert body["items"], "paid programs must survive a total feed outage"
-    assert {i["kind"] for i in body["items"]} == {"Paid program", "Internship"}
+    assert {i["kind"] for i in body["items"]} == {"Paid program"}
 
 
 def test_endpoint_waits_at_most_bounded_for_a_slow_feed(client, monkeypatch):
@@ -379,3 +377,14 @@ def test_internships_are_split_from_programs_and_state_compensation():
     paid = [i for i in INTERNSHIPS if i["stipend"].startswith("Paid:")]
     assert paid, "at least one paid internship documents its stipend"
     assert all("Paid" in i["tags"] for i in paid)
+
+
+def test_internships_endpoint_is_public_and_only_internships(client):
+    res = client.get("/api/public/internships")
+    assert res.status_code == 200
+    body = res.json()
+
+    assert body["items"]
+    assert {item["kind"] for item in body["items"]} == {"Internship"}
+    assert {item["title"] for item in body["items"]} == {i["title"] for i in INTERNSHIPS}
+    assert body["events_live"] is True

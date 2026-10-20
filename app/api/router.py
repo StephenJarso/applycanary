@@ -431,6 +431,18 @@ async def public_opportunities() -> OpportunitiesOut:
     return OpportunitiesOut(**await get_opportunities())
 
 
+@router.get("/public/internships", response_model=OpportunitiesOut)
+def public_internships() -> OpportunitiesOut:
+    """Curated internship placements, public like the events page.
+
+    Kept separate from ``/public/opportunities`` so the page can offer a
+    dedicated Internships tab without every event request carrying the cards.
+    """
+    from app.opportunities import get_internships
+
+    return OpportunitiesOut(**get_internships())
+
+
 @router.get("/jobs", response_model=JobListOut)
 def list_jobs(
     session: Session = Depends(get_session),

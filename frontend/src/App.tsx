@@ -14,17 +14,19 @@ import ResetPassword from "./pages/ResetPassword";
 import VerifyEmail from "./pages/VerifyEmail";
 import Landing from "./pages/Landing";
 import Opportunities from "./pages/Opportunities";
+import Internships from "./pages/Internships";
 import { useAuth } from "./context/AuthContext";
 
 // Side nav per the design pack (dashboard_1/job_discovery_1 code.html):
 // Home, Discovery, Interview, Memory, Profile — with Material Symbols matching
 // the mockups. Interview routes per-job (JobDetail → AI Interview), so the nav
-// item simply lands on Jobs. Opportunities is the public events & paid
-// programs page, so it lives outside the shell (see App() below) but is still
-// one click away from here.
+// item simply lands on Jobs. Internships and Programs are public pages, so
+// they live outside the shell (see App() below) but are still one click away
+// from here.
 const NAV = [
   { to: "/jobs", label: "Home", icon: "dashboard", end: true },
   { to: "/review", label: "Discovery", icon: "search" },
+  { to: "/internships", label: "Internships", icon: "school", end: true },
   { to: "/opportunities", label: "Programs", icon: "event", end: true },
   { to: "/memory", label: "Memory", icon: "psychology" },
   { to: "/profile", label: "Profile", icon: "person" },
@@ -168,6 +170,7 @@ export default function App() {
         so it renders outside the dashboard shell (signed-in users reach it
         from the sidebar). */}
     <Route path="/opportunities" element={<Opportunities />} />
+    <Route path="/internships" element={<Internships />} />
     {/* Public regardless of session: these are opened from an email, and the
         link must not be swallowed by a redirect to /login. Confirming an
         address is also something a signed-in user does. */}
