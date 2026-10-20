@@ -159,6 +159,13 @@ class Profile(SQLModel, table=True):
 
     github_evidence: dict = Field(default_factory=dict, sa_column=Column(JSON))
     github_synced_at: datetime | None = None
+    # Encrypted read-only token. Public scraping works without it; a token raises
+    # the rate limit and lets the user grant access explicitly.
+    github_token_encrypted: str = ""
+
+    # Extracted from the uploaded CV: page size, margins, fonts and sizes. The
+    # renderer reuses these instead of imposing its own template.
+    resume_meta: dict = Field(default_factory=dict, sa_column=Column(JSON))
 
     # Per-user preferences. These used to be process-wide settings; they move to
     # the profile so one user's auto-submit thresholds cannot affect another's.
@@ -357,6 +364,10 @@ class ResumeVersion(SQLModel, table=True):
     text: str = Field(default="", sa_column=Column(Text))
     text_html: str = Field(default="", sa_column=Column(Text))
     diff_summary: str = Field(default="", sa_column=Column(Text))
+    original_text: str = Field(default="", sa_column=Column(Text))
+    original_html: str = Field(default="", sa_column=Column(Text))
+    format_preserved: bool = False
+    template_note: str = ""
 
     ats_score_before: float = 0.0
     ats_score_after: float = 0.0
@@ -564,3 +575,23 @@ class SourceRun(SQLModel, table=True):
     duplicates: int = 0
     ok: bool = True
     error: str = Field(default="", sa_column=Column(Text))
+
+
+# ---------------------------------------------------------------- feedback
+
+
+class Feedback(SQLModel, table=True):
+    """User and visitor feedback, bug reports, and contact messages."""
+
+    __tablename__ = "feedback"
+
+    id: int | None = Field(default=None, primary_key=True)
+    user_id: int | None = Field(default=None, foreign_key="user.id", index=True)
+    name: str = ""
+    email: str = ""
+    category: str = "feedback"  # feedback, bug, feature, contact
+    message: str = Field(default="", sa_column=Column(Text))
+    status: str = "new"  # new, in_progress, resolved
+    admin_notes: str = Field(default="", sa_column=Column(Text))
+    created_at: datetime = Field(default_factory=utcnow, index=True)
+

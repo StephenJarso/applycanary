@@ -236,17 +236,36 @@ export default function JobDetail() {
           <div className="detail-meta" style={{ marginBottom: 10 }}>
             ATS {version.ats_score_before} → <strong>{version.ats_score_after}</strong>
           </div>
+          {version.template_note && (
+            <div className="banner" role="note" style={{ marginBottom: 12 }}>
+              {version.format_preserved ? "Template preserved. " : "Template matched. "}
+              {version.template_note}
+            </div>
+          )}
 
-          <div className="side-by-side" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, marginTop: 16 }}>
+          <div className="side-by-side">
             <div className="panel">
-              <h4 style={{ margin: "0 0 8px" }}>Tailored Resume</h4>
-              <div className="cv-rendered" style={{ maxHeight: 500, overflow: "auto" }} dangerouslySetInnerHTML={{ __html: version.text_html || version.text }} />
+              <h4 className="cv-panel-title">Original resume</h4>
+              <div
+                className="cv-rendered"
+                dangerouslySetInnerHTML={{ __html: version.original_html || version.original_text }}
+              />
             </div>
             <div className="panel">
-              <h4 style={{ margin: "0 0 8px" }}>Job Description</h4>
-              <pre className="doc" style={{ maxHeight: 500, overflow: "auto", whiteSpace: "pre-wrap" }}>{job.description || "No description captured."}</pre>
+              <h4 className="cv-panel-title">Tailored resume</h4>
+              <div
+                className="cv-rendered"
+                dangerouslySetInnerHTML={{ __html: version.text_html || version.text }}
+              />
             </div>
           </div>
+
+          <details style={{ marginTop: 16 }}>
+            <summary>Job description</summary>
+            <pre className="doc" style={{ whiteSpace: "pre-wrap" }}>
+              {job.description || "No description captured."}
+            </pre>
+          </details>
 
           {version.truthcheck_notes.map((note) => (
             <div key={note} className="violation">{note}</div>
@@ -311,9 +330,7 @@ export default function JobDetail() {
           {job.application.cover_letter ? (
             <div className="field" style={{ marginTop: 12 }}>
               <label>Cover letter</label>
-              <pre className="doc" style={{ maxHeight: 320, overflow: "auto" }}>
-                {job.application.cover_letter}
-              </pre>
+              <div className="cover-letter">{job.application.cover_letter}</div>
               <div className="artifact-actions">
                 <button
                   type="button"

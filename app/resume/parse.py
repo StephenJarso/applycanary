@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import logging
 import re
+from collections import Counter
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -52,6 +53,7 @@ class ParsedResume:
     image_count: int = 0
     fonts: set[str] = field(default_factory=set)
     bullet_glyphs: set[str] = field(default_factory=set)
+    template: dict = field(default_factory=dict)
 
     # --- content signals ---
     sections_found: dict[str, str] = field(default_factory=dict)
@@ -117,6 +119,8 @@ def _parse_pdf(p: Path) -> ParsedResume:
                 out.header_footer_text.extend(
                     _pdf_edge_text(words, float(page.height))
                 )
+                if not out.template:
+                    out.template = _pdf_template(page)
             except Exception as exc:  # noqa: BLE001
                 out.parse_errors.append(f"page parse failed: {exc}")
 
@@ -220,7 +224,140 @@ def _parse_docx(p: Path) -> ParsedResume:
     out.has_text_layer = bool(out.text)
     # Multi-column in docx is usually implemented as a borderless layout table.
     out.has_multi_column = _docx_layout_table(doc)
+    out.template = _docx_template(doc)
     return out
+
+
+def _friendly_font(name: str) -> str:
+    raw = re.sub(r"^[A-Z]{6}\+", "", str(name or "")).strip()
+    low = raw.lower().replace(" ", "")
+    if "timesnewroman" in low or low.startswith("times") or "times-roman" in low:
+        return "Times New Roman"
+    if "arial" in low:
+        return "Arial"
+    if "calibri" in low:
+        return "Calibri"
+    if "georgia" in low:
+        return "Georgia"
+    if "cambria" in low:
+        return "Cambria"
+    if "garamond" in low:
+        return "Garamond"
+    if "courier" in low:
+        return "Courier New"
+    if "helvetica" in low:
+        return "Helvetica"
+    return raw or "Calibri"
+
+
+def _pdf_template(page) -> dict:  # noqa: ANN001
+    """Recover the visual template of a PDF page from its glyphs."""
+    chars = page.chars or []
+    words = page.extract_words() or []
+    sizes = Counter(
+        round(float(c.get("size") or 0), 1)
+        for c in chars
+        if c.get("size")
+    )
+    fonts = Counter(
+        _friendly_font(str(c.get("fontname") or ""))
+        for c in chars
+        if c.get("fontname")
+    )
+    body_size = sizes.most_common(1)[0][0] if sizes else 10.5
+    body_font = fonts.most_common(1)[0][0] if fonts else "Times New Roman"
+    larger = [s for s in sizes if s > body_size + 0.4]
+    name_size = max(larger) if larger else body_size + 6
+    heading = [s for s in larger if s < name_size]
+    heading_size = Counter(heading).most_common(1)[0][0] if heading else body_size + 1
+
+    left = min((float(w["x0"]) for w in words), default=50.0)
+    top = min((float(w["top"]) for w in words), default=40.0)
+    right = page.width - max((float(w["x1"]) for w in words), default=page.width - 50)
+    first_top = top
+    first_line = [
+        w for w in words
+        if float(w.get("top", 0)) <= first_top + max(body_size * 1.6, 12)
+    ]
+    centered = False
+    if first_line:
+        cx = sum((float(w["x0"]) + float(w["x1"])) / 2 for w in first_line) / len(first_line)
+        centered = abs(cx - float(page.width) / 2) < float(page.width) * 0.06
+
+    return {
+        "file_type": "pdf",
+        "page_width_pt": round(float(page.width), 1),
+        "page_height_pt": round(float(page.height), 1),
+        "margin_top_pt": round(max(18.0, top), 1),
+        "margin_left_pt": round(max(18.0, left), 1),
+        "margin_right_pt": round(max(18.0, right), 1),
+        "margin_bottom_pt": round(max(18.0, top), 1),
+        "body_font": body_font,
+        "body_size_pt": round(body_size, 1),
+        "name_font": body_font,
+        "name_size_pt": round(name_size, 1),
+        "heading_font": body_font,
+        "heading_size_pt": round(heading_size, 1),
+        "name_align": "center" if centered else "left",
+    }
+
+
+def _docx_template(doc) -> dict:  # noqa: ANN001
+    """Read page setup and typography from the uploaded DOCX."""
+    sec = doc.sections[0] if doc.sections else None
+    width = getattr(getattr(sec, "page_width", None), "pt", 595.0)
+    height = getattr(getattr(sec, "page_height", None), "pt", 842.0)
+    top = getattr(getattr(sec, "top_margin", None), "pt", 40.0)
+    left = getattr(getattr(sec, "left_margin", None), "pt", 50.0)
+    right = getattr(getattr(sec, "right_margin", None), "pt", 50.0)
+    bottom = getattr(getattr(sec, "bottom_margin", None), "pt", 40.0)
+
+    normal = doc.styles.get("Normal", None)
+    normal_font = getattr(getattr(normal, "font", None), "name", None)
+    normal_size = getattr(getattr(getattr(normal, "font", None), "size", None), "pt", None)
+    body_font = _friendly_font(normal_font or "Calibri")
+    body_size = float(normal_size or 11.0)
+
+    paras = [p for p in doc.paragraphs if p.text.strip()]
+    name_font, name_size, name_align = body_font, body_size + 5, "left"
+    if paras:
+        first = paras[0]
+        first_run = next((r for r in first.runs if r.text.strip()), first.runs[0] if first.runs else None)
+        if first_run is not None:
+            name_font = _friendly_font(first_run.font.name or body_font)
+            name_size = float(getattr(first_run.font.size, "pt", None) or name_size)
+        align = str(first.paragraph_format.alignment or "").lower()
+        name_align = "center" if "center" in align else "left"
+
+    heading_font, heading_size = body_font, body_size + 1
+    for para in paras[1:]:
+        text = para.text.strip()
+        if len(text) <= 40 and (text.isupper() or text.lower().rstrip(":") in {
+            "experience", "work experience", "education", "skills",
+            "projects", "summary", "profile", "certifications",
+        }):
+            run = next((r for r in para.runs if r.text.strip()), None)
+            if run is not None:
+                heading_font = _friendly_font(run.font.name or body_font)
+                heading_size = float(getattr(run.font.size, "pt", None) or heading_size)
+            break
+
+    return {
+        "file_type": "docx",
+        "page_width_pt": round(float(width), 1),
+        "page_height_pt": round(float(height), 1),
+        "margin_top_pt": round(float(top), 1),
+        "margin_left_pt": round(float(left), 1),
+        "margin_right_pt": round(float(right), 1),
+        "margin_bottom_pt": round(float(bottom), 1),
+        "body_font": body_font,
+        "body_size_pt": round(body_size, 1),
+        "name_font": name_font,
+        "name_size_pt": round(name_size, 1),
+        "heading_font": heading_font,
+        "heading_size_pt": round(heading_size, 1),
+        "name_align": name_align,
+    }
 
 
 def _docx_layout_table(doc) -> bool:  # noqa: ANN001

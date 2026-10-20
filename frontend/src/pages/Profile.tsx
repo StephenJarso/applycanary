@@ -3,6 +3,12 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, type Profile } from "../api";
 import { Chips, ErrorBox, Loading } from "../components";
 import { useAuth } from "../context/AuthContext";
+import {
+  getNotificationPermission,
+  requestNotificationPermission,
+  triggerLocalDeadlineNotification,
+} from "../deadlineNotifications";
+import { AdminPanel } from "../AdminPanel";
 
 const CSV_FIELDS = ["skills", "target_titles", "target_locations", "excluded_companies"] as const;
 
@@ -15,6 +21,9 @@ export default function ProfilePage() {
   // returns a masked value), so it needs its own state. Binding it to a
   // constant `value=""` makes typing and pasting appear to do nothing.
   const [llmKey, setLlmKey] = useState("");
+  const [githubToken, setGithubToken] = useState("");
+  const [notifPermission, setNotifPermission] = useState(getNotificationPermission());
+  const [testNotifMsg, setTestNotifMsg] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
 
   // Seed the form once the profile arrives. Keyed on the fetch so a background
@@ -47,7 +56,20 @@ export default function ProfilePage() {
       void qc.invalidateQueries({ queryKey: ["ats"] });
     },
   });
-  const github = useMutation({ mutationFn: api.syncGithub, onSuccess: invalidate });
+  const github = useMutation({
+    mutationFn: async () => {
+      if (githubToken) await api.saveProfile({ ...form, github_token: githubToken });
+      return api.syncGithub();
+    },
+    onSuccess: () => {
+      setGithubToken("");
+      invalidate();
+    },
+  });
+  const disconnectGithub = useMutation({
+    mutationFn: () => api.saveProfile({ github_disconnect: true }),
+    onSuccess: invalidate,
+  });
   const discover = useMutation({ mutationFn: api.discover, onSuccess: invalidate });
 
   const ats = useQuery({
@@ -71,7 +93,11 @@ export default function ProfilePage() {
           <span className="material-symbols-outlined" aria-hidden="true">person</span>
           Your resume, targets and agent preferences
         </p>
-      </div>      <div className="card">
+      </div>
+
+      {user?.is_admin && <AdminPanel />}
+
+      <div className="card">
         <h3 className="card-title">Resume</h3>
         {data?.has_resume ? (
           <p className="cell-dim">
@@ -232,26 +258,59 @@ export default function ProfilePage() {
       </div>
 
       <div className="card">
-        <h3 className="card-title">GitHub evidence</h3>
+        <h3 className="card-title">
+          GitHub evidence
+          {data?.github_connected && <span className="chip chip-hit">connected</span>}
+        </h3>
         <p className="cell-dim">
-          Public repos are scanned for verifiable proof of skills, so CV tailoring can
-          surface real work instead of inventing it.
+          Connect GitHub so CV tailoring can use real repositories as evidence.
+          A fine-grained token with read-only access to public repositories is
+          enough. It is stored encrypted and never shown back.
         </p>
+        {!form.github_username && (
+          <p className="cell-dim">Add your GitHub username under Details first.</p>
+        )}
+        <div className="field">
+          <label htmlFor="github-token">GitHub access token (optional)</label>
+          <input
+            id="github-token"
+            type="password"
+            value={githubToken}
+            onChange={(e) => setGithubToken(e.target.value)}
+            placeholder="github_pat_… (read-only)"
+            autoComplete="off"
+            spellCheck={false}
+          />
+        </div>
         {data?.github_synced_at ? (
           <p className="cell-dim">
             {data.github_repo_count} repos · synced {new Date(data.github_synced_at).toLocaleString()}
           </p>
         ) : null}
-        <button
-          onClick={() => github.mutate()}
-          disabled={github.isPending || !form.github_username}
-          title={!form.github_username ? "Set a GitHub username first" : undefined}
-        >
-          {github.isPending && <span className="spinner" />} Sync GitHub
-        </button>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <button
+            onClick={() => github.mutate()}
+            disabled={github.isPending || !form.github_username}
+            title={!form.github_username ? "Set a GitHub username first" : undefined}
+          >
+            {github.isPending && <span className="spinner" />} Connect &amp; sync
+          </button>
+          {data?.github_connected && (
+            <button
+              onClick={() => disconnectGithub.mutate()}
+              disabled={disconnectGithub.isPending}
+              className="btn-ghost"
+            >
+              Disconnect token
+            </button>
+          )}
+        </div>
         {github.isError && <ErrorBox error={github.error} />}
         {github.isSuccess && (
           <div className="banner banner-ok" role="status">{github.data.message}</div>
+        )}
+        {disconnectGithub.isSuccess && (
+          <div className="banner banner-ok" role="status">GitHub token removed.</div>
         )}
       </div>
 
@@ -273,6 +332,57 @@ export default function ProfilePage() {
         {discover.isSuccess && (
           <div className="banner banner-ok" role="status">{discover.data.message}</div>
         )}
+      </div>
+
+      <div className="card">
+        <h3 className="card-title">
+          Deadline notifications
+          {notifPermission === "granted" && <span className="chip chip-hit">active</span>}
+        </h3>
+        <p className="cell-dim">
+          Get daily local notifications on this device when application deadlines for
+          internships, paid programs, or tech events are approaching (closing within 7 days).
+        </p>
+        {notifPermission === "granted" ? (
+          <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+            <span className="chip chip-hit">Device alerts enabled</span>
+            <button
+              type="button"
+              className="btn-ghost"
+              onClick={() => {
+                triggerLocalDeadlineNotification([
+                  {
+                    title: "Google Summer of Code",
+                    org: "Google",
+                    kind: "Paid program",
+                    deadline: new Date(Date.now() + 3 * 86400000).toISOString(),
+                    daysLeft: 3,
+                    url: "https://summerofcode.withgoogle.com",
+                  },
+                ]);
+                setTestNotifMsg("Test deadline notification dispatched!");
+                setTimeout(() => setTestNotifMsg(""), 4000);
+              }}
+            >
+              Send test notification
+            </button>
+          </div>
+        ) : notifPermission === "denied" ? (
+          <p className="cell-dim" style={{ color: "var(--bad)" }}>
+            Notifications are blocked in your browser permissions. Enable notifications for this site to receive daily deadline alerts.
+          </p>
+        ) : (
+          <button
+            type="button"
+            onClick={async () => {
+              const res = await requestNotificationPermission();
+              setNotifPermission(res);
+            }}
+          >
+            Enable daily deadline notifications
+          </button>
+        )}
+        {testNotifMsg && <div className="banner banner-ok" role="status" style={{ marginTop: 8 }}>{testNotifMsg}</div>}
       </div>
 
       <form

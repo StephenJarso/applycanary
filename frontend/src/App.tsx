@@ -17,6 +17,17 @@ import Landing from "./pages/Landing";
 import Opportunities from "./pages/Opportunities";
 import Internships from "./pages/Internships";
 import { useAuth } from "./context/AuthContext";
+import { FeedbackModal } from "./FeedbackModal";
+import {
+  checkAndNotifyDailyDeadlines,
+  dismissDeadlineBannerToday,
+  getNotificationPermission,
+  getUpcomingDeadlines,
+  isDeadlineBannerDismissedToday,
+  requestNotificationPermission,
+  triggerLocalDeadlineNotification,
+} from "./deadlineNotifications";
+import { fmtDate } from "./OpportunityCard";
 
 // Side nav per the design pack (dashboard_1/job_discovery_1 code.html):
 // Home, Discovery, Interview, Memory, Profile — with Material Symbols matching
@@ -72,9 +83,38 @@ function Dashboard({ page }: { page?: "internships" | "programs" }) {
   });
 
   const busy = poll.isPending || score.isPending;
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
   const moreActive = MOBILE_MORE_PATHS.some(
     (path) => location.pathname === path || location.pathname.startsWith(`${path}/`),
   );
+
+  const internships = useQuery({
+    queryKey: ["internships"],
+    queryFn: api.internships,
+    staleTime: 12 * 60 * 60_000,
+    refetchOnWindowFocus: false,
+  });
+  const opportunities = useQuery({
+    queryKey: ["opportunities"],
+    queryFn: api.opportunities,
+    staleTime: 12 * 60 * 60_000,
+    refetchOnWindowFocus: false,
+  });
+
+  const allOpportunities = [
+    ...(internships.data?.items ?? []),
+    ...(opportunities.data?.items ?? []),
+  ];
+
+  const upcomingDeadlines = getUpcomingDeadlines(allOpportunities, 7);
+  const [bannerDismissed, setBannerDismissed] = useState(isDeadlineBannerDismissedToday());
+  const [notifPerm, setNotifPerm] = useState(getNotificationPermission());
+
+  useEffect(() => {
+    if (allOpportunities.length > 0) {
+      checkAndNotifyDailyDeadlines(allOpportunities);
+    }
+  }, [allOpportunities.length]);
 
   useEffect(() => {
     setMoreOpen(false);
@@ -215,9 +255,84 @@ function Dashboard({ page }: { page?: "internships" | "programs" }) {
             {score.isPending ? <span className="spinner" /> : <span className="material-symbols-outlined" aria-hidden="true">insights</span>}
             <span className="topbar-btn-label">Score pending</span>
           </button>
+          <button
+            type="button"
+            onClick={() => setFeedbackOpen(true)}
+            className="btn-ghost"
+            title="Send feedback or contact admin"
+          >
+            <span className="material-symbols-outlined" aria-hidden="true">chat</span>
+            <span className="topbar-btn-label">Feedback</span>
+          </button>
         </header>
 
         <main id="main" className="content">
+          {(() => {
+            const nearest = upcomingDeadlines[0];
+            if (!nearest || bannerDismissed) return null;
+            return (
+              <div
+                className="banner banner-warn"
+                role="status"
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  flexWrap: "wrap",
+                  gap: 10,
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: 20 }}>alarm</span>
+                  <span>
+                    <strong>Upcoming deadline:</strong> {nearest.title} ({nearest.org}){" "}
+                    {nearest.daysLeft === 0
+                      ? "closes today!"
+                      : `closes in ${nearest.daysLeft} day${nearest.daysLeft > 1 ? "s" : ""}`}{" "}
+                    ({fmtDate(nearest.deadline)}).
+                    {upcomingDeadlines.length > 1 &&
+                      ` (${upcomingDeadlines.length - 1} more closing this week)`}
+                  </span>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                  {notifPerm === "default" && (
+                    <button
+                      type="button"
+                      className="banner-action"
+                      onClick={async () => {
+                        const res = await requestNotificationPermission();
+                        setNotifPerm(res);
+                        if (res === "granted") {
+                          triggerLocalDeadlineNotification(upcomingDeadlines);
+                        }
+                      }}
+                    >
+                      Enable device alerts
+                    </button>
+                  )}
+                  <NavLink
+                    to={nearest.kind === "Internship" ? "/internships" : "/opportunities"}
+                    className="banner-action"
+                  >
+                    View details
+                  </NavLink>
+                  <button
+                    type="button"
+                    className="btn-ghost"
+                    style={{ padding: "2px 6px", minWidth: "auto", height: "auto" }}
+                    onClick={() => {
+                      dismissDeadlineBannerToday();
+                      setBannerDismissed(true);
+                    }}
+                    title="Dismiss for today"
+                    aria-label="Dismiss deadline alert for today"
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: 16 }}>close</span>
+                  </button>
+                </div>
+              </div>
+            );
+          })()}
           {user && !user.email_verified && (
             <div className="banner banner-warn" role="status">
               Confirm your email address to secure your account — check your inbox for the link.
@@ -271,6 +386,7 @@ function Dashboard({ page }: { page?: "internships" | "programs" }) {
           )}
         </main>
       </div>
+      <FeedbackModal isOpen={feedbackOpen} onClose={() => setFeedbackOpen(false)} />
     </div>
   );
 }

@@ -20,6 +20,7 @@ export default function Jobs() {
   const [filters, setFilters] = useState<JobFilters>({
     sort: "score",
     prep_only: params.get("prep") === "1",
+    posted_within: 30,
   });
   const [search, setSearch] = useState("");
   const navigate = useNavigate();
@@ -225,12 +226,16 @@ export default function Jobs() {
             ? "No interview preps yet"
             : pending > 0 && !filters.q
               ? "No scored matches yet"
-              : "No jobs match"}
+              : filters.posted_within && !filters.q
+                ? "No roles in this date range"
+                : "No jobs match"}
           hint={filters.prep_only
             ? "Open a job and generate its interview prep to see it here."
             : pending > 0 && !filters.q
               ? `${pending} of ${data.counts.total} live roles are still being scored. The agent scores in batches every couple of minutes — no top match is shown until a role has been judged against your resume.`
-              : 'Try clearing filters, or use "Poll sources" above to fetch new postings.'}
+              : filters.posted_within && !filters.q
+                ? "Older posts are hidden by default. Choose a wider range, or \"Any time\" to include them."
+                : 'Try clearing filters, or use "Poll sources" above to fetch new postings.'}
         />
       )}
 

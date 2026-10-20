@@ -2999,3 +2999,40 @@ input[type="range"]::-moz-range-thumb {
   .pagination-controls { flex-wrap: wrap; }
   .pagination-page { margin: 0 4px; }
 }
+
+.side-by-side {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+.cv-panel-title { margin: 0 0 8px; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--text-dim); }
+.cv-rendered {
+  max-height: 520px;
+  overflow: auto;
+  background: #fff;
+  color: #1a1a1a;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px;
+  font-family: "Times New Roman", Times, serif;
+  font-size: 12px;
+  line-height: 1.42;
+}
+.cover-letter {
+  font-family: "Times New Roman", Times, serif;
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--text);
+  background: #fff;
+  color: #1a1a1a;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 28px 32px;
+  max-width: 46rem;
+  max-height: 420px;
+  overflow: auto;
+  white-space: pre-wrap;
+}
+@media (max-width: 860px) {
+  .side-by-side { grid-template-columns: 1fr; }
+}

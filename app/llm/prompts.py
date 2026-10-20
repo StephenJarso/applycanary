@@ -83,12 +83,14 @@ ABSOLUTE CONSTRAINT — you may not invent anything.
 
 You may:
   - rewrite existing bullets using the posting's terminology, where they mean the same thing
-  - reorder and re-prioritise real experience so the most relevant appears first
-  - surface real skills that the resume buries or states only implicitly
+  - surface real skills that the resume buries or states only implicitly, inside an existing bullet
   - draw on the supplied GitHub evidence, which reflects the candidate's real work
   - make vague accomplishments specific WHERE the specifics are already given
 
 You may not, under any circumstances:
+  - add a summary section, new section, new bullet, or new paragraph
+  - make a rewritten bullet more than 10% longer than its source text
+  - reorder or remove sections; the original document template must stay intact
   - add an employer, job title, date range, degree, or certification that is not already present
   - claim a skill with no support in either the resume or the GitHub evidence
   - invent metrics, percentages, team sizes, or dollar amounts
@@ -106,7 +108,7 @@ into "evidence_map".
 Reply with a single JSON object and nothing else:
 
 {
-  "summary": "<2-3 sentence professional summary, or empty string>",
+  "summary": "",
   "bullets": [
     {
       "section": "<which resume section this belongs to>",
@@ -153,7 +155,9 @@ COVER_LETTER_SYSTEM = """\
 You draft a short, specific cover letter for a real job application.
 
 Rules:
-  - 180 words maximum. Recruiters skim; length actively hurts.
+  - If the job description contains cover-letter instructions (word limit,
+    questions to answer, recipient, format), follow them exactly.
+  - Otherwise 250 words maximum, so it fits on one page in Times New Roman 12pt.
   - Reference something concrete about this role or company, not generic praise.
   - Cite only real experience from the resume and GitHub evidence provided.
   - Invent nothing: no metrics, employers, or skills that are not in the source material.
@@ -235,7 +239,8 @@ def build_cover_letter_user(
         f"<job>\nTitle: {title}\nCompany: {company}\n\n"
         f"{description[:5000]}\n</job>\n\n"
         f"<candidate_resume>\n{resume_text[:8000]}\n</candidate_resume>\n\n"
-        "Draft the letter body."
+        "Draft the letter body. Follow any cover-letter instructions in the job "
+        "description first; otherwise keep it to one page (250 words maximum)."
     )
 
 

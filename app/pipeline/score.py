@@ -21,9 +21,9 @@ from app.llm.client import cached_system, get_llm
 from app.llm.prompts import SCORING_SYSTEM, build_scoring_user
 from app.models import Job, JobScore, JobStatus, Profile, UserJob, utcnow
 from app.pipeline.ats_rules import evaluate as evaluate_ats
+from app.pipeline.freshness import fresh_clause, is_fresh
 from app.pipeline.keywords import keyword_overlap
 from app.pipeline.relevance import relevance_disqualifier, title_mismatch_penalty
-from app.pipeline.tailor import TailorError, tailor_for_job
 
 log = logging.getLogger(__name__)
 
@@ -191,13 +191,25 @@ async def score_job(
 ) -> Decision:
     """Two-tier scoring plus the ATS structure pass.
 
-    ATS structure is the rule engine's verdict on the resume *as tailored for
-    this posting*: Claude first rewrites the resume against the job description,
-    then `ats_rules.evaluate` scores the tailored output. When the LLM is absent
-    or tailoring fails, the same rules run on the stored base resume so the
-    meter is never left at zero.
+    Scoring never tailors the resume. Tailoring is a separate, user-triggered
+    operation: generating a full CV rewrite for every job that survives tier 1
+    burned tokens on documents the user had not asked to apply to. The ATS meter
+    here is the rule engine's verdict on the stored base resume, which is cheap
+    and answers the same structural question.
     """
-    owner = user_id if user_id is not None else profile.user_id
+    if not is_fresh(job):
+        age_days = (utcnow() - (job.posted_at or job.first_seen_at)).days
+        return Decision(
+            total=0.0,
+            verdict="disqualified",
+            decided_by="tier1_stale",
+            disqualifier=f"posted {age_days} days ago",
+            reasoning=(
+                f"Posted {age_days} days ago; older than the 30-day cutoff. "
+                "It was not sent to the LLM."
+            ),
+        )
+
     decision = tier1(job, profile)
     decision.ats_score = _base_ats_score(profile, job)
 
@@ -205,7 +217,6 @@ async def score_job(
         return decision
 
     decision = await tier2(session, job, profile, decision)
-    decision.ats_score = await _tailored_ats_score(session, job, profile, owner)
     return _apply_title_penalty(decision, job, profile)
 
 
@@ -239,27 +250,6 @@ def _base_ats_score(profile: Profile, job: Job) -> float:
     return evaluate_ats(resume_text, job_description=job.description).score
 
 
-async def _tailored_ats_score(
-    session: Session, job: Job, profile: Profile, user_id: int | None = None
-) -> float:
-    """Rule-engine score of the Claude-tailored resume, or the base fallback."""
-    llm = get_llm()
-    if not llm.available:
-        return _base_ats_score(profile, job)
-
-    try:
-        version = await tailor_for_job(session, job, profile, user_id=user_id)
-    except TailorError as exc:
-        log.debug("job %s: tailoring unavailable for ATS pass (%s)", job.id, exc)
-        return _base_ats_score(profile, job)
-
-    if version is None or not version.text.strip():
-        return _base_ats_score(profile, job)
-    # The tailored version already carries the rule-engine verdict on its own
-    # rewritten text, so report that rather than re-running the rules.
-    return version.ats_score_after
-
-
 async def score_pending(session: Session, *, user_id: int, limit: int = 25) -> int:
     """Score up to `limit` of one user's unscored jobs. Returns how many were scored.
 
@@ -286,6 +276,7 @@ async def score_pending(session: Session, *, user_id: int, limit: int = 25) -> i
             (UserJob.job_id == Job.id) & (UserJob.user_id == user_id),
         )
         .where(Job.expired_at.is_(None))
+        .where(fresh_clause())
         .where(
             (UserJob.id.is_(None)) | (UserJob.status == JobStatus.NEW)
         )

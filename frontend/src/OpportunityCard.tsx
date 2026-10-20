@@ -47,6 +47,7 @@ function Timeline({ item }: { item: Opportunity }) {
   }
 
   if (item.opens && item.closes) {
+    const left = daysUntil(item.closes);
     return (
       <>
         <p>
@@ -54,11 +55,13 @@ function Timeline({ item }: { item: Opportunity }) {
             <>
               ⏳ Opens <b>{fmtDate(item.opens)}</b> (in {daysUntil(item.opens)} days)
             </>
+          ) : left <= 7 && left >= 0 ? (
+            <>🚨 <b>Closing soon</b></>
           ) : (
             <>🟢 Open now</>
           )}{" "}
           · Deadline <b>{fmtDate(item.closes)}</b>
-          {daysUntil(item.closes) >= 0 && <> ({daysUntil(item.closes)} days left)</>}
+          {left >= 0 && <> ({left === 0 ? "closes today!" : `${left} days left`})</>}
         </p>
         <Steps item={item} />
       </>

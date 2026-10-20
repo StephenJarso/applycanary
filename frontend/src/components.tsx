@@ -55,11 +55,24 @@ export function Loading({ label = "Loading" }: { label?: string }) {
   );
 }
 
-export function ErrorBox({ error }: { error: unknown }) {
+export function ErrorBox({ error, onRetry }: { error: unknown; onRetry?: () => void }) {
   const message = error instanceof Error ? error.message : String(error);
+  const isWakingUp = /render|waking up|starting up|cannot connect|spin-up/i.test(message);
   return (
-    <div className="banner banner-bad" role="alert">
-      <span>{message}</span>
+    <div
+      className={`banner ${isWakingUp ? "banner-warn" : "banner-bad"}`}
+      role="alert"
+      style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}
+    >
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        {isWakingUp && <span className="spinner" style={{ width: 14, height: 14, flexShrink: 0 }} />}
+        <span>{message}</span>
+      </div>
+      {onRetry && (
+        <button type="button" className="banner-action" onClick={onRetry}>
+          Try again
+        </button>
+      )}
     </div>
   );
 }

@@ -268,6 +268,30 @@ class LlmClient:
             f"All {len(candidates)} available providers failed. Last error: {last_exc}"
         ) from last_exc
 
+    async def test_provider(self, provider: str) -> LlmResult:
+        """Test a specific provider directly without fallback to verify credentials."""
+        s = self._settings
+        model_map = {
+            "xai": s.xai_triage_model,
+            "gemini": s.gemini_model,
+            "openrouter": s.openrouter_triage_model,
+            "groq": s.groq_triage_model,
+            "anthropic": s.model_triage,
+            "ollama": s.ollama_triage_model,
+            "bedrock": s.bedrock_model_id,
+        }
+        model = model_map.get(provider, "") or self.triage_model
+        return await self._complete_for(
+            provider,
+            model=model,
+            system="Reply with the single word: OK",
+            messages=[{"role": "user", "content": "ping"}],
+            max_tokens=10,
+            temperature=0.0,
+            json_mode=False,
+            user_api_key="",
+        )
+
     def _model_for_provider(self, provider: str, model: str) -> str:
         """Map the caller's model (chosen for the active provider) onto the
         provider actually being tried.

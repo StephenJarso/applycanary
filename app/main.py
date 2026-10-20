@@ -156,6 +156,8 @@ def create_app() -> FastAPI:
             if len(window) >= maximum:
                 retry_after = max(1, int(period - (now - window[0])))
                 return JSONResponse(status_code=429, content={"detail": "Too many requests; please try again later."}, headers={"Retry-After": str(retry_after)})
+
+        request.state.user_id = None
         if (
             path == "/health"
             or path in (
@@ -177,9 +179,14 @@ def create_app() -> FastAPI:
             # data, so a signed-out visitor must reach them instead of being
             # bounced to the login wall (their data comes from /api/public/*).
             or path == "/opportunities"
+            or path == "/internships"
             or path.startswith("/api/public/")
             or path == "/favicon.ico"
         ):
+            with Session(engine) as session:
+                opt_user = resolve_current_user(request, session)
+                if opt_user is not None:
+                    request.state.user_id = opt_user.id
             return await call_next(request)
 
         # Resolve the caller once here and hand it to the handlers, rather than

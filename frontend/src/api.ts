@@ -98,6 +98,10 @@ export interface JobDetail extends Job {
     id: number;
     text: string;
     text_html: string;
+    original_text: string;
+    original_html: string;
+    format_preserved: boolean;
+    template_note: string;
     diff_summary: string;
     ats_score_before: number;
     ats_score_after: number;
@@ -188,6 +192,7 @@ export interface Profile {
   skills: string[];
   github_synced_at: string | null;
   github_repo_count: number;
+  github_connected: boolean;
   alert_min_score: number;
   llm_provider: string;
   llm_api_key_masked: string;
@@ -362,7 +367,7 @@ export class ApiError extends Error {
   }
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
+async function request<T>(path: string, init?: RequestInit, retries = 1): Promise<T> {
   const headers = new Headers(init?.headers);
   if (typeof init?.body === "string" && !headers.has("Content-Type")) {
     headers.set("Content-Type", "application/json");
@@ -378,16 +383,24 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
       credentials: crossOrigin ? "include" : init?.credentials,
     });
   } catch {
+    if (retries > 0) {
+      await new Promise((r) => setTimeout(r, 1500));
+      return request<T>(path, init, retries - 1);
+    }
     // fetch only rejects on network-level problems: offline, DNS failure,
-    // mixed-content blocking, or a refused preflight. Say so plainly rather
-    // than letting the browser's opaque "Failed to fetch" reach the UI.
+    // or when Render instance is waking up from idle.
     throw new ApiError(
-      "Cannot connect to the ApplyCanary server. Check your internet connection and try again.",
+      "Cannot connect to the ApplyCanary server. If using Render free tier, the instance might be waking up from idle (~30–50s). Please wait a moment and try again.",
       0,
     );
   }
 
   if (!res.ok) {
+    if ([502, 503, 504].includes(res.status) && retries > 0) {
+      await new Promise((r) => setTimeout(r, 2000));
+      return request<T>(path, init, retries - 1);
+    }
+
     // Read the body exactly once, as text: an earlier .json() call consumes
     // the stream, so a later .text() would resolve to "" and the backend's
     // actual error message would be silently dropped.
@@ -395,20 +408,27 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     let message = "";
     try {
       const body = JSON.parse(text) as { detail?: unknown; message?: unknown };
-      // FastAPI puts the useful message in `detail`; gateway routers use
-      // `message`. Either way the UI never shows a bare "Error".
-      if (typeof body.detail === "string" && body.detail) message = body.detail;
-      else if (typeof body.message === "string" && body.message) message = body.message;
+      // FastAPI puts the useful message in `detail`; gateway routers use `message`.
+      if (typeof body.detail === "string" && body.detail) {
+        message = body.detail;
+      } else if (Array.isArray(body.detail)) {
+        message = body.detail
+          .map((d: any) => (typeof d === "string" ? d : d.msg || JSON.stringify(d)))
+          .join(", ");
+      } else if (typeof body.message === "string" && body.message) {
+        message = body.message;
+      }
     } catch {
       /* HTML/plain body — fall through to the status text */
     }
+
     // Proxy/gateway failures never carry the app's `detail`: a reverse proxy
     // returns 5xx on gateway errors, and when the backend is gone its edge
-    // router answers 404 {message:"Application not found"}. Both read like an
-    // app bug unless restated as an outage.
+    // router answers 404 {message:"Application not found"}.
     const appGone = res.status === 404 && /application not found/i.test(text);
     if (res.status === 502 || res.status === 503 || res.status === 504 || appGone) {
-      message = "Cannot reach the ApplyCanary server. It may be down or redeploying — try again in a minute.";
+      message =
+        "The ApplyCanary server is starting up or temporarily idle on Render (free tier spin-up typically takes ~30–50 seconds). Please hold on a moment and retry.";
     }
     throw new ApiError(message || res.statusText || "Something went wrong. Please try again.", res.status);
   }
@@ -492,8 +512,9 @@ export const api = {
   profile: () => request<Profile>("/profile"),
   atsReport: () => request<AtsReport>("/profile/ats"),
 
-  saveProfile: (body: Partial<Profile>) =>
-    request<Profile>("/profile", { method: "PUT", body: JSON.stringify(body) }),
+  saveProfile: (
+    body: Partial<Profile> & { github_token?: string; github_disconnect?: boolean },
+  ) => request<Profile>("/profile", { method: "PUT", body: JSON.stringify(body) }),
 
   uploadResume: (file: File) => {
     const form = new FormData();
@@ -540,4 +561,113 @@ export const api = {
   semanticSearch: (q: string, limit = 12) =>
     request<{ query: string; jobs: SimilarJob[] }>(`/jobs/search/semantic?q=${encodeURIComponent(q)}&limit=${limit}`),
   memory: () => request<MemoryIndex>("/memory"),
+
+  // Feedback & contact (works for logged-in users & guest visitors)
+  submitFeedback: (payload: { name?: string; email?: string; category?: string; message: string }) =>
+    request<{ ok: boolean; message: string }>("/public/feedback", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+
+  // Admin telemetry & service control (admin only)
+  adminFeedback: (status = "all", limit = 50, offset = 0) =>
+    request<FeedbackList>(`/admin/feedback?status=${status}&limit=${limit}&offset=${offset}`),
+  updateFeedback: (id: number, payload: { status?: string; admin_notes?: string }) =>
+    request<{ ok: boolean; message: string }>(`/admin/feedback/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    }),
+  deleteFeedback: (id: number) =>
+    request<{ ok: boolean; message: string }>(`/admin/feedback/${id}`, {
+      method: "DELETE",
+    }),
+  systemStatus: () => request<SystemStatus>("/admin/system-status"),
+  testLlm: (provider?: string) =>
+    request<TestLlmResult>("/admin/test-llm", {
+      method: "POST",
+      body: JSON.stringify({ provider }),
+    }),
+  triggerJob: (jobName: string) =>
+    request<{ ok: boolean; message: string }>(`/admin/trigger-job/${jobName}`, {
+      method: "POST",
+    }),
 };
+
+export interface FeedbackItem {
+  id: number;
+  user_id: number | null;
+  name: string;
+  email: string;
+  category: string;
+  message: string;
+  status: "new" | "in_progress" | "resolved";
+  admin_notes: string;
+  created_at: string;
+}
+
+export interface FeedbackList {
+  items: FeedbackItem[];
+  total: number;
+  new_count: number;
+}
+
+export interface LlmProviderStatus {
+  name: string;
+  key: string;
+  configured: boolean;
+  model: string;
+  is_active: boolean;
+  on_cooldown: boolean;
+}
+
+export interface ConnectorHealth {
+  source: string;
+  last_run: string | null;
+  duration_ms: number;
+  found: number;
+  new_jobs: number;
+  ok: boolean;
+  error: string;
+}
+
+export interface SystemStatus {
+  database: {
+    ok: boolean;
+    dialect: string;
+    vector_backend: string;
+    jobs_count: number;
+    applications_count: number;
+    sessions_count: number;
+    feedback_new: number;
+  };
+  scheduler: {
+    running: boolean;
+    jobs: Array<{ id: string; name: string; next_run: string | null }>;
+  };
+  users: {
+    total: number;
+    active: number;
+    verified: number;
+    admin: number;
+  };
+  connectors: ConnectorHealth[];
+  llm: {
+    available: boolean;
+    active_provider: string;
+    providers: LlmProviderStatus[];
+  };
+  email: {
+    configured: boolean;
+    backend: string;
+  };
+}
+
+export interface TestLlmResult {
+  ok: boolean;
+  provider: string;
+  model?: string;
+  latency_ms: number;
+  reply?: string;
+  error?: string;
+}
+

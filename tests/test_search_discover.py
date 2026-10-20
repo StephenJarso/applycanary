@@ -113,6 +113,39 @@ def test_search_finds_unscored_matches():
     assert any("Golang" in t for t in _titles(res.json()))
 
 
+def test_default_hides_jobs_older_than_thirty_days():
+    with Session(engine) as session:
+        old = session.exec(
+            select(Job).where(Job.title == "Senior Golang Engineer")
+        ).one()
+        old.posted_at = datetime.now(UTC) - timedelta(days=60)
+        session.add(old)
+        session.commit()
+
+    client = _client()
+    recent = client.get("/api/jobs", params={"include_all": True, "limit": 100})
+    assert "Senior Golang Engineer" not in _titles(recent.json())
+
+    everything = client.get(
+        "/api/jobs", params={"include_all": True, "posted_within": 0, "limit": 100}
+    )
+    assert "Senior Golang Engineer" in _titles(everything.json())
+
+
+def test_recurring_programme_stays_visible_when_old():
+    with Session(engine) as session:
+        session.add(Job(
+            fingerprint="fp-hennge-old", source="careers", company="HENNGE",
+            title="Global Internship Program", description="Go internship",
+            posted_at=datetime.now(UTC) - timedelta(days=240),
+            status=JobStatus.NEW,
+        ))
+        session.commit()
+
+    res = _client().get("/api/jobs", params={"include_all": True, "limit": 100})
+    assert "Global Internship Program" in _titles(res.json())
+
+
 def test_include_all_returns_unscored_and_rejected_live_roles():
     client = _client()
     res = client.get("/api/jobs", params={"include_all": True, "limit": 100})
@@ -166,7 +199,9 @@ def test_posted_within_hides_stale_listings():
     assert fresh.status_code == 200
     assert "Senior Golang Engineer" not in _titles(fresh.json())
 
-    any_time = client.get("/api/jobs", params={"q": "golang", "limit": 100})
+    any_time = client.get(
+        "/api/jobs", params={"q": "golang", "posted_within": 0, "limit": 100}
+    )
     assert "Senior Golang Engineer" in _titles(any_time.json())
 
 

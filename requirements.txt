@@ -37,6 +37,10 @@ pyyaml>=6.0,<7.0
 # --- scheduling ---
 apscheduler>=3.10,<4.0
 
+# --- secrets ---
+# Encrypts user-supplied GitHub tokens at rest with the app secret key.
+cryptography>=42,<51
+
 # --- http ---
 httpx>=0.27,<1.0
 

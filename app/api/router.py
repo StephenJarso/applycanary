@@ -12,11 +12,11 @@ client has something real to mirror.
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import and_, or_
@@ -24,10 +24,12 @@ from sqlmodel import Session, func, select
 
 from app.config import get_settings
 from app.db import get_session
-from app.deps import current_user, user_job
+from app.deps import current_user, require_admin, user_job
 from app.models import (
     Application,
+    Feedback,
     InterviewPrep,
+    InterviewSession,
     Job,
     JobAlias,
     JobScore,
@@ -165,6 +167,7 @@ class ProfileOut(BaseModel):
     skills: list[str] = Field(default_factory=list)
     github_synced_at: datetime | None = None
     github_repo_count: int = 0
+    github_connected: bool = False
     # Email alerts: when a posting scores at/above this, email it immediately.
     alert_min_score: float = 90.0
     # Per-user LLM key
@@ -198,6 +201,9 @@ class ProfileIn(BaseModel):
     # Per-user LLM key (optional — blank means use server default)
     llm_provider: str = ""
     llm_api_key: str = ""  # sent once, stored, never read back raw
+    # GitHub access token: sent once, stored encrypted, never read back.
+    github_token: str = ""
+    github_disconnect: bool = False
     # Job subscription preferences
     preferred_work_type: str = "any"
 
@@ -233,6 +239,19 @@ class ActionResult(BaseModel):
     ok: bool
     message: str = ""
     detail: dict[str, Any] = Field(default_factory=dict)
+
+
+class FeedbackIn(BaseModel):
+    name: str = ""
+    email: str = ""
+    category: str = "feedback"
+    message: str
+
+
+class FeedbackUpdate(BaseModel):
+    status: str | None = None
+    admin_notes: str | None = None
+
 
 
 # ---------------------------------------------------------------- helpers
@@ -475,7 +494,7 @@ def list_jobs(
     remote_only: bool = False,
     prep_only: bool = False,
     include_all: bool = False,
-    posted_within: int = Query(0, ge=0, le=3650),
+    posted_within: int = Query(30, ge=0, le=3650),
     sort: Literal["score", "newest", "oldest"] = "score",
     limit: int = Query(100, ge=1, le=500),
     offset: int = Query(0, ge=0),
@@ -532,10 +551,12 @@ def list_jobs(
             )
         )
     if posted_within:
-        cutoff = utcnow() - timedelta(days=posted_within)
-        # Fall back to first_seen for connectors that do not publish a date, so
-        # a freshness filter never silently drops the whole source.
-        stmt = stmt.where(func.coalesce(Job.posted_at, Job.first_seen_at) >= cutoff)
+        # Fall back to first_seen for connectors that do not publish a date.
+        # Official careers pages and recurring programmes stay visible even when
+        # their printed date is old; see app.pipeline.freshness.
+        from app.pipeline.freshness import fresh_clause
+
+        stmt = stmt.where(fresh_clause(max_age_days=posted_within))
     if q:
         stmt = _apply_text_search(stmt, q)
     if min_score:
@@ -641,6 +662,10 @@ def job_detail(
                 "id": version.id,
                 "text": version.text,
                 "text_html": version.text_html or version.text,
+                "original_text": version.original_text,
+                "original_html": version.original_html or version.original_text,
+                "format_preserved": version.format_preserved,
+                "template_note": version.template_note,
                 "diff_summary": version.diff_summary,
                 "ats_score_before": version.ats_score_before,
                 "ats_score_after": version.ats_score_after,
@@ -810,6 +835,7 @@ def get_profile(
         skills=list(profile.skills or []),
         github_synced_at=profile.github_synced_at,
         github_repo_count=len(evidence.get("repos") or []),
+        github_connected=bool(profile.github_token_encrypted),
         alert_min_score=profile.alert_min_score,
         llm_provider="" if user.is_admin else profile.llm_provider,
         llm_api_key_masked=masked,
@@ -835,10 +861,19 @@ def save_profile(
     # payload that omits target_titles means "leave my titles alone", not
     # "wipe them" — the old behaviour reset every omitted field to its model
     # default, which silently destroyed data when a caller sent a subset.
+    if payload.github_disconnect:
+        profile.github_token_encrypted = ""
+    elif payload.github_token:
+        from app.secrets import encrypt_secret
+
+        profile.github_token_encrypted = encrypt_secret(payload.github_token)
+
     for field, value in payload.model_dump(exclude_unset=True).items():
         # None means "leave unchanged" for the optional alert threshold, so an
         # old client that omits it cannot null out the stored preference.
         if field == "alert_min_score" and value is None:
+            continue
+        if field in ("github_token", "github_disconnect"):
             continue
         # llm_api_key: only overwrite when the user actually sent a new key;
         # an empty string means "I forgot to fill this in", not "clear my key".
@@ -903,6 +938,11 @@ async def upload_resume(
     ).first() or Profile(user_id=user.id)
     profile.base_resume_path = str(dest)
     profile.base_resume_text = parsed.text
+    profile.resume_meta = {
+        **parsed.template,
+        "file_type": parsed.file_type,
+        "pages": parsed.pages,
+    }
     profile.skills = sorted(extract_skills(parsed.text) | set(profile.skills or []))
     if not profile.email and parsed.emails:
         profile.email = parsed.emails[0]
@@ -973,13 +1013,17 @@ def download_resume_version(
         if not path:
             from app.resume.render import render_for_job
 
-            docx_path, pdf_path = render_for_job(
+            docx_path, pdf_path, preserved, note = render_for_job(
                 version.text,
                 company=job.company if job else "company",
                 title=job.title if job else "role",
                 full_name=(profile.full_name if profile else "") or "",
+                profile=profile,
             )
-            version.docx_path, version.pdf_path = str(docx_path), str(pdf_path)
+            version.docx_path = str(docx_path)
+            version.pdf_path = str(pdf_path) if str(pdf_path) != "." else ""
+            version.format_preserved = preserved
+            version.template_note = note
             session.add(version)
             session.commit()
             path = docx_path if fmt == "docx" else pdf_path
@@ -1163,7 +1207,12 @@ async def trigger_github(
     profile = _profile_or_404(session, user)
     if not profile.github_username:
         raise HTTPException(400, "no GitHub username on the profile")
-    evidence = await scan(profile.github_username)
+    from app.secrets import decrypt_secret
+
+    evidence = await scan(
+        profile.github_username,
+        token=decrypt_secret(profile.github_token_encrypted),
+    )
     if not evidence.ok:
         raise HTTPException(502, evidence.error or "GitHub scan failed")
     profile.github_evidence = evidence.to_dict()
@@ -1175,3 +1224,325 @@ async def trigger_github(
         message=f"Scanned {len(evidence.repos)} repositories.",
         detail={"repos": len(evidence.repos), "skills": evidence.skills},
     )
+
+
+# ---------------------------------------------------------------- feedback & admin
+
+
+@router.post("/public/feedback")
+def submit_feedback(
+    payload: FeedbackIn,
+    request: Request,
+    session: Session = Depends(get_session),
+) -> dict:
+    """Allow anyone (logged-in user or guest visitor) to submit feedback or contact the admin."""
+    msg = payload.message.strip()
+    if not msg:
+        raise HTTPException(400, "Message cannot be empty")
+
+    user_id = getattr(request.state, "user_id", None)
+    sender_email = payload.email.strip()
+    sender_name = payload.name.strip()
+
+    if user_id:
+        user_row = session.get(User, user_id)
+        if user_row:
+            if not sender_email:
+                sender_email = user_row.email
+            if not sender_name:
+                sender_name = user_row.email.split("@")[0]
+
+    fb = Feedback(
+        user_id=user_id,
+        name=sender_name or "Guest",
+        email=sender_email,
+        category=payload.category.strip() or "feedback",
+        message=msg,
+        status="new",
+    )
+    session.add(fb)
+    session.commit()
+    return {"ok": True, "message": "Thank you! Your feedback has been received."}
+
+
+@router.get("/admin/feedback")
+def list_feedback(
+    status: str = "all",
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+    user: User = Depends(require_admin),
+    session: Session = Depends(get_session),
+) -> dict:
+    """List user feedback and contact submissions (admin only)."""
+    stmt = select(Feedback)
+    if status != "all":
+        stmt = stmt.where(Feedback.status == status)
+
+    total = session.exec(select(func.count(Feedback.id))).one()
+    new_count = session.exec(select(func.count(Feedback.id)).where(Feedback.status == "new")).one()
+    items = session.exec(stmt.order_by(Feedback.created_at.desc()).offset(offset).limit(limit)).all()
+
+    return {
+        "items": [
+            {
+                "id": it.id,
+                "user_id": it.user_id,
+                "name": it.name,
+                "email": it.email,
+                "category": it.category,
+                "message": it.message,
+                "status": it.status,
+                "admin_notes": it.admin_notes,
+                "created_at": it.created_at.isoformat(),
+            }
+            for it in items
+        ],
+        "total": total,
+        "new_count": new_count,
+    }
+
+
+@router.patch("/admin/feedback/{feedback_id}")
+def update_feedback(
+    feedback_id: int,
+    payload: FeedbackUpdate,
+    user: User = Depends(require_admin),
+    session: Session = Depends(get_session),
+) -> dict:
+    """Update feedback status or admin notes."""
+    fb = session.get(Feedback, feedback_id)
+    if not fb:
+        raise HTTPException(404, "Feedback entry not found")
+    if payload.status is not None:
+        fb.status = payload.status
+    if payload.admin_notes is not None:
+        fb.admin_notes = payload.admin_notes
+    session.add(fb)
+    session.commit()
+    return {"ok": True, "message": "Feedback updated"}
+
+
+@router.delete("/admin/feedback/{feedback_id}")
+def delete_feedback(
+    feedback_id: int,
+    user: User = Depends(require_admin),
+    session: Session = Depends(get_session),
+) -> dict:
+    """Delete a feedback entry."""
+    fb = session.get(Feedback, feedback_id)
+    if not fb:
+        raise HTTPException(404, "Feedback entry not found")
+    session.delete(fb)
+    session.commit()
+    return {"ok": True, "message": "Feedback deleted"}
+
+
+@router.get("/admin/system-status")
+def admin_system_status(
+    user: User = Depends(require_admin),
+    session: Session = Depends(get_session),
+) -> dict:
+    """Live telemetry for database, scheduler, LLM providers, scrapers and users."""
+    import time
+
+    from app import scheduler as sched
+    from app.config import get_settings
+    from app.db import is_cockroach, vector_backend
+    from app.llm.client import get_llm
+
+    settings = get_settings()
+    llm = get_llm()
+
+    # User metrics
+    users_total = session.exec(select(func.count(User.id))).one()
+    users_active = session.exec(select(func.count(User.id)).where(User.is_active.is_(True))).one()
+    users_verified = session.exec(select(func.count(User.id)).where(User.email_verified.is_(True))).one()
+    users_admin = session.exec(select(func.count(User.id)).where(User.is_admin.is_(True))).one()
+
+    # System metrics
+    jobs_count = session.exec(select(func.count(Job.id))).one()
+    applications_count = session.exec(select(func.count(Application.id))).one()
+    sessions_count = session.exec(select(func.count(InterviewSession.id))).one()
+    feedback_new = session.exec(select(func.count(Feedback.id)).where(Feedback.status == "new")).one()
+
+    # Scheduler info
+    scheduler = sched.get_scheduler()
+    sched_info = {
+        "running": bool(scheduler and scheduler.running),
+        "jobs": [
+            {
+                "id": j.id,
+                "name": j.name,
+                "next_run": j.next_run_time.isoformat() if j.next_run_time else None,
+            }
+            for j in (scheduler.get_jobs() if scheduler else [])
+        ],
+    }
+
+    # Connector health
+    connectors: list[dict] = []
+    sources = ["greenhouse", "lever", "workable", "adzuna", "careers", "hacker_news", "linkedin"]
+    for s_name in sources:
+        run = session.exec(
+            select(SourceRun)
+            .where(SourceRun.source == s_name)
+            .order_by(SourceRun.started_at.desc())
+        ).first()
+        if run:
+            connectors.append({
+                "source": s_name,
+                "last_run": run.started_at.isoformat(),
+                "duration_ms": run.duration_ms,
+                "found": run.found,
+                "new_jobs": run.new_jobs,
+                "ok": run.ok,
+                "error": run.error,
+            })
+        else:
+            connectors.append({
+                "source": s_name,
+                "last_run": None,
+                "duration_ms": 0,
+                "found": 0,
+                "new_jobs": 0,
+                "ok": True,
+                "error": "No runs recorded yet",
+            })
+
+    # LLM Provider info
+    now_mono = time.monotonic()
+    provider_statuses = [
+        {
+            "name": "xAI Grok",
+            "key": "xai",
+            "configured": bool(settings.xai_api_key),
+            "model": settings.xai_triage_model,
+            "is_active": llm.active_provider == "xai",
+            "on_cooldown": llm._cooldowns.get("xai", 0) > now_mono,
+        },
+        {
+            "name": "Google Gemini",
+            "key": "gemini",
+            "configured": bool(settings.gemini_api_key),
+            "model": settings.gemini_model,
+            "is_active": llm.active_provider == "gemini",
+            "on_cooldown": llm._cooldowns.get("gemini", 0) > now_mono,
+        },
+        {
+            "name": "OpenRouter",
+            "key": "openrouter",
+            "configured": bool(settings.openrouter_api_key),
+            "model": settings.openrouter_triage_model,
+            "is_active": llm.active_provider == "openrouter",
+            "on_cooldown": llm._cooldowns.get("openrouter", 0) > now_mono,
+        },
+        {
+            "name": "Groq",
+            "key": "groq",
+            "configured": bool(settings.groq_api_key),
+            "model": settings.groq_triage_model,
+            "is_active": llm.active_provider == "groq",
+            "on_cooldown": llm._cooldowns.get("groq", 0) > now_mono,
+        },
+        {
+            "name": "Anthropic Claude",
+            "key": "anthropic",
+            "configured": bool(settings.anthropic_api_key),
+            "model": settings.model_triage,
+            "is_active": llm.active_provider == "anthropic",
+            "on_cooldown": llm._cooldowns.get("anthropic", 0) > now_mono,
+        },
+        {
+            "name": "Ollama (local)",
+            "key": "ollama",
+            "configured": bool(settings.ollama_host),
+            "model": settings.ollama_triage_model,
+            "is_active": llm.active_provider == "ollama",
+            "on_cooldown": llm._cooldowns.get("ollama", 0) > now_mono,
+        },
+    ]
+
+    return {
+        "database": {
+            "ok": True,
+            "dialect": "cockroachdb" if is_cockroach() else "sqlite",
+            "vector_backend": vector_backend(),
+            "jobs_count": jobs_count,
+            "applications_count": applications_count,
+            "sessions_count": sessions_count,
+            "feedback_new": feedback_new,
+        },
+        "scheduler": sched_info,
+        "users": {
+            "total": users_total,
+            "active": users_active,
+            "verified": users_verified,
+            "admin": users_admin,
+        },
+        "connectors": connectors,
+        "llm": {
+            "available": llm.available,
+            "active_provider": llm.active_provider,
+            "providers": provider_statuses,
+        },
+        "email": {
+            "configured": settings.email_enabled,
+            "backend": "resend" if settings.resend_api_key else ("smtp" if settings.smtp_host else "none"),
+        },
+    }
+
+
+@router.post("/admin/test-llm")
+async def admin_test_llm(
+    payload: dict = Body(default_factory=dict),
+    user: User = Depends(require_admin),
+) -> dict:
+    """Test a specific LLM provider or default with live probe to catch expired keys."""
+    import time
+
+    from app.llm.client import get_llm
+
+    llm = get_llm()
+    provider = payload.get("provider", "") or llm.active_provider
+    if not provider:
+        raise HTTPException(400, "No LLM provider specified and none active")
+
+    t0 = time.monotonic()
+    try:
+        res = await llm.test_provider(provider)
+        latency_ms = int((time.monotonic() - t0) * 1000)
+        return {
+            "ok": True,
+            "provider": provider,
+            "model": res.model,
+            "latency_ms": latency_ms,
+            "reply": res.text.strip(),
+        }
+    except Exception as exc:  # noqa: BLE001
+        latency_ms = int((time.monotonic() - t0) * 1000)
+        return {
+            "ok": False,
+            "provider": provider,
+            "latency_ms": latency_ms,
+            "error": str(exc),
+        }
+
+
+@router.post("/admin/trigger-job/{job_name}")
+def admin_trigger_job(
+    job_name: str,
+    user: User = Depends(require_admin),
+) -> dict:
+    """Trigger a scheduled background task immediately."""
+    from app import scheduler as sched
+
+    scheduler = sched.get_scheduler()
+    if not scheduler or not scheduler.running:
+        raise HTTPException(503, "Scheduler is not currently running")
+    job = scheduler.get_job(job_name)
+    if not job:
+        raise HTTPException(404, f"Scheduled job {job_name!r} not found")
+
+    job.modify(next_run_time=utcnow())
+    return {"ok": True, "message": f"Job {job_name!r} scheduled for immediate execution."}
+

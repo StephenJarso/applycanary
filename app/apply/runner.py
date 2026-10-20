@@ -63,14 +63,17 @@ async def prepare(
 
     if version is not None and write_files and not version.docx_path:
         try:
-            docx_path, pdf_path = render_for_job(
+            docx_path, pdf_path, preserved, note = render_for_job(
                 version.text,
                 company=job.company,
                 title=job.title,
                 full_name=profile.full_name,
+                profile=profile,
             )
             version.docx_path = str(docx_path)
             version.pdf_path = str(pdf_path) if str(pdf_path) != "." else ""
+            version.format_preserved = preserved
+            version.template_note = note
             session.add(version)
         except Exception as exc:  # noqa: BLE001
             log.exception("job %s: resume render failed", job.id)

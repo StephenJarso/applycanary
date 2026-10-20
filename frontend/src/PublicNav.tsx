@@ -1,4 +1,6 @@
+import { useState } from "react";
 import { Link, NavLink } from "react-router-dom";
+import { FeedbackModal } from "./FeedbackModal";
 
 /**
  * Sticky public top bar shared by the marketing page and the public Programs
@@ -21,43 +23,56 @@ type Props = {
 };
 
 export default function PublicNav({ localSections = false, onLogin, onSignup }: Props) {
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
+
   return (
-    <header className="landing-nav">
-      <div className="landing-nav-inner">
-        <Link to="/" className="brand" aria-label="ApplyCanary home">
-          <span className="brand-name">ApplyCanary</span>
-        </Link>
-        <nav className="landing-nav-links" aria-label="Sections">
-          {SECTIONS.map((section) =>
-            localSections ? (
-              <a key={section.href} href={section.href}>{section.label}</a>
-            ) : (
-              <Link key={section.href} to={`/${section.href}`}>{section.label}</Link>
-            ),
-          )}
-          {PAGES.map((page) => (
-            <NavLink
-              key={page.to}
-              to={page.to}
-              className={({ isActive }) => (isActive ? "active" : undefined)}
+    <>
+      <header className="landing-nav">
+        <div className="landing-nav-inner">
+          <Link to="/" className="brand" aria-label="ApplyCanary home">
+            <span className="brand-name">ApplyCanary</span>
+          </Link>
+          <nav className="landing-nav-links" aria-label="Sections">
+            {SECTIONS.map((section) =>
+              localSections ? (
+                <a key={section.href} href={section.href}>{section.label}</a>
+              ) : (
+                <Link key={section.href} to={`/${section.href}`}>{section.label}</Link>
+              ),
+            )}
+            {PAGES.map((page) => (
+              <NavLink
+                key={page.to}
+                to={page.to}
+                className={({ isActive }) => (isActive ? "active" : undefined)}
+              >
+                {page.label}
+              </NavLink>
+            ))}
+          </nav>
+          <div className="landing-nav-actions">
+            <button
+              type="button"
+              className="landing-login"
+              onClick={() => setFeedbackOpen(true)}
+              style={{ background: "transparent", border: "1px solid var(--border)" }}
             >
-              {page.label}
-            </NavLink>
-          ))}
-        </nav>
-        <div className="landing-nav-actions">
-          {onLogin ? (
-            <button type="button" className="landing-login" onClick={onLogin}>Login</button>
-          ) : (
-            <Link to="/?mode=login" className="landing-login">Login</Link>
-          )}
-          {onSignup ? (
-            <button type="button" className="btn-primary landing-signup" onClick={onSignup}>Sign Up</button>
-          ) : (
-            <Link to="/?mode=register" className="btn-primary landing-signup">Sign Up</Link>
-          )}
+              Contact / Feedback
+            </button>
+            {onLogin ? (
+              <button type="button" className="landing-login" onClick={onLogin}>Login</button>
+            ) : (
+              <Link to="/?mode=login" className="landing-login">Login</Link>
+            )}
+            {onSignup ? (
+              <button type="button" className="btn-primary landing-signup" onClick={onSignup}>Sign Up</button>
+            ) : (
+              <Link to="/?mode=register" className="btn-primary landing-signup">Sign Up</Link>
+            )}
+          </div>
         </div>
-      </div>
-    </header>
+      </header>
+      <FeedbackModal isOpen={feedbackOpen} onClose={() => setFeedbackOpen(false)} />
+    </>
   );
 }

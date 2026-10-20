@@ -110,7 +110,9 @@ class GithubEvidence:
         )
 
 
-async def scan(username: str = "", *, include_forks: bool = False) -> GithubEvidence:
+async def scan(
+    username: str = "", *, token: str = "", include_forks: bool = False
+) -> GithubEvidence:
     settings = get_settings()
     username = username or settings.github_username
     if not username:
@@ -121,8 +123,9 @@ async def scan(username: str = "", *, include_forks: bool = False) -> GithubEvid
         "Accept": "application/vnd.github+json",
         "X-GitHub-Api-Version": "2022-11-28",
     }
-    if settings.github_token:
-        headers["Authorization"] = f"Bearer {settings.github_token}"
+    auth_token = token or settings.github_token
+    if auth_token:
+        headers["Authorization"] = f"Bearer {auth_token}"
 
     async with httpx.AsyncClient(
         timeout=DEFAULT_TIMEOUT, headers=headers, follow_redirects=True
@@ -134,10 +137,15 @@ async def scan(username: str = "", *, include_forks: bool = False) -> GithubEvid
             if code == 404:
                 return GithubEvidence(username=username,
                                       error=f"GitHub user {username!r} not found")
+            if code == 401:
+                return GithubEvidence(
+                    username=username,
+                    error="GitHub rejected the access token; reconnect GitHub",
+                )
             if code in (403, 429):
                 return GithubEvidence(
                     username=username,
-                    error="GitHub rate limit reached; set GITHUB_TOKEN to raise it",
+                    error="GitHub rate limit reached; connect a read-only token to raise it",
                 )
             return GithubEvidence(username=username, error=f"GitHub HTTP {code}")
         except Exception as exc:  # noqa: BLE001

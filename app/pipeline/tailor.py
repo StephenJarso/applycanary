@@ -113,6 +113,7 @@ async def tailor_for_job(
             user_provider=user_provider,
             user_api_key=user_api_key,
         )
+        parsed = _conservative_rewrites(parsed)
         report = verify(parsed, resume_text=resume_text, github_evidence=evidence_text)
         rebuilt = _rebuild_text(resume_text, parsed)
         truthcheck_passed = report.passed
@@ -135,6 +136,14 @@ async def tailor_for_job(
     version = existing or ResumeVersion(job_id=job.id, user_id=owner)
     version.text = rebuilt
     version.text_html = _render_cv_html(rebuilt)
+    version.original_text = resume_text
+    version.original_html = _render_cv_html(resume_text)
+    version.format_preserved = profile.base_resume_path.lower().endswith(".docx")
+    version.template_note = (
+        "Original DOCX template is reused on export."
+        if version.format_preserved
+        else "Original is a PDF; page size, margins and fonts are matched on export."
+    )
     version.diff_summary = diff_sum
     version.ats_score_before = before.score
     # Report what the rule engine actually measured. The previous
@@ -162,15 +171,37 @@ async def tailor_for_job(
     return version
 
 
+def _conservative_rewrites(parsed: dict) -> dict:
+    """Keep only in-place bullet edits that cannot inflate the document.
+
+    A rewrite may replace an existing bullet, not add a section, a bullet, or a
+    paragraph. Anything more than 15% longer than its source is dropped: length
+    is what changes page count and breaks the original template.
+    """
+    bullets: list[dict] = []
+    source = parsed.get("bullets")
+    if isinstance(source, list):
+        for entry in source:
+            if not isinstance(entry, dict):
+                continue
+            original = str(entry.get("original") or "").strip()
+            rewritten = str(entry.get("rewritten") or "").strip()
+            if not original or not rewritten:
+                continue
+            if len(rewritten) > len(original) * 1.15 + 25:
+                continue
+            bullets.append(entry)
+    return {**parsed, "bullets": bullets, "summary": "", "skills_to_surface": []}
+
+
 def _rebuild_text(original: str, parsed: dict) -> str:
     """Apply the model's rewrites to the resume text.
 
     Substitution is exact-match only. A fuzzy replace risks corrupting unrelated
-    lines, and a resume is a document the user will submit as-is.
+    lines, and a resume is a document the user will submit as-is. Summary blocks
+    and new bullets are ignored on purpose: they change the template.
     """
     text = original
-    summary = str(parsed.get("summary") or "").strip()
-
     bullets = parsed.get("bullets")
     if isinstance(bullets, list):
         for entry in bullets:
@@ -180,24 +211,7 @@ def _rebuild_text(original: str, parsed: dict) -> str:
             dst = str(entry.get("rewritten") or "").strip()
             if src and dst and src in text:
                 text = text.replace(src, dst, 1)
-
-    if summary:
-        text = _insert_summary(text, summary)
     return text
-
-
-def _insert_summary(text: str, summary: str) -> str:
-    """Place the summary under an existing heading, or after the contact block."""
-    lines = text.splitlines()
-    headings = ("summary", "profile", "objective", "about")
-    for idx, line in enumerate(lines):
-        if line.strip().lower().rstrip(":") in headings:
-            end = idx + 1
-            while end < len(lines) and lines[end].strip():
-                end += 1
-            return "\n".join([*lines[: idx + 1], summary, *lines[end:]])
-    cut = min(4, len(lines))
-    return "\n".join([*lines[:cut], "", "Summary", summary, *lines[cut:]])
 
 
 def _diff_summary(parsed: dict, report, added: list[str]) -> str:  # noqa: ANN001
@@ -224,22 +238,13 @@ def _diff_summary(parsed: dict, report, added: list[str]) -> str:  # noqa: ANN00
 def _rule_based_tailor(
     resume_text: str, title: str, company: str, missing_keywords: list[str]
 ) -> tuple[str, list[str]]:
-    """Rule-based ATS optimizer when LLM API is unconfigured or unavailable."""
-    lines = [ln.strip() for ln in resume_text.splitlines() if ln.strip()]
-    header_lines = lines[:3] if len(lines) >= 3 else lines
-    body_lines = lines[3:] if len(lines) >= 3 else []
+    """Deliberately a no-op.
 
-    added_terms = [k.title() for k in missing_keywords[:8] if k]
-    skills_block = (
-        f"\nTARGETED ATS KEYWORDS & SKILLS ({title} at {company})\n"
-        + ", ".join(added_terms)
-        + "\n"
-        if added_terms
-        else ""
-    )
-
-    rebuilt = "\n".join(header_lines) + "\n" + skills_block + "\n" + "\n".join(body_lines)
-    return rebuilt.strip(), added_terms
+    Without an LLM there is no truthful rewrite to make. Adding a keyword block
+    changed the template and could imply experience the candidate had not
+    claimed, so keeping the original is the safe fallback.
+    """
+    return resume_text, []
 
 
 def _render_cv_html(text: str) -> str:

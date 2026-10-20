@@ -272,7 +272,12 @@ async def job_refresh_github() -> None:
         for profile in _active_profiles(session):
             if not profile.github_username:
                 continue
-            evidence = await scan(profile.github_username)
+            from app.secrets import decrypt_secret
+
+            evidence = await scan(
+                profile.github_username,
+                token=decrypt_secret(profile.github_token_encrypted),
+            )
             if evidence.ok:
                 profile.github_evidence = evidence.to_dict()
                 profile.github_synced_at = utcnow()
