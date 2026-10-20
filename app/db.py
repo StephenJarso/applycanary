@@ -250,7 +250,7 @@ def _default_clause(column) -> str:  # noqa: ANN001
     if value is None or callable(value):
         return ""
     if isinstance(value, bool):
-        return f" DEFAULT {1 if value else 0}"
+        return f" DEFAULT {'TRUE' if value else 'FALSE'}"
     if isinstance(value, (int, float)):
         return f" DEFAULT {value}"
     if isinstance(value, str):
