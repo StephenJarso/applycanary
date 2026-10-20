@@ -42,33 +42,89 @@ DISCOVER_WEB = "discover:websearch"
 DEFAULT_TIMEOUT = 20.0
 
 
+# A skill is not a search phrase. "go docker python kubernetes job posting" is
+# too narrow for a search engine; "golang developer" is what a hiring page
+# actually says. Map the skills we can turn into role phrases and fall back to
+# the combined phrase only when none apply.
+_SKILL_ROLE_QUERIES: dict[str, str] = {
+    "go": "golang developer",
+    "golang": "golang developer",
+    "python": "python developer",
+    "typescript": "typescript developer",
+    "javascript": "javascript developer",
+    "rust": "rust developer",
+    "java": "java developer",
+    "kotlin": "kotlin developer",
+    "c#": "c# developer",
+    "c++": "c++ developer",
+    "react": "react developer",
+    "backend": "backend engineer",
+    "frontend": "frontend engineer",
+    "full stack": "full stack engineer",
+    "fullstack": "full stack engineer",
+    "kubernetes": "kubernetes engineer",
+    "grpc": "grpc engineer",
+    "aws": "aws engineer",
+    "devops": "devops engineer",
+    "sre": "site reliability engineer",
+    "platform": "platform engineer",
+}
+
+
+def _profile_skills(profile) -> list[str]:  # noqa: ANN001
+    """Stated skills first, then GitHub-evidence skills, lowercased and unique."""
+    skills: list[str] = []
+    evidence = profile.github_evidence if isinstance(profile.github_evidence, dict) else {}
+    for source in (profile.skills or [], evidence.get("skills") or []):
+        for value in source:
+            skill = str(value).strip().lower()
+            if skill and skill not in skills:
+                skills.append(skill)
+    return skills
+
+
 def build_queries(profile) -> list[str]:  # noqa: ANN001
     """Up to MAX_QUERIES_PER_PROFILE search phrases for one profile.
 
-    Target titles first (highest signal), then a combined phrase from stated
-    skills and GitHub-evidence skills. Single-word skills like \"go\" are folded
-    into the combined phrase rather than fired as their own query — \"go\" alone
-    would pull half the internet.
+    Target titles are the highest-signal phrases and come first. Then each
+    skill that maps to a real role phrase (Go -> "golang developer", Kubernetes
+    -> "kubernetes engineer") gets its own query, but only if the target titles
+    do not already cover it. The old combined phrase remains as a last resort
+    for profiles whose skills have no mapping.
     """
     queries: list[str] = []
-    for title in (profile.target_titles or [])[:2]:
-        title = str(title).strip()
-        if title and title not in queries:
-            queries.append(title)
 
-    if len(queries) < MAX_QUERIES_PER_PROFILE:
-        skills: list[str] = []
-        for s in (profile.skills or [])[:4]:
-            s = str(s).strip().lower()
-            if s and s not in skills:
-                skills.append(s)
-        evidence = profile.github_evidence if isinstance(profile.github_evidence, dict) else {}
-        for s in (evidence.get("skills") or [])[:4]:
-            s = str(s).strip().lower()
-            if s and s not in skills:
-                skills.append(s)
-        if skills:
-            queries.append(" ".join(skills[:4]))
+    def add(query: str) -> bool:
+        query = " ".join(str(query).split())
+        if not query:
+            return False
+        low = query.lower()
+        if any(existing.lower() == low for existing in queries):
+            return False
+        # Do not add "golang developer" when "Golang Developer" is a target.
+        if any(low in existing.lower() or existing.lower() in low for existing in queries):
+            return False
+        queries.append(query)
+        return True
+
+    for title in (profile.target_titles or [])[:MAX_QUERIES_PER_PROFILE]:
+        add(str(title))
+
+    if len(queries) >= MAX_QUERIES_PER_PROFILE:
+        return queries[:MAX_QUERIES_PER_PROFILE]
+
+    skills = _profile_skills(profile)
+    role_added = False
+    for skill in skills:
+        role = _SKILL_ROLE_QUERIES.get(skill)
+        if role:
+            role_added = add(role) or role_added
+            if len(queries) >= MAX_QUERIES_PER_PROFILE:
+                return queries[:MAX_QUERIES_PER_PROFILE]
+
+    # Only use the old keyword-soup query when no skill mapped to a real role.
+    if len(queries) < MAX_QUERIES_PER_PROFILE and skills and not role_added:
+        add(" ".join(skills[:4]))
 
     return queries[:MAX_QUERIES_PER_PROFILE]
 

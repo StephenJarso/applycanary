@@ -147,10 +147,29 @@ def test_build_queries_from_profile():
         github_evidence={"skills": ["kubernetes", "grpc"]},
     )
     queries = build_queries(profile)
-    # Target titles first, highest signal; skills+Github folded into one phrase.
+    # Target titles first. "go" and "golang" fold into the existing title,
+    # then skills become role phrases rather than one over-narrow keyword soup.
     assert queries[:2] == ["Golang Developer", "Backend Engineer"]
     assert len(queries) == 3
-    assert queries[2].startswith("go docker python kubernetes")
+    assert queries[2] == "python developer"
+
+
+def test_build_queries_go_skill_without_go_title():
+    profile = Profile(
+        target_titles=["Software Engineer"],
+        skills=["go", "docker"],
+        github_evidence={},
+    )
+    assert build_queries(profile) == ["Software Engineer", "golang developer"]
+
+
+def test_build_queries_falls_back_to_combined_phrase():
+    profile = Profile(
+        target_titles=[],
+        skills=["docker", "terraform", "postgres"],
+        github_evidence={},
+    )
+    assert build_queries(profile) == ["docker terraform postgres"]
 
 
 def test_build_queries_empty_profile():

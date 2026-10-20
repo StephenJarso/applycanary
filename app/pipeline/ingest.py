@@ -57,14 +57,15 @@ class IngestSummary:
 def load_config(path: Path = CONFIG_PATH) -> dict:
     if not path.exists():
         log.warning("%s not found; no curated companies configured", path)
-        return {"companies": [], "aggregators": []}
+        return {"companies": [], "careers": [], "aggregators": []}
     try:
         data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
     except yaml.YAMLError as exc:
         log.error("%s is not valid YAML: %s", path, exc)
-        return {"companies": [], "aggregators": []}
+        return {"companies": [], "careers": [], "aggregators": []}
     return {
         "companies": data.get("companies") or [],
+        "careers": data.get("careers") or [],
         "aggregators": data.get("aggregators") or [],
     }
 
@@ -92,6 +93,36 @@ def build_curated(config: dict, client: httpx.AsyncClient) -> list[BaseSource]:
                              client=client))
         except TypeError as exc:
             log.warning("cannot build %s/%s: %s", platform, token, exc)
+    return built
+
+
+def build_careers(config: dict, client: httpx.AsyncClient) -> list[BaseSource]:
+    """Instantiate one connector per official careers-site entry.
+
+    Entries use the `careers` source directly rather than the ATS platform
+    registry: the configuration is a URL/sitemap plus filters, not a board
+    token.
+    """
+    from app.sources.careers import OfficialCareersSource
+
+    built: list[BaseSource] = []
+    for entry in config.get("careers", []):
+        if not isinstance(entry, dict) or entry.get("enabled") is False:
+            continue
+        if not (entry.get("url") or entry.get("sitemap")):
+            log.warning("skipping malformed careers entry: %r", entry)
+            continue
+        kwargs = {
+            k: v for k, v in entry.items()
+            if k not in ("enabled",)
+        }
+        # `name` is the human label in YAML; the connector calls it company_name.
+        if "name" in kwargs:
+            kwargs["company_name"] = kwargs.pop("name")
+        try:
+            built.append(OfficialCareersSource(client=client, **kwargs))
+        except TypeError as exc:
+            log.warning("cannot build careers source %r: %s", entry.get("name"), exc)
     return built
 
 
@@ -244,3 +275,8 @@ async def poll_curated() -> IngestSummary:
 async def poll_broad() -> IngestSummary:
     """Aggregators and regional boards. Noisier, polled less often."""
     return await _run(build_aggregators)
+
+
+async def poll_careers() -> IngestSummary:
+    """Official company career sites, polled at their own (slower) cadence."""
+    return await _run(build_careers)

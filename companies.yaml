@@ -41,6 +41,54 @@ companies:
   - platform: workable
     token: zego
     name: Zego
+  # Go-heavy product teams. Official ATS boards carry the full description and
+  # often the posting before it reaches an aggregator.
+  - platform: greenhouse
+    token: grafanalabs
+    name: Grafana Labs
+  - platform: greenhouse
+    token: tailscale
+    name: Tailscale
+  - platform: greenhouse
+    token: cockroachlabs
+    name: Cockroach Labs
+  - platform: greenhouse
+    token: cloudflare
+    name: Cloudflare
+  - platform: greenhouse
+    token: canonical
+    name: Canonical
+  - platform: ashby
+    token: coder
+    name: Coder
+
+# Official careers sites that are not on a supported ATS. These are parsed from
+# the page itself (JSON-LD when present, otherwise title/meta/main content).
+# `sitemap` + `include` is the useful shape for a site with one page per role;
+# `exclude` drops listing/apply/FAQ pages, and `exclude_exact` drops an index
+# page without also dropping the role pages beneath it.
+careers:
+  - name: HENNGE
+    # Cloud security company in Tokyo; hires Go/Python engineers and runs an
+    # English-speaking global internship. The careers site is WordPress, not
+    # Greenhouse/Lever, so it needs the official-site connector.
+    sitemap: https://recruit.hennge.com/en/wp-sitemap-posts-page-1.xml
+    location: Tokyo, Japan
+    include:
+      - /en/mid-career-ngh/
+      - /en/gip/
+    exclude:
+      - /apply/
+      - /faq
+      - /terms
+      - /hennges-admission
+      - /hello-
+      - /translation-
+      - /gip-tgt
+      - /part-time
+      - /recruiting-anti-harassment
+    exclude_exact:
+      - https://recruit.hennge.com/en/mid-career-ngh/
 
 # Broad aggregator sources. Set enabled: false to skip one.
 #
@@ -127,3 +175,20 @@ aggregators:
     location: "united states"
     max_results: 50
 
+  # Hacker News "Who is hiring?" — one long monthly thread of postings
+  # made by the hiring teams themselves, often before any job board carries
+  # them. Algolia's public API, no key. Good for small teams and unusual roles.
+  - source: hn_hiring
+    enabled: true
+    search_terms:
+      - engineer
+      - developer
+      - backend
+      - golang
+      - go
+      - python
+      - rust
+      - kubernetes
+      - platform
+      - sre
+    max_results: 120

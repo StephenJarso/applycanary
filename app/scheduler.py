@@ -83,6 +83,17 @@ async def job_poll_broad() -> None:
     )
 
 
+async def job_poll_careers() -> None:
+    from app.pipeline.ingest import poll_careers
+
+    summary = await poll_careers()
+    log.info(
+        "poll_careers: %d sources, %d found, %d new, %d dup, %d failed",
+        summary.sources_run, summary.found, summary.new,
+        summary.duplicates, summary.sources_failed,
+    )
+
+
 async def job_score_new() -> None:
     from app.notify import email as notify
     from app.pipeline.score import score_pending
@@ -372,6 +383,9 @@ def build_scheduler() -> AsyncIOScheduler:
             IntervalTrigger(minutes=settings.poll_broad_minutes, jitter=300),
             job_poll_broad,
         ),
+        # Official careers sites are high-signal but low-churn; 30 minutes is
+        # fast enough to beat aggregators without hammering a small site.
+        ("poll_careers", IntervalTrigger(minutes=30, jitter=120), job_poll_careers),
         (
             "score_new",
             IntervalTrigger(minutes=settings.score_interval_minutes, jitter=20),
