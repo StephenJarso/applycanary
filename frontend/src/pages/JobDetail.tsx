@@ -128,6 +128,47 @@ export default function JobDetail() {
         </div>
       </div>
 
+      <div className="card">
+        <h3 className="card-title">
+          <span className="material-symbols-outlined" aria-hidden="true">badge</span>
+          Role details
+        </h3>
+        <div className="grid2">
+          <div>
+            <label>Location</label>
+            <p className="cell-dim" style={{ margin: "2px 0 0" }}>
+              {job.is_remote ? "Remote" : job.location || "Not stated"}
+            </p>
+          </div>
+          <div>
+            <label>Salary</label>
+            <p className="cell-dim" style={{ margin: "2px 0 0" }}>
+              {salary || "Not listed by the source"}
+            </p>
+          </div>
+          <div>
+            <label>Applicants</label>
+            <p className="cell-dim" style={{ margin: "2px 0 0" }}>
+              {job.applicants !== null
+                ? `${job.applicants.toLocaleString()} applicant${job.applicants === 1 ? "" : "s"}`
+                : "Not provided by the source"}
+            </p>
+          </div>
+          <div>
+            <label>Employment type</label>
+            <p className="cell-dim" style={{ margin: "2px 0 0" }}>
+              {job.employment_type || "Not stated"}
+            </p>
+          </div>
+        </div>
+        {job.benefits.length > 0 && (
+          <div className="field" style={{ marginTop: 12 }}>
+            <label>Benefits mentioned</label>
+            <Chips items={job.benefits} variant="accent" max={30} />
+          </div>
+        )}
+      </div>
+
       {[tailor, submit, skip, prep].map((m, i) =>
         m.isError ? <ErrorBox key={i} error={m.error} /> : null,
       )}

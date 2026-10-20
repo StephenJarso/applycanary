@@ -16,7 +16,7 @@ from dataclasses import dataclass, field
 
 from sqlmodel import Session, select
 
-from app.deps import user_job
+from app.deps import llm_credentials, user_job
 from app.llm.client import cached_system, get_llm
 from app.llm.prompts import SCORING_SYSTEM, build_scoring_user
 from app.models import Job, JobScore, JobStatus, Profile, UserJob, utcnow
@@ -118,10 +118,13 @@ def tier1(job: Job, profile: Profile) -> Decision:
 # ---------------------------------------------------------------- tier 2
 
 
-async def tier2(job: Job, profile: Profile, base: Decision) -> Decision:
+async def tier2(
+    session: Session, job: Job, profile: Profile, base: Decision
+) -> Decision:
     """LLM fit assessment. Falls back to the tier-1 decision on any failure."""
     llm = get_llm()
-    if not llm.available and not (profile.llm_provider and profile.llm_api_key):
+    user_provider, user_api_key = llm_credentials(session, profile)
+    if not llm.available and not (user_provider and user_api_key):
         return base
 
     system = cached_system(
@@ -141,7 +144,7 @@ async def tier2(job: Job, profile: Profile, base: Decision) -> Decision:
     # the client can still complete the call — it just needs to be told to
     # try the user's provider even when the server chain is empty.
     if not llm.available:
-        llm._provider_order = [profile.llm_provider]  # noqa: SLF001
+        llm._provider_order = [user_provider]  # noqa: SLF001
 
     try:
         parsed, result = await llm.complete_json(
@@ -149,8 +152,8 @@ async def tier2(job: Job, profile: Profile, base: Decision) -> Decision:
             system=system,
             messages=[{"role": "user", "content": user_msg}],
             max_tokens=4096,
-            user_provider=profile.llm_provider or "",
-            user_api_key=profile.llm_api_key or "",
+            user_provider=user_provider,
+            user_api_key=user_api_key,
         )
     except Exception as exc:  # noqa: BLE001 - scoring must never break ingestion
         log.warning("tier2 scoring failed for job %s: %s", job.id, exc)
@@ -201,7 +204,7 @@ async def score_job(
     if decision.decided_by == "tier1_filter" or decision.verdict == "weak":
         return decision
 
-    decision = await tier2(job, profile, decision)
+    decision = await tier2(session, job, profile, decision)
     decision.ats_score = await _tailored_ats_score(session, job, profile, owner)
     return _apply_title_penalty(decision, job, profile)
 

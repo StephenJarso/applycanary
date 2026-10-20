@@ -12,6 +12,7 @@ import logging
 
 from sqlmodel import Session, select
 
+from app.deps import llm_credentials
 from app.llm.client import get_llm
 from app.llm.prompts import INTERVIEW_SYSTEM, build_interview_user
 from app.models import InterviewPrep, Job, Profile, utcnow
@@ -42,11 +43,12 @@ async def prep_for_job(
         return existing
 
     llm = get_llm()
-    has_user_key = bool(profile.llm_provider and profile.llm_api_key)
+    user_provider, user_api_key = llm_credentials(session, profile)
+    has_user_key = bool(user_provider and user_api_key)
     if not llm.available and not has_user_key:
         raise InterviewPrepError("no LLM API key configured (GEMINI_API_KEY or ANTHROPIC_API_KEY)")
     if not llm.available and has_user_key:
-        llm._provider_order = [profile.llm_provider]  # noqa: SLF001
+        llm._provider_order = [user_provider]  # noqa: SLF001
 
     resume_text = (profile.base_resume_text or "").strip()
     if not resume_text:
@@ -70,8 +72,8 @@ async def prep_for_job(
             }],
             max_tokens=8000,
             temperature=0.3,
-            user_provider=profile.llm_provider or "",
-            user_api_key=profile.llm_api_key or "",
+            user_provider=user_provider,
+            user_api_key=user_api_key,
         )
     except Exception as exc:  # noqa: BLE001
         raise InterviewPrepError(f"interview prep call failed: {exc}") from exc

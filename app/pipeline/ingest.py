@@ -70,6 +70,80 @@ def load_config(path: Path = CONFIG_PATH) -> dict:
     }
 
 
+# Manual polls and the startup poll run in the background: a full sweep of every
+# source can outlive a platform/proxy request timeout, which used to surface as
+# "Cannot reach the ApplyCanary server" even though the poll was still running.
+_manual_poll_task: asyncio.Task | None = None
+_poll_state: dict[str, object] = {"running": False, "message": ""}
+
+
+def poll_status() -> dict[str, object]:
+    """Current/last background poll state, surfaced by GET /status."""
+    return dict(_poll_state)
+
+
+async def run_full_poll(user_id: int) -> None:
+    """Poll every source group, then score a first batch for `user_id`."""
+    from app.pipeline.score import score_pending
+
+    _poll_state.update(running=True, message="Polling sources…")
+    try:
+        results = await asyncio.gather(
+            poll_curated(), poll_careers(), poll_broad(), return_exceptions=True
+        )
+        summaries = [r for r in results if isinstance(r, IngestSummary)]
+        failures = [r for r in results if isinstance(r, Exception)]
+        for failure in failures:
+            log.error("poll group failed: %s", failure)
+
+        found = sum(r.found for r in summaries)
+        new = sum(r.new for r in summaries)
+        failed = sum(r.sources_failed for r in summaries)
+        duplicates = sum(r.duplicates for r in summaries)
+        scored = 0
+        scoring_error = ""
+        if summaries:
+            _poll_state.update(message="Sources finished — scoring your first matches…")
+            try:
+                with session_scope() as session:
+                    scored = await score_pending(session, user_id=user_id, limit=25)
+            except Exception as exc:  # noqa: BLE001 - ingestion already succeeded
+                log.exception("poll scoring failed")
+                scoring_error = f" Scoring failed: {exc}"
+        message = (
+            f"Found {found} postings, {new} new; scored {scored} for your profile."
+        )
+        if failed:
+            message += f" {failed} source(s) failed."
+        if failures:
+            message += f" {len(failures)} poll group(s) failed."
+        message += scoring_error
+        _poll_state.update(
+            running=False, message=message, found=found, new=new,
+            duplicates=duplicates, scored=scored, failed_sources=failed,
+        )
+        log.info("manual poll: %s", message)
+    except Exception as exc:  # noqa: BLE001 - report, never crash the loop
+        log.exception("manual poll failed")
+        _poll_state.update(running=False, message=f"Poll failed: {exc}")
+
+
+def start_full_poll(user_id: int) -> bool:
+    """Start a background poll; return False when one is already running."""
+    global _manual_poll_task  # noqa: PLW0603
+    if _manual_poll_task is not None and not _manual_poll_task.done():
+        return False
+    _poll_state.update(running=True, message="Polling sources…")
+    _manual_poll_task = asyncio.create_task(run_full_poll(user_id))
+    _manual_poll_task.add_done_callback(lambda _task: _clear_poll_task())
+    return True
+
+
+def _clear_poll_task() -> None:
+    global _manual_poll_task  # noqa: PLW0603
+    _manual_poll_task = None
+
+
 def build_curated(config: dict, client: httpx.AsyncClient) -> list[BaseSource]:
     """Instantiate one connector per curated company entry."""
     registry = all_sources()

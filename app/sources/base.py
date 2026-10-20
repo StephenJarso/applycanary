@@ -17,6 +17,7 @@ import httpx
 from app.models import Job, utcnow
 from app.pipeline.normalize import (
     canonical_url,
+    extract_benefits,
     fingerprint,
     is_remote,
     text_hash,
@@ -45,6 +46,9 @@ class RawJob:
     salary_max: int | None = None
     salary_currency: str = ""
     salary_is_estimate: bool = False
+    applicants: int | None = None
+    benefits: list[str] = field(default_factory=list)
+    employment_type: str = ""
     remote_flag: bool | None = None
     ats_platform: str = ""
     ats_board_token: str = ""
@@ -66,6 +70,15 @@ class RawJob:
             salary_max=self.salary_max,
             salary_currency=self.salary_currency,
             salary_is_estimate=self.salary_is_estimate,
+            applicants=self.applicants,
+            benefits=self.benefits or extract_benefits(self.description),
+            employment_type=(
+                self.employment_type
+                or str(self.extra.get("employment_type") or "")
+                or str(self.extra.get("job_type") or "")
+                or str(self.extra.get("commitment") or "")
+                or str(self.extra.get("contract_type") or "")
+            ).strip(),
             apply_url=self.apply_url,
             canonical_url=canonical_url(self.apply_url),
             ats_platform=self.ats_platform,

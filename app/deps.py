@@ -52,6 +52,23 @@ def require_admin(user: User = Depends(current_user)) -> User:
     return user
 
 
+def llm_credentials(session: Session, profile: Profile) -> tuple[str, str]:
+    """Per-user LLM provider/key, unless the account is an administrator.
+
+    Admins are funded by the operator: they must use the server pipeline
+    configured on Render, even if an old profile row still carries a personal
+    key. Ignoring those columns centrally keeps scoring, tailoring and interview
+    prep consistent instead of each caller re-implementing the rule.
+    """
+    provider = (profile.llm_provider or "").strip()
+    key = (profile.llm_api_key or "").strip()
+    if provider and key:
+        user = session.get(User, profile.user_id)
+        if user is not None and user.is_admin:
+            return "", ""
+    return provider, key
+
+
 def user_job(
     session: Session, user_id: int, job_id: int
 ) -> UserJob:

@@ -166,6 +166,19 @@ aggregators:
     enabled: true
     search_terms: *terms
 
+  # LinkedIn guest job search. No API key, but only public search/detail pages
+  # are read and coverage is deliberately capped. Cards often show a salary;
+  # applicant counts appear only when LinkedIn prints one.
+  - source: linkedin
+    enabled: true
+    search_terms:
+      - golang
+      - software engineer internship
+      - new grad software engineer
+    location: ""
+    max_results: 20
+    max_queries: 3
+
   # Adzuna API — structured JSON, global, no scraping. Requires ADZUNA_APP_ID
   # and ADZUNA_APP_KEY in .env. Free tier: 500 req/month.
   - source: adzuna

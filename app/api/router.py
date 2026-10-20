@@ -11,7 +11,6 @@ client has something real to mirror.
 
 from __future__ import annotations
 
-import asyncio
 import logging
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -78,6 +77,9 @@ class JobOut(BaseModel):
     salary_max: int | None = None
     salary_currency: str = ""
     salary_is_estimate: bool = False
+    applicants: int | None = None
+    benefits: list[str] = Field(default_factory=list)
+    employment_type: str = ""
     posted_at: datetime | None = None
     first_seen_at: datetime
     seen_count: int
@@ -218,6 +220,8 @@ class StatusOut(BaseModel):
     scheduler_running: bool
     scheduled_jobs: list[str]
     llm_enabled: bool
+    poll_running: bool = False
+    poll_message: str = ""
     auto_submit: bool
     auto_submit_min_score: int
     daily_apply_cap: int
@@ -280,6 +284,9 @@ def _job_out(
         salary_max=job.salary_max,
         salary_currency=job.salary_currency,
         salary_is_estimate=job.salary_is_estimate,
+        applicants=job.applicants,
+        benefits=list(job.benefits or []),
+        employment_type=job.employment_type,
         posted_at=job.posted_at,
         first_seen_at=job.first_seen_at,
         seen_count=job.seen_count,
@@ -344,6 +351,8 @@ def _counts(session: Session, user: User) -> dict[str, int]:
     # placeholder numbers when a user has no rows in a given status.
     counts.setdefault(str(JobStatus.APPLIED), 0)
     counts.setdefault(str(JobStatus.QUEUED), 0)
+    counts.setdefault(str(JobStatus.SCORED), 0)
+    counts.setdefault(str(JobStatus.REJECTED), 0)
     counts["preps"] = session.exec(
         select(func.count(InterviewPrep.id)).where(InterviewPrep.user_id == user.id)
     ).one()
@@ -368,9 +377,11 @@ def status(
     user: User = Depends(current_user),
 ) -> StatusOut:
     from app import scheduler as sched
+    from app.pipeline.ingest import poll_status
 
     settings = get_settings()
     scheduler = sched.get_scheduler()
+    poll = poll_status()
     profile = session.exec(
         select(Profile).where(Profile.user_id == user.id)
     ).first()
@@ -380,6 +391,8 @@ def status(
         scheduler_running=bool(scheduler and scheduler.running),
         scheduled_jobs=[j.id for j in scheduler.get_jobs()] if scheduler else [],
         llm_enabled=settings.llm_enabled,
+        poll_running=bool(poll.get("running")),
+        poll_message=str(poll.get("message") or ""),
         # Submission thresholds are per-user preferences now; fall back to the
         # process defaults only when the user has no profile yet.
         auto_submit=profile.enable_auto_submit if profile else False,
@@ -766,7 +779,9 @@ def get_profile(
     if profile is None:
         return ProfileOut()
     evidence = profile.github_evidence or {}
-    key = profile.llm_api_key or ""
+    # Admins always use the server's LLM pipeline. Never surface a stored
+    # personal key for an admin account (the UI hides the card as well).
+    key = "" if user.is_admin else (profile.llm_api_key or "")
     masked = (key[:4] + "••••••••" + key[-4:]) if len(key) > 8 else ("••••••••" if key else "")
     return ProfileOut(
         full_name=profile.full_name,
@@ -791,7 +806,7 @@ def get_profile(
         github_synced_at=profile.github_synced_at,
         github_repo_count=len(evidence.get("repos") or []),
         alert_min_score=profile.alert_min_score,
-        llm_provider=profile.llm_provider,
+        llm_provider="" if user.is_admin else profile.llm_provider,
         llm_api_key_masked=masked,
         preferred_work_type=profile.preferred_work_type,
     )
@@ -833,6 +848,10 @@ def save_profile(
         profile.skills = sorted(extract_skills(", ".join(payload.skills)))
     if "github_username" in payload.model_fields_set:
         profile.github_username = profile.github_username.strip().removeprefix("@")
+    if user.is_admin:
+        # Clear stale personal credentials: admins are funded by the operator.
+        profile.llm_provider = ""
+        profile.llm_api_key = ""
     profile.updated_at = utcnow()
     session.add(profile)
     session.commit()
@@ -1077,36 +1096,23 @@ async def make_prep(
 
 @router.post("/actions/poll", response_model=ActionResult)
 async def trigger_poll(
-    session: Session = Depends(get_session),
     user: User = Depends(current_user),
 ) -> ActionResult:
-    from app.pipeline.ingest import poll_broad, poll_careers, poll_curated
-    from app.pipeline.score import score_pending
+    from app.pipeline.ingest import start_full_poll
 
-    # The three groups are independent; running them in parallel keeps a manual
-    # poll inside the proxy timeout instead of stacking their slowest sources.
-    curated, careers, broad = await asyncio.gather(
-        poll_curated(), poll_careers(), poll_broad()
-    )
-    runs = (curated, careers, broad)
-    found = sum(r.found for r in runs)
-    new = sum(r.new for r in runs)
-    failed = sum(r.sources_failed for r in runs)
-    # Score a small first batch so new matches appear promptly; the scheduler
-    # continues scoring in the background rather than holding this request open.
-    scored = await score_pending(session, user_id=user.id, limit=10)
-    message = f"Found {found} postings, {new} new; scored {scored} for your profile."
-    if failed:
-        message += f" {failed} source(s) failed."
+    # A full sweep can exceed the platform request timeout, which the browser
+    # reports as the server being unreachable. Start it in the background and
+    # let the UI follow progress through /status instead of holding the request.
+    if not start_full_poll(user.id):
+        return ActionResult(
+            ok=True,
+            message="A poll is already running — new postings will appear shortly.",
+            detail={"started": False},
+        )
     return ActionResult(
         ok=True,
-        message=message,
-        detail={
-            "found": found, "new": new, "scored": scored,
-            "duplicates": sum(r.duplicates for r in runs),
-            "failed_sources": failed,
-            "errors": [e for r in runs for e in r.errors],
-        },
+        message="Poll started — new postings will appear shortly.",
+        detail={"started": True},
     )
 
 

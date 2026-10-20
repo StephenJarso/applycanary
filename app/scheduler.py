@@ -13,14 +13,17 @@ on a fixed beat.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from collections.abc import Callable, Coroutine
+from datetime import datetime, timedelta
 from typing import Any
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
+from apscheduler.triggers.date import DateTrigger
 from apscheduler.triggers.interval import IntervalTrigger
-from sqlmodel import select
+from sqlmodel import func, select
 
 from app.config import get_settings
 from app.db import session_scope
@@ -91,6 +94,32 @@ async def job_poll_careers() -> None:
         "poll_careers: %d sources, %d found, %d new, %d dup, %d failed",
         summary.sources_run, summary.found, summary.new,
         summary.duplicates, summary.sources_failed,
+    )
+
+
+async def job_poll_initial() -> None:
+    """First sweep shortly after boot, so a fresh deploy polls by default.
+
+    APScheduler interval jobs do not fire until their first interval elapses
+    (5–30 minutes here), and a free Render instance that just woke up would sit
+    idle until then. Skip when a real ingestion run is already recent so a
+    restart loop cannot hammer the boards.
+    """
+    from app.models import SourceRun, utcnow
+
+    with session_scope() as session:
+        latest = session.exec(
+            select(func.max(SourceRun.started_at)).where(
+                ~SourceRun.source.like("discover:%")
+            )
+        ).one()
+    if latest is not None and (utcnow() - latest).total_seconds() < 600:
+        log.info("initial poll skipped: a poll ran %.0fs ago",
+                 (utcnow() - latest).total_seconds())
+        return
+
+    await asyncio.gather(
+        job_poll_curated(), job_poll_careers(), job_poll_broad()
     )
 
 
@@ -340,12 +369,11 @@ async def job_expire_stale() -> None:
 
 
 async def job_refresh_opportunities() -> None:
-    """Keep the public Opportunities page's event cache warm.
+    """Refresh the public events cache once a day (plus once at startup).
 
-    The endpoint refreshes lazily on its own, so this job is an optimisation
-    rather than a requirement: it means a page load serves memory instead of
-    waiting on Tech Group Kenya, and a broken feed shows up in the logs on a
-    schedule rather than whenever a visitor happens to arrive.
+    Listings change rarely, so anything more frequent just adds third-party
+    traffic. The endpoint still refreshes lazily after the daily TTL expires,
+    which covers instances that stayed up across the scheduled run.
     """
     from app.opportunities import refresh_events
 
@@ -401,8 +429,20 @@ def build_scheduler() -> AsyncIOScheduler:
         ("embed_new", IntervalTrigger(minutes=15, jitter=120), job_embed_new),
         # The public Opportunities page reads a cached TGK event list; keep it
         # warm so page loads never wait on a third-party fetch.
-        ("refresh_opportunities", IntervalTrigger(minutes=15, jitter=60), job_refresh_opportunities),
+        # Events/programs barely change; startup warms the cache and this daily
+        # job is the only scheduled refresh, avoiding needless third-party hits.
+        ("refresh_opportunities", CronTrigger(hour=3, minute=7), job_refresh_opportunities),
     ]
+
+    # DateTrigger, not IntervalTrigger: run once ~20s after startup. `replace`
+    # keeps a re-started scheduler from raising on the duplicate id.
+    scheduler.add_job(
+        _guard("poll_initial", job_poll_initial),
+        trigger=DateTrigger(run_date=datetime.now() + timedelta(seconds=20)),
+        id="poll_initial",
+        name="poll_initial",
+        replace_existing=True,
+    )
 
     for name, trigger, fn in specs:
         scheduler.add_job(_guard(name, fn), trigger=trigger, id=name, name=name)

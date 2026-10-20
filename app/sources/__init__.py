@@ -19,6 +19,7 @@ from app.sources import (  # noqa: F401,E402
     hn_hiring,
     jobicy,
     lever,
+    linkedin,
     myjobmag,
     remoteok,
     remotive,

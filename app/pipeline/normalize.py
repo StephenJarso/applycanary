@@ -145,3 +145,37 @@ def fingerprint(company: str, title: str, location: str, *, remote: bool = False
 def text_hash(text: str) -> str:
     """Stable hash of description prose, ignoring whitespace and case."""
     return hashlib.sha256(_collapse((text or "").lower()).encode("utf-8")).hexdigest()
+
+
+# Benefits are marketing prose, not a structured field. Match only explicit,
+# recognisable perks so the UI never turns "great culture" into a benefit chip.
+_BENEFIT_PATTERNS: tuple[tuple[str, str], ...] = (
+    ("Health insurance", r"\bhealth\s*(?:insurance|cover|benefits?)\b"),
+    ("Dental insurance", r"\bdental\s*(?:insurance|cover|benefits?)\b"),
+    ("Vision insurance", r"\bvision\s*(?:insurance|cover|benefits?)\b"),
+    ("401(k)", r"\b401\s*\(?k\)?\b|\bretirement\s+(?:plan|savings)\b"),
+    ("Paid time off", r"\bpaid\s+time\s+off\b|\bPTO\b"),
+    ("Parental leave", r"\b(?:parental|maternity|paternity)\s+leave\b"),
+    ("Equity", r"\bequity\b|\b stock options?\b|\bRSUs?\b"),
+    ("Remote-friendly", r"\bremote[- ]first\b|\bfully remote\b|\bwork from anywhere\b"),
+    ("Flexible hours", r"\bflexible\s+(?:hours|schedule|working)\b"),
+    ("Learning budget", r"\b(?:learning|training|professional development)\s+(?:budget|stipend|allowance)\b"),
+    ("Home office budget", r"\bhome[- ]office\s+(?:budget|stipend|allowance)\b"),
+    ("Visa sponsorship", r"\bvisa\s+sponsorship\b|\bsponsorship available\b"),
+    ("Wellness budget", r"\bwellness\s+(?:budget|stipend|allowance)\b"),
+    ("Unlimited leave", r"\bunlimited\s+(?:paid\s+)?(?:leave|vacation|PTO)\b"),
+)
+
+
+def extract_benefits(description: str, *, limit: int = 8) -> list[str]:
+    """Explicit perks mentioned in a posting, in a stable display order."""
+    text = _collapse(description)
+    if not text:
+        return []
+    found: list[str] = []
+    for label, pattern in _BENEFIT_PATTERNS:
+        if re.search(pattern, text, re.IGNORECASE):
+            found.append(label)
+        if len(found) >= limit:
+            break
+    return found

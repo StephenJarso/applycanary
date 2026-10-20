@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Navigate, NavLink, Route, Routes } from "react-router-dom";
 import { api } from "./api";
@@ -34,13 +35,31 @@ const NAV = [
 function Dashboard({ page }: { page?: "internships" | "programs" }) {
   const { user, logout } = useAuth();
   const qc = useQueryClient();
-  const status = useQuery({ queryKey: ["status"], queryFn: api.status });
+  const status = useQuery({
+    queryKey: ["status"],
+    queryFn: api.status,
+    // A manual poll runs in the background; follow it until it finishes.
+    refetchInterval: (query) => (query.state.data?.poll_running ? 3000 : false),
+  });
+  const wasPolling = useRef(false);
+
+  useEffect(() => {
+    if (status.data?.poll_running) {
+      wasPolling.current = true;
+      return;
+    }
+    if (wasPolling.current) {
+      wasPolling.current = false;
+      // A finished poll touched ingestion, scoring and counts at once.
+      void qc.invalidateQueries();
+    }
+  }, [status.data?.poll_running, qc]);
 
   const poll = useMutation({
     mutationFn: api.poll,
-    // Everything downstream of ingestion changes, so invalidate broadly rather
-    // than trying to predict which queries a poll touched.
-    onSuccess: () => qc.invalidateQueries(),
+    // The request returns as soon as the poll starts; keep status fresh so the
+    // banner/refresh above sees the transition to running and then finished.
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ["status"] }),
   });
   const score = useMutation({
     mutationFn: api.score,
@@ -91,7 +110,9 @@ function Dashboard({ page }: { page?: "internships" | "programs" }) {
             <div className="sidebar-user-avatar">{user?.email?.[0]?.toUpperCase() ?? "A"}</div>
             <div className="sidebar-user-info">
               <div className="sidebar-user-name">{user?.email?.split("@")[0] ?? ""}</div>
-              <div className="sidebar-user-plan">Free Plan</div>
+              <div className="sidebar-user-plan">
+                {user?.is_admin ? "Administrator" : "Free Plan"}
+              </div>
             </div>
             <button className="btn-ghost logout-button" onClick={() => void logout()} title="Sign out">
               <span className="material-symbols-outlined" aria-hidden="true">logout</span>
@@ -123,11 +144,23 @@ function Dashboard({ page }: { page?: "internships" | "programs" }) {
           {poll.isSuccess && (
             <div className="banner banner-ok" role="status">{poll.data.message}</div>
           )}
+          {status.data?.poll_running && (
+            <div className="banner banner-ok" role="status">
+              {status.data.poll_message || "Polling sources…"} New postings appear as each board finishes.
+            </div>
+          )}
           {score.isSuccess && (
             <div className="banner banner-ok" role="status">{score.data.message}</div>
           )}
           {poll.isError && (
             <div className="banner banner-bad" role="alert">{String(poll.error)}</div>
+          )}
+
+          {status.data && !status.data.scheduler_running && (
+            <div className="banner banner-warn" role="status">
+              Automatic polling is paused. Set ENABLE_SCHEDULER=true on Render
+              and redeploy so new postings arrive without clicking Poll sources.
+            </div>
           )}
 
           {status.data?.warnings.map((w) => (

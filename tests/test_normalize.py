@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from app.pipeline.normalize import (
     canonical_url,
+    extract_benefits,
     fingerprint,
     is_remote,
     location_bucket,
@@ -130,3 +131,17 @@ class TestFingerprint:
         fp = fingerprint("Acme", "Engineer", "Remote")
         assert len(fp) == 64
         assert fp == fingerprint("Acme", "Engineer", "Remote")
+
+
+def test_extract_benefits_only_explicit_perks():
+    text = (
+        "We offer health insurance, a 401(k) match and flexible hours. "
+        "Our culture is amazing and the team is great."
+    )
+    assert extract_benefits(text) == [
+        "Health insurance", "401(k)", "Flexible hours",
+    ]
+
+
+def test_extract_benefits_empty_for_generic_prose():
+    assert extract_benefits("Great culture, exciting product, fast pace.") == []

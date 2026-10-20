@@ -105,3 +105,50 @@ def test_partial_put_never_touches_the_resume(client_with_profile):
 
         profile = session.exec(select(Profile)).first()
         assert profile.base_resume_text == "resume text that must survive"
+
+
+def test_admin_ignores_personal_llm_key(isolated_db):
+    """Admins use the server pipeline; stale personal keys are hidden and cleared."""
+    init_db()
+    with Session(engine) as session:
+        user = User(
+            email="admin@example.com",
+            password_hash=hash_password(PASSWORD),
+            is_admin=True,
+            email_verified=True,
+        )
+        session.add(user)
+        session.commit()
+        session.refresh(user)
+        session.add(
+            Profile(
+                user_id=user.id,
+                llm_provider="gemini",
+                llm_api_key="sk-old-personal-key",
+            )
+        )
+        session.commit()
+        token = create_session_token(user)
+
+    client = TestClient(create_app(), follow_redirects=False)
+    client.cookies.set(SESSION_COOKIE_NAME, token)
+
+    body = client.get("/api/profile").json()
+    assert body["llm_provider"] == ""
+    assert body["llm_api_key_masked"] == ""
+
+    saved = client.put(
+        "/api/profile",
+        json={"llm_provider": "groq", "llm_api_key": "sk-new-personal-key"},
+    )
+    assert saved.status_code == 200
+    assert saved.json()["llm_provider"] == ""
+    assert saved.json()["llm_api_key_masked"] == ""
+
+    with Session(engine) as session:
+        profile = session.exec(select(Profile)).one()
+        assert profile.llm_provider == ""
+        assert profile.llm_api_key == ""
+        from app.deps import llm_credentials
+
+        assert llm_credentials(session, profile) == ("", "")

@@ -64,6 +64,9 @@ export interface Job {
   salary_max: number | null;
   salary_currency: string;
   salary_is_estimate: boolean;
+  applicants: number | null;
+  benefits: string[];
+  employment_type: string;
   posted_at: string | null;
   first_seen_at: string;
   seen_count: number;
@@ -151,6 +154,9 @@ export interface PublicJob {
   salary_max: number | null;
   salary_currency: string;
   salary_is_estimate: boolean;
+  applicants: number | null;
+  benefits: string[];
+  employment_type: string;
   posted_at: string | null;
   first_seen_at: string;
 }
@@ -206,6 +212,8 @@ export interface Status {
   scheduler_running: boolean;
   scheduled_jobs: string[];
   llm_enabled: boolean;
+  poll_running: boolean;
+  poll_message: string;
   auto_submit: boolean;
   auto_submit_min_score: number;
   daily_apply_cap: number;
@@ -308,6 +316,9 @@ export interface SimilarJob {
   salary_max: number | null;
   salary_currency: string;
   salary_is_estimate: boolean;
+  applicants: number | null;
+  benefits: string[];
+  employment_type: string;
   posted_at: string | null;
   first_seen_at: string;
   similarity: number;

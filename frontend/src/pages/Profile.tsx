@@ -2,11 +2,13 @@ import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, type Profile } from "../api";
 import { Chips, ErrorBox, Loading } from "../components";
+import { useAuth } from "../context/AuthContext";
 
 const CSV_FIELDS = ["skills", "target_titles", "target_locations", "excluded_companies"] as const;
 
 export default function ProfilePage() {
   const qc = useQueryClient();
+  const { user } = useAuth();
   const { data, isPending, error } = useQuery({ queryKey: ["profile"], queryFn: api.profile });
   const [form, setForm] = useState<Partial<Profile>>({});
   // The key input is deliberately not seeded from the profile (the API only
@@ -131,62 +133,75 @@ export default function ProfilePage() {
         )}
       </div>
 
-      <div className="card">
-        <h3 className="card-title">
-          <span className="material-symbols-outlined" aria-hidden="true">key</span>
-          LLM API Key
-        </h3>
-        <p className="cell-dim">
-          Bring your own provider key so scoring and tailoring use your account
-          instead of the operator's. Leave blank to use the server default.
-        </p>
-        <div className="field">
-          <label htmlFor="llm-provider">Provider</label>
-          <select
-            id="llm-provider"
-            value={form.llm_provider ?? ""}
-            onChange={(e) => set("llm_provider", e.target.value)}
-          >
-            <option value="">Use server default</option>
-            <option value="xai">xAI (Grok)</option>
-            <option value="gemini">Google Gemini</option>
-            <option value="openrouter">OpenRouter</option>
-            <option value="groq">Groq</option>
-            <option value="anthropic">Anthropic</option>
-          </select>
+      {user?.is_admin ? (
+        <div className="card">
+          <h3 className="card-title">
+            <span className="material-symbols-outlined" aria-hidden="true">key</span>
+            LLM pipeline
+          </h3>
+          <p className="cell-dim">
+            Your administrator account uses the server LLM configured on Render.
+            Personal provider keys are not used for admins.
+          </p>
         </div>
-        <div className="field">
-          <label htmlFor="llm-key">API Key</label>
-          <input
-            id="llm-key"
-            type="password"
-            placeholder={data?.llm_api_key_masked || "sk-..."}
-            value={llmKey}
-            autoComplete="off"
-            spellCheck={false}
-            onChange={(e) => {
-              const value = e.target.value;
-              setLlmKey(value);
-              // Only send the key when the user entered one; blank means
-              // "keep the stored key" to the backend.
-              setForm((f) => {
-                const next = { ...f };
-                if (value) {
-                  (next as { llm_api_key?: string }).llm_api_key = value;
-                } else {
-                  delete (next as { llm_api_key?: string }).llm_api_key;
-                }
-                return next;
-              });
-            }}
-          />
-          {data?.llm_api_key_masked && (
-            <p className="cell-dim" style={{ marginTop: 4 }}>
-              Current: {data.llm_api_key_masked}
-            </p>
-          )}
+      ) : (
+        <div className="card">
+          <h3 className="card-title">
+            <span className="material-symbols-outlined" aria-hidden="true">key</span>
+            LLM API Key
+          </h3>
+          <p className="cell-dim">
+            Bring your own provider key so scoring and tailoring use your account
+            instead of the operator's. Leave blank to use the server default.
+          </p>
+          <div className="field">
+            <label htmlFor="llm-provider">Provider</label>
+            <select
+              id="llm-provider"
+              value={form.llm_provider ?? ""}
+              onChange={(e) => set("llm_provider", e.target.value)}
+            >
+              <option value="">Use server default</option>
+              <option value="xai">xAI (Grok)</option>
+              <option value="gemini">Google Gemini</option>
+              <option value="openrouter">OpenRouter</option>
+              <option value="groq">Groq</option>
+              <option value="anthropic">Anthropic</option>
+            </select>
+          </div>
+          <div className="field">
+            <label htmlFor="llm-key">API Key</label>
+            <input
+              id="llm-key"
+              type="password"
+              placeholder={data?.llm_api_key_masked || "sk-..."}
+              value={llmKey}
+              autoComplete="off"
+              spellCheck={false}
+              onChange={(e) => {
+                const value = e.target.value;
+                setLlmKey(value);
+                // Only send the key when the user entered one; blank means
+                // "keep the stored key" to the backend.
+                setForm((f) => {
+                  const next = { ...f };
+                  if (value) {
+                    (next as { llm_api_key?: string }).llm_api_key = value;
+                  } else {
+                    delete (next as { llm_api_key?: string }).llm_api_key;
+                  }
+                  return next;
+                });
+              }}
+            />
+            {data?.llm_api_key_masked && (
+              <p className="cell-dim" style={{ marginTop: 4 }}>
+                Current: {data.llm_api_key_masked}
+              </p>
+            )}
+          </div>
         </div>
-      </div>
+      )}
 
       <div className="card">
         <h3 className="card-title">

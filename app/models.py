@@ -234,6 +234,12 @@ class Job(SQLModel, table=True):
     salary_currency: str = ""
     salary_is_estimate: bool = False
 
+    # Optional metadata sources expose inconsistently. Never invent values:
+    # NULL applicants means "the board did not say", not zero.
+    applicants: int | None = None
+    benefits: list[str] = Field(default_factory=list, sa_column=Column(JSON))
+    employment_type: str = ""
+
     apply_url: str = ""
     canonical_url: str = Field(default="", index=True)
     # Platform + board token, e.g. ("smartrecruiters", "acme"). Determines which

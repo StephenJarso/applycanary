@@ -29,8 +29,10 @@ from app.sources import adzuna, websearch
 
 log = logging.getLogger(__name__)
 
-# At most this many distinct queries per profile per cycle.
-MAX_QUERIES_PER_PROFILE = 3
+# At most this many distinct queries per profile per cycle. Web search is free;
+# only the first MAX_ADZUNA_QUERIES go to Adzuna so its monthly budget lasts.
+MAX_QUERIES_PER_PROFILE = 6
+MAX_ADZUNA_QUERIES = 3
 # Rolling 30-day ceiling on Adzuna calls (free tier = 500/month; stay clear so
 # the regular broad poll's own Adzuna usage never tips the account over).
 ADZUNA_MONTHLY_BUDGET = 450
@@ -94,7 +96,7 @@ def build_queries(profile) -> list[str]:  # noqa: ANN001
     """
     queries: list[str] = []
 
-    def add(query: str) -> bool:
+    def add(query: str, *, related: bool = False) -> bool:
         query = " ".join(str(query).split())
         if not query:
             return False
@@ -102,18 +104,37 @@ def build_queries(profile) -> list[str]:  # noqa: ANN001
         if any(existing.lower() == low for existing in queries):
             return False
         # Do not add "golang developer" when "Golang Developer" is a target.
-        if any(low in existing.lower() or existing.lower() in low for existing in queries):
+        # Internship/new-grad variants intentionally contain the target phrase.
+        if not related and any(
+            low in existing.lower() or existing.lower() in low for existing in queries
+        ):
             return False
         queries.append(query)
         return True
 
-    for title in (profile.target_titles or [])[:MAX_QUERIES_PER_PROFILE]:
+    for title in (profile.target_titles or [])[:2]:
         add(str(title))
 
     if len(queries) >= MAX_QUERIES_PER_PROFILE:
         return queries[:MAX_QUERIES_PER_PROFILE]
 
     skills = _profile_skills(profile)
+
+    # Early-career and rare-opportunity variants are derived from the user's
+    # primary target, so a Go profile also sees Go internships/new-grad roles
+    # instead of only senior product engineering postings.
+    primary = next((str(t).strip() for t in (profile.target_titles or []) if str(t).strip()), "")
+    if not primary and skills:
+        primary = _SKILL_ROLE_QUERIES.get(skills[0], "")
+    if primary:
+        lower = primary.lower()
+        for label in ("internship", "new grad", "fellowship"):
+            if label in lower:
+                continue
+            add(f"{primary} {label}", related=True)
+            if len(queries) >= MAX_QUERIES_PER_PROFILE:
+                return queries[:MAX_QUERIES_PER_PROFILE]
+
     role_added = False
     for skill in skills:
         role = _SKILL_ROLE_QUERIES.get(skill)
@@ -165,8 +186,8 @@ async def _fetch_queries(
     poll's adzuna/websearch rows.
     """
     sources = []
-    for q in queries:
-        if allow_adzuna:
+    for index, q in enumerate(queries):
+        if allow_adzuna and index < MAX_ADZUNA_QUERIES:
             sources.append(adzuna.AdzunaSource(
                 search_terms=[q], country="us", location="", max_results=25,
                 client=client,

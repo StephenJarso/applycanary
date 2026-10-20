@@ -59,10 +59,10 @@ USER_AGENT = "applycanary/0.1 (personal job search agent; +https://github.com)"
 SOURCE_NAME = "TGK Events"
 FALLBACK_ORG = "Tech Group Kenya"
 
-CACHE_TTL = 15 * 60.0        # serve the event list from memory for 15 minutes
+CACHE_TTL = 24 * 3600.0      # events/programs change rarely: refresh once a day
 DETAIL_TTL = 6 * 3600.0      # an event's own page rarely changes once published
 DETAIL_MISS_TTL = 600.0      # a failing detail page is retried within 10 minutes
-STALE_TTL = 24 * 3600.0      # how long a broken feed keeps serving old events
+STALE_TTL = 7 * 24 * 3600.0  # keep last-known events through a multi-day outage
 ENRICH_CONCURRENCY = 4       # parallel detail requests; be a polite guest
 REQUEST_TIMEOUT = 20.0
 MAX_EVENTS = 40

@@ -113,6 +113,25 @@ def test_search_finds_unscored_matches():
     assert any("Golang" in t for t in _titles(res.json()))
 
 
+def test_job_metadata_round_trips():
+    with Session(engine) as session:
+        job = session.exec(
+            select(Job).where(Job.title == "Senior Golang Engineer")
+        ).one()
+        job.applicants = 42
+        job.benefits = ["Health insurance", "401(k)"]
+        job.employment_type = "Full-time"
+        session.add(job)
+        session.commit()
+
+    res = _client().get("/api/jobs", params={"q": "golang", "limit": 100})
+    assert res.status_code == 200
+    card = next(j for j in res.json()["jobs"] if j["title"] == "Senior Golang Engineer")
+    assert card["applicants"] == 42
+    assert card["benefits"] == ["Health insurance", "401(k)"]
+    assert card["employment_type"] == "Full-time"
+
+
 def test_search_matches_description_terms():
     client = _client()
     res = client.get("/api/jobs", params={"q": "latte art"})
@@ -199,11 +218,14 @@ def test_build_queries_from_profile():
         github_evidence={"skills": ["kubernetes", "grpc"]},
     )
     queries = build_queries(profile)
-    # Target titles first. "go" and "golang" fold into the existing title,
-    # then skills become role phrases rather than one over-narrow keyword soup.
+    # Target titles first, then the early-career/rare variants derived from the
+    # primary title, then mapped skill roles.
     assert queries[:2] == ["Golang Developer", "Backend Engineer"]
-    assert len(queries) == 3
-    assert queries[2] == "python developer"
+    assert "Golang Developer internship" in queries
+    assert "Golang Developer new grad" in queries
+    assert "Golang Developer fellowship" in queries
+    assert "python developer" in queries
+    assert len(queries) == 6
 
 
 def test_build_queries_go_skill_without_go_title():
@@ -212,7 +234,13 @@ def test_build_queries_go_skill_without_go_title():
         skills=["go", "docker"],
         github_evidence={},
     )
-    assert build_queries(profile) == ["Software Engineer", "golang developer"]
+    assert build_queries(profile) == [
+        "Software Engineer",
+        "Software Engineer internship",
+        "Software Engineer new grad",
+        "Software Engineer fellowship",
+        "golang developer",
+    ]
 
 
 def test_build_queries_falls_back_to_combined_phrase():

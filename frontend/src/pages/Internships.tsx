@@ -24,13 +24,16 @@ export default function Internships({ embedded = false }: { embedded?: boolean }
   const internships = useQuery({
     queryKey: ["internships"],
     queryFn: api.internships,
-    staleTime: 5 * 60_000,
+    // Curated placements rarely change; do not refetch on every mount.
+    staleTime: 12 * 60 * 60_000,
+    refetchOnWindowFocus: false,
   });
   // Signed-in users get paid programs here too; visitors only see placements.
   const opportunities = useQuery({
     queryKey: ["opportunities"],
     queryFn: api.opportunities,
-    staleTime: 5 * 60_000,
+    staleTime: 12 * 60 * 60_000,
+    refetchOnWindowFocus: false,
     enabled: embedded,
   });
 

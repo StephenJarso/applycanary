@@ -48,6 +48,12 @@ export default function Jobs() {
     () => Math.max(1, Math.ceil((data?.total ?? 0) / PAGE_SIZE)),
     [data?.total],
   );
+  const scored = (data?.counts.scored ?? 0) + (data?.counts.rejected ?? 0);
+  const pending = data?.counts.new ?? 0;
+  const bestScore = useMemo(
+    () => Math.max(0, ...(data?.jobs ?? []).map((j) => j.score?.total ?? 0)),
+    [data?.jobs],
+  );
 
   return (
     <>
@@ -57,7 +63,8 @@ export default function Jobs() {
           {/* dashboard_1: agent line with the gradient-highlighted count. */}
           <p className="dashboard-subtext ac-headline-md">
             <span className="material-symbols-outlined icon-fill" style={{ color: "var(--ac-canary)", fontSize: 22 }}>auto_awesome</span>{" "}
-            Your agent found <span className="gradient-text" style={{ fontWeight: 700 }}>{data?.counts.total ?? 0} live roles</span> today.
+            Your agent found <span className="gradient-text" style={{ fontWeight: 700 }}>{data?.counts.total ?? 0} live roles</span> today
+            {data ? ` · ${scored} scored${pending ? ` · ${pending} awaiting scoring` : ""}` : ""}.
           </p>
         </div>
         <div className="dashboard-agent-status card glass-card">
@@ -67,7 +74,7 @@ export default function Jobs() {
           <div>
             <strong>Agent active</strong>
             <div style={{ fontSize: 12, color: "var(--text-dim)" }}>
-              Scanned {data?.total ?? 0} listings
+              {data?.jobs.length ?? 0} matches shown{bestScore ? ` · best ${Math.round(bestScore)}%` : ""}
             </div>
           </div>
         </div>
@@ -210,10 +217,16 @@ export default function Jobs() {
 
       {data && data.jobs.length === 0 && (
         <Empty
-          title={filters.prep_only ? "No interview preps yet" : "No jobs match"}
+          title={filters.prep_only
+            ? "No interview preps yet"
+            : pending > 0 && !filters.q
+              ? "No scored matches yet"
+              : "No jobs match"}
           hint={filters.prep_only
             ? "Open a job and generate its interview prep to see it here."
-            : 'Try clearing filters, or use "Poll sources" above to fetch new postings.'}
+            : pending > 0 && !filters.q
+              ? `${pending} of ${data.counts.total} live roles are still being scored. The agent scores in batches every couple of minutes — no top match is shown until a role has been judged against your resume.`
+              : 'Try clearing filters, or use "Poll sources" above to fetch new postings.'}
         />
       )}
 
@@ -280,6 +293,17 @@ export default function Jobs() {
                         );
                       })()}
                       {salary && <span className="chip chip-accent">{salary}</span>}
+                      {job.applicants !== null && (
+                        <span className="chip" title="Applicants reported by the source">
+                          {job.applicants} applicant{job.applicants === 1 ? "" : "s"}
+                        </span>
+                      )}
+                      {job.employment_type && (
+                        <span className="chip">{job.employment_type}</span>
+                      )}
+                      {job.benefits.length > 0 && (
+                        <Chips items={job.benefits} variant="accent" max={3} />
+                      )}
                       {job.score?.matched_keywords.length ? (
                         <Chips items={job.score.matched_keywords} variant="hit" max={3} />
                       ) : null}

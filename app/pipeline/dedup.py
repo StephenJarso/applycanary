@@ -147,6 +147,12 @@ def _record_duplicate(
         existing.salary_max = incoming.salary_max
         existing.salary_currency = incoming.salary_currency
         existing.salary_is_estimate = incoming.salary_is_estimate
+    if existing.applicants is None and incoming.applicants is not None:
+        existing.applicants = incoming.applicants
+    if not existing.benefits and incoming.benefits:
+        existing.benefits = incoming.benefits
+    if not existing.employment_type and incoming.employment_type:
+        existing.employment_type = incoming.employment_type
     if not existing.posted_at and incoming.posted_at:
         existing.posted_at = incoming.posted_at
     # A sanctioned ATS platform enables auto-submit, so never lose it.

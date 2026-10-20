@@ -39,8 +39,9 @@ export default function Opportunities({ embedded = false }: { embedded?: boolean
   const { data, isPending, error } = useQuery({
     queryKey: ["opportunities"],
     queryFn: api.opportunities,
-    // The backend caches the feed for 15 minutes; don't refetch on every mount.
-    staleTime: 5 * 60_000,
+    // Events/programs change rarely; the backend refreshes once a day.
+    staleTime: 12 * 60 * 60_000,
+    refetchOnWindowFocus: false,
   });
 
   const allItems = data?.items ?? [];
