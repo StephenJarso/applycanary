@@ -30,6 +30,7 @@ from app.models import (
     Feedback,
     InterviewPrep,
     InterviewSession,
+    InviteCode,
     Job,
     JobAlias,
     JobScore,
@@ -1361,6 +1362,22 @@ def admin_system_status(
     users_verified = session.exec(select(func.count(User.id)).where(User.email_verified.is_(True))).one()
     users_admin = session.exec(select(func.count(User.id)).where(User.is_admin.is_(True))).one()
 
+    users_rows = session.exec(select(User).order_by(User.created_at.desc())).all()
+    profiles_map = {p.user_id: p for p in session.exec(select(Profile)).all()}
+    user_list = [
+        {
+            "id": u.id,
+            "email": u.email,
+            "is_admin": u.is_admin,
+            "is_active": u.is_active,
+            "email_verified": u.email_verified,
+            "plan": "paid" if getattr(profiles_map.get(u.id), "llm_api_key", "") else "free",
+            "last_login_at": u.last_login_at.isoformat() if u.last_login_at else None,
+            "created_at": u.created_at.isoformat(),
+        }
+        for u in users_rows
+    ]
+
     # System metrics
     jobs_count = session.exec(select(func.count(Job.id))).one()
     applications_count = session.exec(select(func.count(Application.id))).one()
@@ -1383,7 +1400,12 @@ def admin_system_status(
 
     # Connector health
     connectors: list[dict] = []
-    sources = ["greenhouse", "lever", "workable", "adzuna", "careers", "hacker_news", "linkedin"]
+    sources = [
+        "greenhouse", "lever", "ashby", "workable", "adzuna", "careers",
+        "brightermonday", "fuzu", "myjobmag", "careerpointkenya",
+        "remoteok", "remotive", "jobicy", "himalayas", "arbeitnow",
+        "websearch", "linkedin", "hn_hiring"
+    ]
     for s_name in sources:
         run = session.exec(
             select(SourceRun)
@@ -1480,6 +1502,7 @@ def admin_system_status(
             "active": users_active,
             "verified": users_verified,
             "admin": users_admin,
+            "user_list": user_list,
         },
         "connectors": connectors,
         "llm": {
@@ -1685,5 +1708,163 @@ def unwatch_opp(
         session.delete(row)
         session.commit()
     return {"ok": True, "watched": False}
+
+
+# ---------------------------------------------------------------- admin management
+
+
+@router.patch("/admin/users/{user_id}/role")
+def admin_set_user_role(
+    user_id: int,
+    body: dict = Body(...),
+    admin: User = Depends(require_admin),
+    session: Session = Depends(get_session),
+) -> dict:
+    """Toggle admin status or active status for a user."""
+    u = session.get(User, user_id)
+    if not u:
+        raise HTTPException(404, "User not found")
+    if "is_admin" in body:
+        # Prevent removing the last admin
+        if not bool(body["is_admin"]):
+            admin_count = session.exec(select(func.count(User.id)).where(User.is_admin.is_(True))).one()
+            if admin_count <= 1 and u.is_admin:
+                raise HTTPException(400, "Cannot remove the only administrator")
+        u.is_admin = bool(body["is_admin"])
+    if "is_active" in body:
+        u.is_active = bool(body["is_active"])
+    session.add(u)
+    session.commit()
+    return {"ok": True}
+
+
+@router.delete("/admin/users/{user_id}")
+def admin_delete_user(
+    user_id: int,
+    admin: User = Depends(require_admin),
+    session: Session = Depends(get_session),
+) -> dict:
+    """Delete a user account."""
+    if user_id == admin.id:
+        raise HTTPException(400, "Cannot delete your own account")
+    u = session.get(User, user_id)
+    if not u:
+        raise HTTPException(404, "User not found")
+    if u.is_admin:
+        admin_count = session.exec(select(func.count(User.id)).where(User.is_admin.is_(True))).one()
+        if admin_count <= 1:
+            raise HTTPException(400, "Cannot delete the only administrator")
+    session.delete(u)
+    session.commit()
+    return {"ok": True}
+
+
+@router.patch("/admin/settings/llm-keys")
+def admin_update_llm_keys(
+    body: dict = Body(...),
+    admin: User = Depends(require_admin),
+) -> dict:
+    """Persist LLM provider API keys to the process-level settings in memory."""
+    from app.config import get_settings
+
+    s = get_settings()
+    updated: list[str] = []
+    key_map = {
+        "xai": "xai_api_key",
+        "gemini": "gemini_api_key",
+        "openrouter": "openrouter_api_key",
+        "groq": "groq_api_key",
+        "anthropic": "anthropic_api_key",
+        "openai": "openai_api_key",
+    }
+    for provider, field in key_map.items():
+        val = body.get(provider)
+        if isinstance(val, str) and val.strip():
+            object.__setattr__(s, field, val.strip())
+            updated.append(provider)
+    return {
+        "ok": True,
+        "updated": updated,
+        "note": "Keys updated in live process cache. Set environment variables to persist across server restarts.",
+    }
+
+
+@router.get("/admin/source-runs")
+def admin_get_source_runs(
+    limit: int = Query(default=50, ge=1, le=100),
+    admin: User = Depends(require_admin),
+    session: Session = Depends(get_session),
+) -> list[dict]:
+    """Recent source runs across all connectors."""
+    runs = session.exec(
+        select(SourceRun).order_by(SourceRun.started_at.desc()).limit(limit)
+    ).all()
+    return [
+        {
+            "id": r.id,
+            "source": r.source,
+            "started_at": r.started_at.isoformat(),
+            "duration_ms": r.duration_ms,
+            "found": r.found,
+            "new_jobs": r.new_jobs,
+            "duplicates": r.duplicates,
+            "ok": r.ok,
+            "error": r.error,
+        }
+        for r in runs
+    ]
+
+
+@router.get("/admin/invites")
+def admin_get_invites(
+    admin: User = Depends(require_admin),
+    session: Session = Depends(get_session),
+) -> list[dict]:
+    """List all invite codes."""
+    invites = session.exec(
+        select(InviteCode).order_by(InviteCode.created_at.desc())
+    ).all()
+    return [
+        {
+            "id": inv.id,
+            "code": inv.code,
+            "used": inv.used_at is not None,
+            "used_at": inv.used_at.isoformat() if inv.used_at else None,
+            "expires_at": inv.expires_at.isoformat() if inv.expires_at else None,
+            "created_at": inv.created_at.isoformat(),
+        }
+        for inv in invites
+    ]
+
+
+@router.post("/admin/invites")
+def admin_create_invite(
+    admin: User = Depends(require_admin),
+    session: Session = Depends(get_session),
+) -> dict:
+    """Generate a new invite code."""
+    import secrets
+
+    code = secrets.token_urlsafe(12)
+    inv = InviteCode(code=code, created_by_id=admin.id)
+    session.add(inv)
+    session.commit()
+    return {"ok": True, "code": inv.code, "link": f"/register?invite_code={inv.code}"}
+
+
+@router.delete("/admin/invites/{code}")
+def admin_revoke_invite(
+    code: str,
+    admin: User = Depends(require_admin),
+    session: Session = Depends(get_session),
+) -> dict:
+    """Revoke/delete an unused invite code."""
+    inv = session.exec(select(InviteCode).where(InviteCode.code == code)).first()
+    if not inv:
+        raise HTTPException(404, "Invite code not found")
+    session.delete(inv)
+    session.commit()
+    return {"ok": True}
+
 
 

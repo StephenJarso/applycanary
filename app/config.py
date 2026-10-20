@@ -75,6 +75,8 @@ class Settings(BaseSettings):
     groq_triage_model: str = "llama-3.1-8b-instant"
     groq_tailor_model: str = "llama-3.1-8b-instant"
 
+    openai_api_key: str = ""
+
     ollama_host: str = "http://localhost:11434"
     ollama_triage_model: str = "llama3.1:8b"
     ollama_tailor_model: str = "llama3.1:8b"

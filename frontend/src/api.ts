@@ -608,6 +608,49 @@ export const api = {
       method: "DELETE",
     }),
   systemStatus: () => request<SystemStatus>("/admin/system-status"),
+  setUserRole: (userId: number, payload: { is_admin?: boolean; is_active?: boolean }) =>
+    request<{ ok: boolean }>(`/admin/users/${userId}/role`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    }),
+  deleteUser: (userId: number) =>
+    request<{ ok: boolean }>(`/admin/users/${userId}`, {
+      method: "DELETE",
+    }),
+  updateLlmKeys: (keys: Record<string, string>) =>
+    request<{ ok: boolean; updated: string[]; note: string }>("/admin/settings/llm-keys", {
+      method: "PATCH",
+      body: JSON.stringify(keys),
+    }),
+  getSourceRuns: (limit = 50) =>
+    request<Array<{
+      id: number;
+      source: string;
+      started_at: string;
+      duration_ms: number;
+      found: number;
+      new_jobs: number;
+      duplicates: number;
+      ok: boolean;
+      error: string;
+    }>>(`/admin/source-runs?limit=${limit}`),
+  getInvites: () =>
+    request<Array<{
+      id: number;
+      code: string;
+      used: boolean;
+      used_at: string | null;
+      expires_at: string | null;
+      created_at: string;
+    }>>("/admin/invites"),
+  createInvite: () =>
+    request<{ ok: boolean; code: string; link: string }>("/admin/invites", {
+      method: "POST",
+    }),
+  revokeInvite: (code: string) =>
+    request<{ ok: boolean }>(`/admin/invites/${code}`, {
+      method: "DELETE",
+    }),
   testLlm: (provider?: string) =>
     request<TestLlmResult>("/admin/test-llm", {
       method: "POST",
@@ -666,6 +709,17 @@ export interface ConnectorHealth {
   error: string;
 }
 
+export interface AdminUserItem {
+  id: number;
+  email: string;
+  is_admin: boolean;
+  is_active: boolean;
+  email_verified: boolean;
+  plan: "paid" | "free";
+  last_login_at: string | null;
+  created_at: string;
+}
+
 export interface SystemStatus {
   database: {
     ok: boolean;
@@ -685,6 +739,7 @@ export interface SystemStatus {
     active: number;
     verified: number;
     admin: number;
+    user_list?: AdminUserItem[];
   };
   connectors: ConnectorHealth[];
   llm: {
