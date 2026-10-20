@@ -35,10 +35,12 @@ from app.models import (
     JobScore,
     JobStatus,
     Profile,
+    PushSubscription,
     ResumeVersion,
     SourceRun,
     User,
     UserJob,
+    WatchedOpportunity,
     utcnow,
 )
 
@@ -1545,4 +1547,143 @@ def admin_trigger_job(
 
     job.modify(next_run_time=utcnow())
     return {"ok": True, "message": f"Job {job_name!r} scheduled for immediate execution."}
+
+
+# ---------------------------------------------------------------- push / watch
+
+
+class PushSubIn(BaseModel):
+    endpoint: str
+    p256dh: str
+    auth: str
+
+
+class WatchIn(BaseModel):
+    url: str
+    title: str = ""
+    org: str = ""
+    kind: str = ""
+    deadline: str | None = None
+
+
+@router.get("/push/vapid-public-key")
+def get_vapid_public_key() -> dict:
+    """Return VAPID public key for push subscription (public endpoint)."""
+    return {"publicKey": get_settings().vapid_public_key}
+
+
+@router.post("/push/subscribe")
+def push_subscribe(
+    body: PushSubIn,
+    user: User = Depends(current_user),
+    session: Session = Depends(get_session),
+) -> dict:
+    """Save or refresh a browser push subscription for the current user."""
+    existing = session.exec(
+        select(PushSubscription).where(
+            PushSubscription.user_id == user.id,
+            PushSubscription.endpoint == body.endpoint,
+        )
+    ).first()
+    if existing:
+        existing.p256dh = body.p256dh
+        existing.auth = body.auth
+        session.add(existing)
+    else:
+        session.add(
+            PushSubscription(
+                user_id=user.id,
+                endpoint=body.endpoint,
+                p256dh=body.p256dh,
+                auth=body.auth,
+            )
+        )
+    session.commit()
+    return {"ok": True}
+
+
+@router.delete("/push/unsubscribe")
+def push_unsubscribe(
+    user: User = Depends(current_user),
+    session: Session = Depends(get_session),
+) -> dict:
+    """Remove all push subscriptions for the current user."""
+    subs = session.exec(
+        select(PushSubscription).where(PushSubscription.user_id == user.id)
+    ).all()
+    for s in subs:
+        session.delete(s)
+    session.commit()
+    return {"ok": True}
+
+
+@router.get("/opportunities/watched")
+def get_watched(
+    user: User = Depends(current_user),
+    session: Session = Depends(get_session),
+) -> list[dict]:
+    """Return all watched opportunities for the current user."""
+    rows = session.exec(
+        select(WatchedOpportunity).where(WatchedOpportunity.user_id == user.id)
+    ).all()
+    return [
+        {
+            "id": r.id,
+            "opp_url": r.opp_url,
+            "opp_title": r.opp_title,
+            "opp_org": r.opp_org,
+            "opp_kind": r.opp_kind,
+            "deadline": r.deadline,
+            "created_at": r.created_at.isoformat(),
+        }
+        for r in rows
+    ]
+
+
+@router.post("/opportunities/watch")
+def watch_opp(
+    body: WatchIn,
+    user: User = Depends(current_user),
+    session: Session = Depends(get_session),
+) -> dict:
+    """Subscribe to deadline notifications for an opportunity."""
+    existing = session.exec(
+        select(WatchedOpportunity).where(
+            WatchedOpportunity.user_id == user.id,
+            WatchedOpportunity.opp_url == body.url,
+        )
+    ).first()
+    if not existing:
+        session.add(
+            WatchedOpportunity(
+                user_id=user.id,
+                opp_url=body.url,
+                opp_title=body.title,
+                opp_org=body.org,
+                opp_kind=body.kind,
+                deadline=body.deadline,
+            )
+        )
+        session.commit()
+    return {"ok": True, "watched": True}
+
+
+@router.delete("/opportunities/watch")
+def unwatch_opp(
+    body: WatchIn,
+    user: User = Depends(current_user),
+    session: Session = Depends(get_session),
+) -> dict:
+    """Remove deadline notification subscription for an opportunity."""
+    row = session.exec(
+        select(WatchedOpportunity).where(
+            WatchedOpportunity.user_id == user.id,
+            WatchedOpportunity.opp_url == body.url,
+        )
+    ).first()
+    if row:
+        session.delete(row)
+        session.commit()
+    return {"ok": True, "watched": False}
+
 

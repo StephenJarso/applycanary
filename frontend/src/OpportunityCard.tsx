@@ -76,8 +76,27 @@ function Timeline({ item }: { item: Opportunity }) {
   );
 }
 
+interface OpportunityCardProps {
+  item: Opportunity;
+  isWatched?: boolean;
+  onToggleWatch?: (
+    url: string,
+    title: string,
+    org: string,
+    kind: string,
+    deadline: string | null,
+    currentlyWatched: boolean,
+  ) => void;
+}
+
 /** Shared card for the events/programs list and the internships page. */
-export function OpportunityCard({ item }: { item: Opportunity }) {
+export function OpportunityCard({
+  item,
+  isWatched = false,
+  onToggleWatch,
+}: OpportunityCardProps) {
+  const deadline = item.closes ?? (item.kind === "Event" ? item.date : null) ?? null;
+
   return (
     <a
       className="opp-card"
@@ -96,6 +115,21 @@ export function OpportunityCard({ item }: { item: Opportunity }) {
           {item.kind}
         </span>
         <span className="opp-source">via {item.source}</span>
+        {onToggleWatch && (
+          <button
+            type="button"
+            className={`opp-watch-btn${isWatched ? " opp-watch-active" : ""}`}
+            title={isWatched ? "Remove deadline alert" : "Get notified 5 days before deadline"}
+            aria-label={isWatched ? "Remove deadline alert" : "Notify me of deadline"}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onToggleWatch(item.url, item.title, item.org, item.kind, deadline, isWatched);
+            }}
+          >
+            {isWatched ? "🔔" : "🔕"}
+          </button>
+        )}
       </div>
 
       <div>

@@ -595,3 +595,42 @@ class Feedback(SQLModel, table=True):
     admin_notes: str = Field(default="", sa_column=Column(Text))
     created_at: datetime = Field(default_factory=utcnow, index=True)
 
+
+# ---------------------------------------------------------------- push / watch
+
+
+class WatchedOpportunity(SQLModel, table=True):
+    """Records that a logged-in user wants deadline push alerts for this opportunity."""
+
+    __tablename__ = "watched_opportunity"
+    __table_args__ = (
+        UniqueConstraint("user_id", "opp_url", name="uq_watch_user_opp"),
+    )
+
+    id: int | None = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="user.id", ondelete="CASCADE", index=True)
+    opp_url: str = Field(index=True)
+    opp_title: str = ""
+    opp_org: str = ""
+    opp_kind: str = ""  # Internship | Event | Paid program
+    deadline: str | None = None  # ISO date e.g. '2025-01-15'
+    notified_at: datetime | None = None
+    created_at: datetime = Field(default_factory=utcnow)
+
+
+class PushSubscription(SQLModel, table=True):
+    """Browser Web Push subscription for one user device."""
+
+    __tablename__ = "push_subscription"
+    __table_args__ = (
+        UniqueConstraint("user_id", "endpoint", name="uq_push_user_endpoint"),
+    )
+
+    id: int | None = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="user.id", ondelete="CASCADE", index=True)
+    endpoint: str = Field(sa_column=Column(Text))
+    p256dh: str = ""
+    auth: str = ""
+    created_at: datetime = Field(default_factory=utcnow)
+
+

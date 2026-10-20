@@ -27,7 +27,19 @@ from sqlmodel import func, select
 
 from app.config import get_settings
 from app.db import session_scope
-from app.models import Job, JobScore, JobStatus, Profile, User, UserJob, utcnow
+from app.models import (
+    Job,
+    JobScore,
+    JobStatus,
+    Profile,
+    PushSubscription,
+    User,
+    UserJob,
+    WatchedOpportunity,
+    utcnow,
+)
+from app.notify.push import push_enabled as push_enabled_check
+from app.notify.push import send_push
 
 log = logging.getLogger(__name__)
 
@@ -390,6 +402,67 @@ async def job_refresh_opportunities() -> None:
     )
 
 
+async def _send_deadline_pushes() -> None:
+    """Fire Web Push notifications for watched opportunities closing in 5 days."""
+    from datetime import date, timedelta
+
+    from sqlmodel import Session as SyncSession
+
+    from app.db import engine
+
+    today = date.today()
+    target_date = (today + timedelta(days=5)).isoformat()
+
+    sent = 0
+    stale_ids: list[int] = []
+
+    with SyncSession(engine) as session:
+        watched = session.exec(
+            select(WatchedOpportunity).where(
+                WatchedOpportunity.deadline == target_date
+            )
+        ).all()
+
+        for w in watched:
+            # Skip if already notified today
+            if w.notified_at and w.notified_at.date() >= today:
+                continue
+
+            subs = session.exec(
+                select(PushSubscription).where(PushSubscription.user_id == w.user_id)
+            ).all()
+
+            any_sent = False
+            for sub in subs:
+                result = send_push(
+                    endpoint=sub.endpoint,
+                    p256dh=sub.p256dh,
+                    auth=sub.auth,
+                    title="ApplyCanary — Deadline in 5 days",
+                    body=f"{w.opp_title} ({w.opp_org}) closes on {w.deadline}. Don't miss it!",
+                    url=w.opp_url,
+                )
+                if result == "ok":
+                    any_sent = True
+                elif result == "stale":
+                    stale_ids.append(sub.id)
+
+            if any_sent:
+                w.notified_at = utcnow()
+                session.add(w)
+            sent += int(any_sent)
+
+        # Clean up stale subscriptions
+        for sid in stale_ids:
+            stale = session.get(PushSubscription, sid)
+            if stale:
+                session.delete(stale)
+
+        session.commit()
+
+    log.info("deadline_push: sent %d push notifications", sent)
+
+
 # ---------------------------------------------------------------- wiring
 
 
@@ -451,6 +524,15 @@ def build_scheduler() -> AsyncIOScheduler:
 
     for name, trigger, fn in specs:
         scheduler.add_job(_guard(name, fn), trigger=trigger, id=name, name=name)
+
+    if push_enabled_check():
+        scheduler.add_job(
+            _guard("deadline_push", _send_deadline_pushes),
+            CronTrigger(hour=8, jitter=300),
+            id="deadline_push",
+            name="deadline_push",
+            replace_existing=True,
+        )
 
     return scheduler
 

@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { api } from "../api";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { api, getWatched, unwatchOpp, watchOpp } from "../api";
+import { useAuth } from "../context/AuthContext";
 import PublicNav from "../PublicNav";
 import { ErrorBox, Loading } from "../components";
 import {
@@ -8,6 +9,11 @@ import {
   opportunityDeadline as deadline,
   opportunityStatus as status,
 } from "../OpportunityCard";
+import {
+  getVapidPublicKey,
+  isPushSupported,
+  subscribeToPush,
+} from "../pushSubscription";
 
 /**
  * Public Internships screen. Same card and filter vocabulary as the events
@@ -21,6 +27,44 @@ const TYPES = ["All", "Internship", "Paid program"] as const;
 const BASE_LOCATIONS = ["Tokyo", "Kenya", "Online"];
 
 export default function Internships({ embedded = false }: { embedded?: boolean }) {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+
+  const { data: watchedList } = useQuery({
+    queryKey: ["watched-opps"],
+    queryFn: getWatched,
+    enabled: !!user,
+  });
+  const watchedUrls = new Set((watchedList ?? []).map((w) => w.opp_url));
+
+  const toggleWatchMut = useMutation({
+    mutationFn: async (args: {
+      url: string;
+      title: string;
+      org: string;
+      kind: string;
+      deadline: string | null;
+      isWatched: boolean;
+    }) => {
+      if (args.isWatched) {
+        return unwatchOpp(args.url);
+      } else {
+        if (isPushSupported()) {
+          const key = await getVapidPublicKey();
+          if (key) await subscribeToPush();
+        }
+        return watchOpp({
+          url: args.url,
+          title: args.title,
+          org: args.org,
+          kind: args.kind,
+          deadline: args.deadline,
+        });
+      }
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["watched-opps"] }),
+  });
+
   const internships = useQuery({
     queryKey: ["internships"],
     queryFn: api.internships,
@@ -229,7 +273,24 @@ export default function Internships({ embedded = false }: { embedded?: boolean }
 
               <div className="opp-grid">
                 {results.map((item) => (
-                  <OpportunityCard key={`${item.kind}:${item.title}`} item={item} />
+                  <OpportunityCard
+                    key={`${item.kind}:${item.title}`}
+                    item={item}
+                    isWatched={watchedUrls.has(item.url)}
+                    onToggleWatch={
+                      user
+                        ? (url, title, org, kind, deadline, isWatched) =>
+                            toggleWatchMut.mutate({
+                              url,
+                              title,
+                              org,
+                              kind,
+                              deadline,
+                              isWatched,
+                            })
+                        : undefined
+                    }
+                  />
                 ))}
               </div>
             </>

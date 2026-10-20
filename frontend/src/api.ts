@@ -367,7 +367,33 @@ export class ApiError extends Error {
   }
 }
 
-async function request<T>(path: string, init?: RequestInit, retries = 1): Promise<T> {
+export function request<T>(path: string, init?: RequestInit, retries?: number): Promise<T>;
+export function request<T>(method: string, path: string, body?: unknown): Promise<T>;
+export async function request<T>(
+  pathOrMethod: string,
+  initOrPath?: RequestInit | string,
+  bodyOrRetries?: unknown,
+): Promise<T> {
+  let path: string;
+  let init: RequestInit | undefined;
+  let retries = 1;
+
+  if (typeof initOrPath === "string") {
+    const rawPath = initOrPath;
+    path = rawPath.startsWith("/api") ? rawPath.slice(4) : rawPath;
+    init = {
+      method: pathOrMethod,
+      body: bodyOrRetries !== undefined ? JSON.stringify(bodyOrRetries) : undefined,
+    };
+  } else {
+    const rawPath = pathOrMethod;
+    path = rawPath.startsWith("/api") ? rawPath.slice(4) : rawPath;
+    init = initOrPath;
+    if (typeof bodyOrRetries === "number") {
+      retries = bodyOrRetries;
+    }
+  }
+
   const headers = new Headers(init?.headers);
   if (typeof init?.body === "string" && !headers.has("Content-Type")) {
     headers.set("Content-Type", "application/json");
@@ -591,6 +617,16 @@ export const api = {
     request<{ ok: boolean; message: string }>(`/admin/trigger-job/${jobName}`, {
       method: "POST",
     }),
+  watchOpp: (data: {
+    url: string;
+    title: string;
+    org: string;
+    kind: string;
+    deadline: string | null;
+  }) => watchOpp(data),
+  unwatchOpp: (url: string) => unwatchOpp(url),
+  getWatched: () => getWatched(),
+  vapidKey: () => vapidKey(),
 };
 
 export interface FeedbackItem {
@@ -670,4 +706,32 @@ export interface TestLlmResult {
   reply?: string;
   error?: string;
 }
+
+export interface WatchedOpp {
+  id: number;
+  opp_url: string;
+  opp_title: string;
+  opp_org: string;
+  opp_kind: string;
+  deadline: string | null;
+  created_at: string;
+}
+
+export const watchOpp = (data: {
+  url: string;
+  title: string;
+  org: string;
+  kind: string;
+  deadline: string | null;
+}) => request<{ ok: boolean }>("POST", "/api/opportunities/watch", data);
+
+export const unwatchOpp = (url: string) =>
+  request<{ ok: boolean }>("DELETE", "/api/opportunities/watch", { url });
+
+export const getWatched = () =>
+  request<WatchedOpp[]>("GET", "/api/opportunities/watched");
+
+export const vapidKey = () =>
+  request<{ publicKey: string }>("GET", "/api/push/vapid-public-key");
+
 

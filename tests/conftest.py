@@ -49,6 +49,10 @@ for _k in (
     # Origin used for links in email. Left blank so no test depends on a
     # developer's deployment URL.
     "PUBLIC_BASE_URL",
+    # VAPID keys
+    "VAPID_PRIVATE_KEY",
+    "VAPID_PUBLIC_KEY",
+    "VAPID_EMAIL",
 ):
     os.environ[_k] = ""
 

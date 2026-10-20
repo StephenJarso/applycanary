@@ -117,6 +117,11 @@ class Settings(BaseSettings):
     # new signup, so it is opt-in once the operator has verified a real send.
     require_email_verification: bool = False
 
+    # --- web push (VAPID) ---
+    vapid_private_key: str = ""  # VAPID_PRIVATE_KEY env var
+    vapid_public_key: str = ""   # VAPID_PUBLIC_KEY env var
+    vapid_email: str = ""         # VAPID_EMAIL env var e.g. mailto:you@example.com
+
     # --- amazon web services (Bedrock, Polly, Transcribe, S3) ---
     # All optional. Bedrock adds a Claude + Titan-embedding provider to the LLM
     # chain; Polly/Transcribe power the voice interview; S3 stores interview
