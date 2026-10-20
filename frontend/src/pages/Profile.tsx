@@ -5,9 +5,14 @@ import { Chips, ErrorBox, Loading } from "../components";
 import { useAuth } from "../context/AuthContext";
 import {
   getNotificationPermission,
-  requestNotificationPermission,
   triggerLocalDeadlineNotification,
 } from "../deadlineNotifications";
+import {
+  isPushSupported,
+  subscribeToPush,
+  unsubscribeFromPush,
+  getExistingSubscription,
+} from "../pushSubscription";
 import { AdminPanel } from "../AdminPanel";
 
 const CSV_FIELDS = ["skills", "target_titles", "target_locations", "excluded_companies"] as const;
@@ -23,8 +28,16 @@ export default function ProfilePage() {
   const [llmKey, setLlmKey] = useState("");
   const [githubToken, setGithubToken] = useState("");
   const [notifPermission, setNotifPermission] = useState(getNotificationPermission());
+  const [hasPushSub, setHasPushSub] = useState(false);
+  const [pushBusy, setPushBusy] = useState(false);
   const [testNotifMsg, setTestNotifMsg] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (isPushSupported()) {
+      getExistingSubscription().then((sub) => setHasPushSub(Boolean(sub)));
+    }
+  }, []);
 
   // Seed the form once the profile arrives. Keyed on the fetch so a background
   // refetch does not clobber edits in progress.
@@ -336,53 +349,87 @@ export default function ProfilePage() {
 
       <div className="card">
         <h3 className="card-title">
-          Deadline notifications
-          {notifPermission === "granted" && <span className="chip chip-hit">active</span>}
+          Push Notifications &amp; Match Alerts
+          {(notifPermission === "granted" || hasPushSub) && <span className="chip chip-hit">active</span>}
         </h3>
         <p className="cell-dim">
-          Get daily local notifications on this device when application deadlines for
-          internships, paid programs, or tech events are approaching (closing within 7 days).
+          Receive push notifications directly to your phone or desktop even when you are not actively in the app or signed out.
+          You will get alerts for new top matches corresponding to your target roles and approaching opportunity deadlines.
         </p>
-        {notifPermission === "granted" ? (
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-            <span className="chip chip-hit">Device alerts enabled</span>
-            <button
-              type="button"
-              className="btn-ghost"
-              onClick={() => {
-                triggerLocalDeadlineNotification([
-                  {
-                    title: "Google Summer of Code",
-                    org: "Google",
-                    kind: "Paid program",
-                    deadline: new Date(Date.now() + 3 * 86400000).toISOString(),
-                    daysLeft: 3,
-                    url: "https://summerofcode.withgoogle.com",
-                  },
-                ]);
-                setTestNotifMsg("Test deadline notification dispatched!");
-                setTimeout(() => setTestNotifMsg(""), 4000);
-              }}
-            >
-              Send test notification
-            </button>
+            {hasPushSub ? (
+              <>
+                <span className="chip chip-hit">Background Device Push Active</span>
+                <button
+                  type="button"
+                  className="btn-ghost"
+                  style={{ color: "var(--bad)" }}
+                  disabled={pushBusy}
+                  onClick={async () => {
+                    setPushBusy(true);
+                    await unsubscribeFromPush();
+                    setHasPushSub(false);
+                    setPushBusy(false);
+                  }}
+                >
+                  {pushBusy ? "Disabling…" : "Disable Background Push"}
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                className="btn-primary"
+                disabled={pushBusy}
+                onClick={async () => {
+                  setPushBusy(true);
+                  const ok = await subscribeToPush();
+                  if (ok) {
+                    setHasPushSub(true);
+                    setNotifPermission("granted");
+                    setTestNotifMsg("Background push alerts enabled for this device!");
+                    setTimeout(() => setTestNotifMsg(""), 4000);
+                  }
+                  setPushBusy(false);
+                }}
+              >
+                {pushBusy ? "Enabling…" : "Enable Push Notifications on this Device"}
+              </button>
+            )}
+
+            {notifPermission === "granted" && (
+              <button
+                type="button"
+                className="btn-ghost"
+                onClick={() => {
+                  triggerLocalDeadlineNotification([
+                    {
+                      title: "Google Summer of Code",
+                      org: "Google",
+                      kind: "Paid program",
+                      deadline: new Date(Date.now() + 3 * 86400000).toISOString(),
+                      daysLeft: 3,
+                      url: "https://summerofcode.withgoogle.com",
+                    },
+                  ]);
+                  setTestNotifMsg("Test deadline alert dispatched!");
+                  setTimeout(() => setTestNotifMsg(""), 4000);
+                }}
+              >
+                Send test alert
+              </button>
+            )}
           </div>
-        ) : notifPermission === "denied" ? (
-          <p className="cell-dim" style={{ color: "var(--bad)" }}>
-            Notifications are blocked in your browser permissions. Enable notifications for this site to receive daily deadline alerts.
-          </p>
-        ) : (
-          <button
-            type="button"
-            onClick={async () => {
-              const res = await requestNotificationPermission();
-              setNotifPermission(res);
-            }}
-          >
-            Enable daily deadline notifications
-          </button>
-        )}
-        {testNotifMsg && <div className="banner banner-ok" role="status" style={{ marginTop: 8 }}>{testNotifMsg}</div>}
+
+          {notifPermission === "denied" && (
+            <p className="cell-dim" style={{ color: "var(--bad)", margin: 0 }}>
+              Notifications are blocked in your browser settings. Please allow notifications for ApplyCanary to receive background alerts.
+            </p>
+          )}
+
+          {testNotifMsg && <div className="banner banner-ok" role="status" style={{ margin: 0 }}>{testNotifMsg}</div>}
+        </div>
       </div>
 
       <form

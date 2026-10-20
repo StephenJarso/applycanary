@@ -198,6 +198,21 @@ async def job_score_new() -> None:
             for job, score in rows:
                 await notify.send_alert(job, score, profile=profile, user=user)
 
+                # Send Web Push notification to user's registered devices (even when signed out / background)
+                if push_enabled_check():
+                    subs = session.exec(
+                        select(PushSubscription).where(PushSubscription.user_id == profile.user_id)
+                    ).all()
+                    for sub in subs:
+                        send_push(
+                            endpoint=sub.endpoint,
+                            p256dh=sub.p256dh,
+                            auth=sub.auth,
+                            title=f"New Top Match ({score.total:.0f}%): {job.title}",
+                            body=f"{job.company} · {job.location or 'Remote'}. Tap to review and tailor your application.",
+                            url=f"/jobs?id={job.id}",
+                        )
+
 
 def _filter_by_work_type(rows: list, profile) -> list:  # noqa: ANN001
     """Filter scored job rows by the user's preferred work arrangement.
