@@ -109,14 +109,18 @@ export default function Jobs() {
       </div>
 
       <div className="feed-head" style={{ margin: "28px 0 14px" }}>
-        <h3 className="ac-headline-md" style={{ margin: 0 }}>Top Matches for You</h3>
+        <h3 className="ac-headline-md" style={{ margin: 0 }}>
+          {filters.include_all ? "All Live Roles" : "Top Matches for You"}
+        </h3>
         <button
           className="ac-label-md"
           style={{ border: "none", background: "none", color: "var(--ac-primary)", cursor: "pointer", display: "inline-flex", alignItems: "center" }}
-          onClick={() => set("sort", "score")}
+          onClick={() => set("include_all", !filters.include_all)}
         >
-          View All
-          <span className="material-symbols-outlined" style={{ fontSize: 16, marginLeft: 4 }}>arrow_forward</span>
+          {filters.include_all ? "Top Matches" : "View All"}
+          <span className="material-symbols-outlined" style={{ fontSize: 16, marginLeft: 4 }}>
+            {filters.include_all ? "arrow_back" : "arrow_forward"}
+          </span>
         </button>
       </div>
 

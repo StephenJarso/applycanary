@@ -248,6 +248,7 @@ export interface JobFilters {
   min_score?: number;
   remote_only?: boolean;
   prep_only?: boolean;
+  include_all?: boolean;
   posted_within?: number;
   sort?: "score" | "newest" | "oldest";
   limit?: number;

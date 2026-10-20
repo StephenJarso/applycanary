@@ -474,6 +474,7 @@ def list_jobs(
     min_score: int = Query(0, ge=0, le=100),
     remote_only: bool = False,
     prep_only: bool = False,
+    include_all: bool = False,
     posted_within: int = Query(0, ge=0, le=3650),
     sort: Literal["score", "newest", "oldest"] = "score",
     limit: int = Query(100, ge=1, le=500),
@@ -502,6 +503,10 @@ def list_jobs(
         stmt = stmt.where(UserJob.status == JobStatus.REJECTED)
     elif status:
         stmt = stmt.where(UserJob.status == status)
+    elif include_all:
+        # The "View All" feed: every live posting, including ones the scorer
+        # has not reached and ones tier-1 rejected for this user.
+        pass
     else:
         # Default to relevant jobs only; REJECTED jobs are tier-1 disqualifications
         # (irrelevant titles/seniority etc.) and are hidden unless explicitly

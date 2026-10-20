@@ -113,6 +113,14 @@ def test_search_finds_unscored_matches():
     assert any("Golang" in t for t in _titles(res.json()))
 
 
+def test_include_all_returns_unscored_and_rejected_live_roles():
+    client = _client()
+    res = client.get("/api/jobs", params={"include_all": True, "limit": 100})
+    assert res.status_code == 200
+    assert res.json()["total"] == 4
+    assert "Barista" in _titles(res.json())
+
+
 def test_job_metadata_round_trips():
     with Session(engine) as session:
         job = session.exec(
