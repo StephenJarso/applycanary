@@ -151,6 +151,20 @@ def title_mismatch_penalty(job: Job, profile: Profile) -> tuple[float, str]:
     targets = [t for t in (profile.target_titles or []) if t.strip()]
     if not targets or title_matches_target(job.title, targets):
         return 0.0, ""
+
+    # If the user specified a language/keyword target like "Golang" or "Go",
+    # check if the job is a general backend/software role and mentions Go in the description.
+    t_lows = [t.lower() for t in targets]
+    has_go_target = any(
+        t in ("go", "golang") or "golang" in t or "go developer" in t for t in t_lows
+    )
+    if has_go_target:
+        job_low = job.title.lower()
+        if any(w in job_low for w in ("software", "backend", "developer", "engineer", "systems", "platform")):
+            desc_head = (job.description or "")[:1000].lower()
+            if "golang" in desc_head or " go " in desc_head or "\ngo " in desc_head or "/go" in desc_head:
+                return 0.0, ""
+
     return TITLE_MISMATCH_PENALTY, (
         f"title {job.title!r} is outside your target roles "
         f"({', '.join(targets)})"

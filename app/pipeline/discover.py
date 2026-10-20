@@ -112,8 +112,9 @@ def build_queries(profile) -> list[str]:  # noqa: ANN001
         queries.append(query)
         return True
 
-    for title in (profile.target_titles or [])[:2]:
-        add(str(title))
+    for title in (profile.target_titles or [])[:4]:
+        t_str = str(title).strip()
+        add(t_str)
 
     if len(queries) >= MAX_QUERIES_PER_PROFILE:
         return queries[:MAX_QUERIES_PER_PROFILE]
@@ -195,8 +196,29 @@ async def _fetch_queries(
         sources.append(websearch.WebSearchSource(
             query=f"{q} job posting", max_results=15, client=client,
         ))
+
+    if queries:
+        primary_q = queries[0]
+        try:
+            from app.sources import jobicy as jobicy_mod
+            from app.sources import linkedin as linkedin_mod
+            from app.sources import remotive as remotive_mod
+
+            sources.append(remotive_mod.RemotiveSource(
+                search_terms=[primary_q], limit=40, client=client,
+            ))
+            sources.append(jobicy_mod.JobicySource(
+                search_terms=[primary_q], count=30, client=client,
+            ))
+            sources.append(linkedin_mod.LinkedInSource(
+                search_terms=[primary_q], max_results=20, max_queries=2, client=client,
+            ))
+        except Exception as exc:  # noqa: BLE001
+            log.warning("failed to attach supplementary sources for discovery: %s", exc)
+
     for src in sources:
-        src.name = DISCOVER_ADZUNA if src.name == "adzuna" else DISCOVER_WEB
+        if src.name not in ("remotive", "jobicy", "linkedin"):
+            src.name = DISCOVER_ADZUNA if src.name == "adzuna" else DISCOVER_WEB
         src._client = client  # noqa: SLF001 - share one pooled client
         src._owns_client = False  # noqa: SLF001
     return await run_sources(sources)
