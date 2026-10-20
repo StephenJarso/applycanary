@@ -9,6 +9,10 @@ export default function ProfilePage() {
   const qc = useQueryClient();
   const { data, isPending, error } = useQuery({ queryKey: ["profile"], queryFn: api.profile });
   const [form, setForm] = useState<Partial<Profile>>({});
+  // The key input is deliberately not seeded from the profile (the API only
+  // returns a masked value), so it needs its own state. Binding it to a
+  // constant `value=""` makes typing and pasting appear to do nothing.
+  const [llmKey, setLlmKey] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
 
   // Seed the form once the profile arrives. Keyed on the fetch so a background
@@ -22,7 +26,18 @@ export default function ProfilePage() {
     void qc.invalidateQueries({ queryKey: ["status"] });
   };
 
-  const save = useMutation({ mutationFn: () => api.saveProfile(form), onSuccess: invalidate });
+  const save = useMutation({
+    mutationFn: () => api.saveProfile(form),
+    onSuccess: () => {
+      setLlmKey("");
+      setForm((f) => {
+        const next = { ...f };
+        delete (next as { llm_api_key?: string }).llm_api_key;
+        return next;
+      });
+      invalidate();
+    },
+  });
   const upload = useMutation({
     mutationFn: (file: File) => api.uploadResume(file),
     onSuccess: () => {
@@ -146,12 +161,23 @@ export default function ProfilePage() {
             id="llm-key"
             type="password"
             placeholder={data?.llm_api_key_masked || "sk-..."}
-            value=""
+            value={llmKey}
+            autoComplete="off"
+            spellCheck={false}
             onChange={(e) => {
-              // Store in form state with a special key so save_profile sends it
-              if (e.target.value) {
-                setForm((f) => ({ ...f, llm_api_key: e.target.value } as any));
-              }
+              const value = e.target.value;
+              setLlmKey(value);
+              // Only send the key when the user entered one; blank means
+              // "keep the stored key" to the backend.
+              setForm((f) => {
+                const next = { ...f };
+                if (value) {
+                  (next as { llm_api_key?: string }).llm_api_key = value;
+                } else {
+                  delete (next as { llm_api_key?: string }).llm_api_key;
+                }
+                return next;
+              });
             }}
           />
           {data?.llm_api_key_masked && (
