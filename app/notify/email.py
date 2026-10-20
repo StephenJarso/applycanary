@@ -419,6 +419,15 @@ async def send(subject: str, html: str, text: str, *, to: str = "") -> bool:
             log.error("email send failed (%s): %s", subject, exc)
             return False
 
+    # Only reachable when Resend failed (or its import broke) and SMTP is not
+    # configured — every configured path returned above. Without this line the
+    # earlier "falling back to SMTP" message hides that the mail was dropped,
+    # e.g. Resend's sandbox only emails the account owner until a domain is
+    # verified at resend.com/domains.
+    log.warning(
+        "email: DROPPED %r — no working backend (Resend failed; SMTP_HOST/SMTP_USER unset)",
+        subject,
+    )
     return False
 
 
