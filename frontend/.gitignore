@@ -1,5 +1,3 @@
-.vercel
-
 # Capacitor build output + local env overrides for the native shell
 android/app/build/
 android/.gradle/

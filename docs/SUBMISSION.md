@@ -185,7 +185,7 @@ completeness):**
 
 - *Coding assistants (dev-time):* **Codebuff** (primary assistant: feature
   implementation, debugging, deployments, 226 passing tests, documentation)
-  and **Claude Code** (earlier phases, e.g. the Railway deployment branch —
+  and **Claude Code** (earlier phases, e.g. an earlier deployment branch —
   see the `.claude/worktrees/` history).
 - *CockroachDB agent tooling (also the required tools):* the **Cloud Managed
   MCP Server** (read-only agent access for Claude Code / Cursor / VS Code),

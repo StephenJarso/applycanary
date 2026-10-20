@@ -95,7 +95,7 @@ class Settings(BaseSettings):
     # --- email ---
     # Preferred: Resend (resend_api_key + email_from). Falls back to SMTP
     # when RESEND_API_KEY is empty. EMAIL_FROM defaults to Resend's sandbox
-    # domain; switch to a verified domain (or set a custom FROM in Railway)
+    # domain; switch to a verified domain (or set a custom FROM in production)
     # for production.
     resend_api_key: str = ""
     email_from: str = "ApplyCanary@resend.dev"
@@ -343,7 +343,7 @@ class Settings(BaseSettings):
                 # A container must bind 0.0.0.0 to be reachable at all, so the
                 # bind address says nothing about exposure here.  When a proper
                 # SECRET_KEY is in place the session is signed and the warning
-                # is noise for operators (Railway/Vercel always terminate TLS).
+                # is noise for operators (managed ingress always terminates TLS).
                 if self.secret_key == DEFAULT_SECRET_KEY:
                     warnings.append(
                         f"Running in a container bound to {self.host}. "

@@ -193,14 +193,11 @@ Transcribe-grade accuracy.
 4. **Connect your agent to the cluster** (read-only, audited): see
    [mcp/README.md](mcp/README.md).
 
-### Frontend hosting (Vercel)
+### Frontend
 
-The React dashboard is served from Vercel. The Vercel project's **Root Directory
-must be `frontend`** — set it under Project Settings → General (it is a project
-setting, *not* a `vercel.json` key). `frontend/vercel.json` rewrites `/api/*` and
-`/health` to the API backend (Railway by default). To deploy manually, run
-`vercel --prod` from the **repository root**; the Root Directory setting then
-resolves `frontend/` correctly.
+The React dashboard is bundled into the Docker image and served by FastAPI at
+`/`, so one process serves both the API and the SPA. For local UI work, run
+`cd frontend && npm run dev` (Vite proxies `/api` to `127.0.0.1:8000`).
 
 ## Configuration
 
@@ -209,7 +206,7 @@ list. The ones that matter most:
 
 | Variable | Default | Notes |
 |---|---|---|
-| `DATABASE_URL` | `sqlite:///./data/applycanary.db` | CockroachDB: `postgresql://…?sslmode=require` |
+| `DATABASE_URL` | `sqlite:///./data/applycanary.db` | CockroachDB: `postgresql://…?sslmode=require`; Postgres/Supabase also supported |
 | `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` | — | Enables Bedrock + Polly + Transcribe + S3; IAM in production |
 | `AWS_REGION` | `us-east-1` | Keep near the CockroachDB cluster |
 | `BEDROCK_MODEL_ID` | Claude Sonnet 3.5 | Foundation model for scoring/tailoring/interview |

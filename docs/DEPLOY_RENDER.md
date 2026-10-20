@@ -3,7 +3,7 @@
 Render is a good free-tier target for ApplyCanary. The repository already
 contains a multi-stage `Dockerfile` and a [`render.yaml`](../render.yaml)
 blueprint; Render builds that Dockerfile and runs its `CMD` (`python run.py`) —
-the same image used by docker-compose and the Railway setup. No build or port
+the same image used by docker-compose. No build or port
 configuration is needed: Render detects the port from the `PORT` env var.
 
 ## What the free plan gives you — and what it costs you
@@ -18,25 +18,29 @@ Before deploying, know the three free-plan limitations that ApplyCanary hits
 2. **Spin-down after 15 idle minutes.** The service sleeps with no traffic and
    takes ~1 minute to wake. The background scheduler (job polling, scoring,
    digests) does not run while asleep. One always-on service uses ~744 of the
-   750 free instance-hours per month, so keeping it warm with an external
-   pinger (e.g. cron-job.org hitting `/health`) fits the allowance — but it
-   consumes nearly all of it, leaving no room for a second free service.
+   750 free instance-hours per month, so keeping it warm with a free pinger
+   fits the allowance — but it consumes nearly all of it, leaving no room for
+   a second free service. The repo ships a GitHub Actions workflow
+   (`.github/workflows/keepalive.yml`) that pings `/health` every 5 minutes;
+   see [Keep-alive](#keep-alive) below.
 3. **Outbound SMTP ports (25/465/587) are blocked.** Use an HTTP email API —
    the app already prefers Resend (`RESEND_API_KEY`) over SMTP when set.
 
 For durable data on the free plan, pair the web service with a hosted
-Postgres. **Neon** is the recommended pick: free forever, no credit card,
-1 GB storage per project, and pgvector support for job embeddings:
+Postgres. **Supabase** is a good pick: free tier, no credit card, 500 MB
+Postgres with pgvector for job embeddings:
 
-1. Sign up at [neon.com/signup](https://neon.com/signup) and create a project.
-2. Copy the connection string — it looks like:
+1. Sign up at [supabase.com](https://supabase.com) and create a project.
+2. Open **Project Settings → Database → Connection string** and choose
+   **Session pooler**. Copy the URI — it looks like:
 
    ```text
-   postgresql://user:password@ep-xxxx.eu-central-1.aws.neon.tech/neondb?sslmode=require
+   postgresql://postgres.<ref>:<password>@aws-0-<region>.pooler.supabase.com:5432/postgres?sslmode=require
    ```
 
-   Tip: use the **pooled** connection string (with `-pooler` in the host)
-   — Render's ephemeral workers create many short-lived connections.
+   Use the **Session pooler** (port `5432`), not the transaction pooler on
+   `6543`. The session pooler is IPv4, so it also avoids Render's missing IPv6
+   route (`Network is unreachable` on AAAA records).
 
 ## Create the service
 
@@ -59,21 +63,22 @@ Postgres. **Neon** is the recommended pick: free forever, no credit card,
 4. Click **Apply**. The first build takes a few minutes (frontend `npm build`
    plus the Python venv); subsequent builds cache layers and are faster.
 
-## Data durability: point at Neon (required on free)
+## Data durability: point at Supabase (required on free)
 
 Render's free tier has no persistent disk, so the SQLite file under `/data`
 would be wiped on every redeploy and spin-down. The blueprint therefore marks
 `DATABASE_URL` as `sync: false` — Render prompts for it at deploy time and you
-paste the Neon connection string from the signup step above:
+paste the Supabase connection string from the step above:
 
 1. Paste that string when Render prompts for `DATABASE_URL` during blueprint
    apply (or afterwards under **Environment**), then deploy. Tables are
    created automatically on first connect — no migration step is needed.
 
-2. On Neon's free plan note the two soft limits: scale-to-zero after 5 idle
-   minutes (first query after a nap costs ~0.5–1 s wake-up) and 1 GB storage
-   per project — plenty for this app's data, but uploaded resume files live
-   in `/data` on Render's ephemeral disk and still vanish on redeploy.
+2. On Supabase's free plan, note the soft limits: a project **pauses after
+   about 7 days without database activity** (restore it from the dashboard if
+   that happens) and storage is capped at 500 MB — plenty for this app's data.
+   Uploaded resumes and generated CVs live in `/data` on Render's ephemeral
+   disk and still vanish on redeploy.
 
 Because the database lives outside the container, deployments and spin-downs
 no longer touch your **relational** data (jobs, scores, applications,
@@ -87,6 +92,25 @@ true}`). `render.yaml` sets `healthCheckPath: /health`, so a deploy is only
 marked live once the scheduler has started. If the health check fails during
 deployment, open the service **Logs** tab: a boot error (bad `DATABASE_URL`,
 missing variable) shows there verbatim.
+
+## Keep-alive
+
+Free services sleep after 15 idle minutes, which also stops the scheduler. The
+included workflow `.github/workflows/keepalive.yml` curls `/health` every 5
+minutes once you set a repository variable:
+
+1. Render dashboard → your service → copy the URL
+   (`https://applycanary.onrender.com`).
+2. GitHub repo → **Settings → Secrets and variables → Actions → Variables →
+   New repository variable**: `RENDER_URL` = that origin (no trailing slash).
+3. Run the workflow once from the **Actions** tab (`Render keep-alive` →
+   **Run workflow**) to confirm it returns `{"ok":true,...}`.
+
+Caveats: GitHub can delay scheduled runs under load, and it disables schedules
+in repositories with no activity for 60 days. For a guaranteed ping, point a
+free external monitor (cron-job.org, UptimeRobot) at the same `/health` URL.
+
+Keeping the service warm uses ~744 of the 750 free instance-hours per month.
 
 ## Email verification (required by the blueprint)
 
@@ -129,7 +153,7 @@ On the free plan there is no shell access, so run the same command against a
 local checkout that points at the same database:
 
 ```bash
-DATABASE_URL=postgresql://user:password@ep-xxxx-pooler.eu-central-1.aws.neon.tech/neondb?sslmode=require \
+DATABASE_URL=postgresql://postgres.<ref>:<password>@aws-0-<region>.pooler.supabase.com:5432/postgres?sslmode=require \
 BOOTSTRAP_EMAIL=you@example.com \
 BOOTSTRAP_PASSWORD="use-a-long-password" \
 .venv/bin/python scripts/bootstrap_admin.py
@@ -152,16 +176,8 @@ additional invite links.
   curl -fsS https://<your-url>/health
   ```
 
-## Frontend / Vercel wiring
+## Frontend
 
-If you keep the React frontend on Vercel with the rewrites in `vercel.json`
-(or `frontend/vercel.json`), update both `destination` URLs from the old
-Railway domain to your Render URL, e.g.:
-
-```text
-https://applycanary.onrender.com/api/:path*
-https://applycanary.onrender.com/health
-```
-
-Or simpler: skip Vercel entirely — this image serves the built React bundle at
-`/` from the same process, so the Render URL alone is the whole app.
+The Docker image builds the React bundle and FastAPI serves it at `/`, so the
+Render URL alone is the whole app. There is no separate frontend deployment:
+one origin, no CORS or cookie-crossing to configure.

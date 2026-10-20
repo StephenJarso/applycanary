@@ -7,7 +7,7 @@ Usage:
     python scripts/bootstrap_admin.py
 
 The command is intentionally one-shot and refuses to overwrite an existing
-user. Run it from a private Railway shell or another trusted environment.
+user. Run it from a private shell or another trusted environment.
 """
 
 from __future__ import annotations

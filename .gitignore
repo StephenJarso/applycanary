@@ -48,5 +48,3 @@ backups/
 
 # Local AI tooling state (worktrees etc.)
 .claude/
-.vercel
-.vercel

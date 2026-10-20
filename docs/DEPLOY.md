@@ -2,7 +2,8 @@
 
 Oracle's Always Free tier is the only genuinely $0 host that supports what this
 app needs: a process that runs continuously and a disk that survives restarts.
-Serverless platforms cannot run it — see [Why not Vercel](#why-not-vercel).
+Serverless platforms cannot run it — see
+[Why not serverless platforms](#why-not-serverless-platforms).
 
 Allowance as of June 2026: **2 OCPU / 12 GB RAM** on Ampere A1 (Arm), 200 GB
 block storage, no expiry while the account stays active. Oracle halved the Arm
@@ -240,26 +241,25 @@ usually means its API changed, not that hiring stopped. Run
 
 ---
 
-## Why not Vercel
+## Why not serverless platforms
 
 Recorded because it is the obvious first instinct and it does not work.
 
-- **Cron on Hobby is once per day**, and Vercel rejects a more frequent
-  expression at deploy time. This tool exists to poll every 5 minutes.
+- **Coarse cron.** Free tiers commonly cap scheduled jobs at once per day. This
+  tool exists to poll every 5 minutes.
 - **No persistent filesystem.** The SQLite database, uploaded resumes and
   generated CVs would vanish between invocations.
-- **10-second function timeout.** A single Greenhouse board with full
-  descriptions can take 20 seconds.
+- **Short function timeouts** (often 10 seconds). A single Greenhouse board
+  with full descriptions can take 20 seconds.
 - **No long-running process**, so APScheduler has nothing to run inside.
 
 Making it work would mean replacing SQLite with Postgres, replacing APScheduler
 with external cron, chunking ingestion into 10-second slices, and moving file
-storage to blob — and the free plan would still cap you at one poll per day.
+storage to blob — and the free plan would still cap polling frequency.
 
-Vercel *is* a good host for the React frontend alone (`frontend/` builds to
-static assets), pointed at a backend running elsewhere. For a single-user tool
-that adds CORS and auth complexity for little gain, so one box serving both is
-simpler.
+A static frontend could be split off to a CDN-backed host, pointed at a backend
+running elsewhere. For a single-user tool that adds CORS and auth complexity
+for little gain, so one box serving both is simpler.
 
 ---
 

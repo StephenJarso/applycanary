@@ -96,11 +96,11 @@ gate that prevents fabrication in both LLM and rule-based tailoring.
   whatever boards were configured. We rebuilt it to derive queries from the
   user's actual profile — target titles, skills, and GitHub evidence — so the
   search is about *you*, and "go developer" finds "Senior Golang Engineer".
-- **Deployment friction.** The frontend and backend live in one repo, and the
-  first Vercel deploy failed because the build ran at the repo root. Tracking
-  down a root-directory setting, an SSO-locked deployment, and a proxy round
-  trip to a backend with a separate database taught us a lot about real
-  multi-service deploys.
+- **Deployment friction.** The frontend and backend live in one repo, and an
+  early split-hosting deploy failed because the build ran at the repo root.
+  Tracking down a root-directory setting, an SSO-locked deployment, and a
+  proxy round trip to a backend with a separate database taught us a lot about
+  real multi-service deploys.
 - **Memory that isn't a gimmick.** Storing sessions is easy; making the coach
   genuinely *better with you* is hard. We had to design what gets embedded,
   when it's recalled, and how the UI proves it's working ("🧠 Coach remembers").

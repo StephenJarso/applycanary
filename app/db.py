@@ -60,7 +60,7 @@ def is_cockroach() -> bool:
     """True when the server is actually CockroachDB, not vanilla Postgres.
 
     Both speak the postgres dialect, so the dialect name alone cannot tell
-    them apart (this once sent Neon down the CockroachDB code path and died
+    them apart (this once sent a vanilla Postgres down the CockroachDB code path and died
     on `USING vec_cosine_ops`). CockroachDB reports a `crdb_version` server
     setting that Postgres lacks; probe it once and cache the answer.
     """
@@ -83,7 +83,7 @@ def is_cockroach() -> bool:
 
 # Which vector strategy the current engine supports, discovered lazily:
 #   "cockroach" — native VECTOR + vec_cosine_ops (CockroachDB Cloud)
-#   "pgvector"  — vanilla Postgres with the pgvector extension (e.g. Neon)
+#   "pgvector"  — vanilla Postgres with the pgvector extension (e.g. Supabase)
 #   "python"    — embeddings as JSON, distances computed in Python (SQLite)
 _vector_backend: str | None = None
 
@@ -195,7 +195,7 @@ def _ensure_vector_indexes() -> None:
     """Create the approximate-nearest-neighbour index for the active backend.
 
     ``vec_cosine_ops`` on CockroachDB, ``hnsw`` + ``vector_cosine_ops`` on
-    pgvector (vanilla Postgres/Neon), and nothing on the Python fallback —
+    pgvector (vanilla Postgres/Supabase), and nothing on the Python fallback —
     SQLite has no vector index, and in-process cosine is fast enough at small
     row counts. Without an ANN index, semantic queries would degrade to
     sequential scans. Both tables' embedding columns get one.

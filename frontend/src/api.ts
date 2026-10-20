@@ -388,12 +388,12 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     } catch {
       /* HTML/plain body — fall through to the status text */
     }
-    // Proxy/gateway failures never carry the app's `detail`: the Vercel→Railway
-    // rewrite returns 5xx on gateway errors, and when the Railway service is
-    // gone its edge router answers 404 {message:"Application not found"}. Both
-    // read like an app bug unless restated as an outage.
-    const railwayGone = res.status === 404 && /application not found/i.test(text);
-    if (res.status === 502 || res.status === 503 || res.status === 504 || railwayGone) {
+    // Proxy/gateway failures never carry the app's `detail`: a reverse proxy
+    // returns 5xx on gateway errors, and when the backend is gone its edge
+    // router answers 404 {message:"Application not found"}. Both read like an
+    // app bug unless restated as an outage.
+    const appGone = res.status === 404 && /application not found/i.test(text);
+    if (res.status === 502 || res.status === 503 || res.status === 504 || appGone) {
       message = "Cannot reach the ApplyCanary server. It may be down or redeploying — try again in a minute.";
     }
     throw new ApiError(message || res.statusText || "Something went wrong. Please try again.", res.status);

@@ -5,8 +5,8 @@
 #
 # The service runs the repo's multi-stage Dockerfile, which builds the React
 # bundle and the Python venv and serves both from one process — same image as
-# docker-compose.yml and the Railway setup. No explicit port config is needed:
-# Render detects the listening port from the PORT env var automatically.
+# docker-compose.yml. No explicit port config is needed: Render detects the
+# listening port from the PORT env var automatically.
 #
 # NOTE on the free plan: Free web services cannot attach persistent disks and
 # spin down after 15 idle minutes. Point DATABASE_URL at a managed database
@@ -27,12 +27,13 @@ services:
         value: 8000
       - key: DATA_DIR
         value: /data
-      # Data durability: sign up at https://neon.com/signup (free forever,
-      # no credit card, 1 GB storage, pgvector supported) and create a
-      # project. Its pooled connection string is pasted at deploy time
+      # Data durability: sign up at https://supabase.com (free tier, no card,
+      # 500 MB Postgres with pgvector) and create a project. Copy the
+      # connection string from Project Settings -> Database -> Connection
+      # string -> Session pooler (port 5432, IPv4) and paste it at deploy time
       # (`sync: false` — it contains the DB password and must not live in a
       # committed file). Format:
-      #   postgresql://user:pass@ep-xxx-pooler.eu-central-1.aws.neon.tech/neondb?sslmode=require
+      #   postgresql://postgres.<ref>:<password>@aws-0-<region>.pooler.supabase.com:5432/postgres?sslmode=require
       # Tables are created automatically on first connect.
       #
       # DO NOT fall back to SQLite here: Render's free tier has no persistent
