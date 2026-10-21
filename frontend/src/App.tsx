@@ -81,8 +81,14 @@ function Dashboard({ page }: { page?: "internships" | "programs" }) {
     mutationFn: api.score,
     onSuccess: () => qc.invalidateQueries(),
   });
+  // Re-evaluates jobs that already have a score, so a relevance fix applies
+  // to the existing feed instead of only to postings found from now on.
+  const rescore = useMutation({
+    mutationFn: () => api.rescore(50),
+    onSuccess: () => qc.invalidateQueries(),
+  });
 
-  const busy = poll.isPending || score.isPending;
+  const busy = poll.isPending || score.isPending || rescore.isPending;
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const moreActive = MOBILE_MORE_PATHS.some(
     (path) => location.pathname === path || location.pathname.startsWith(`${path}/`),
@@ -254,6 +260,15 @@ function Dashboard({ page }: { page?: "internships" | "programs" }) {
           <button onClick={() => score.mutate()} disabled={busy} className="btn-ghost">
             {score.isPending ? <span className="spinner" /> : <span className="material-symbols-outlined" aria-hidden="true">insights</span>}
             <span className="topbar-btn-label">Score pending</span>
+          </button>
+          <button
+            onClick={() => rescore.mutate()}
+            disabled={busy}
+            className="btn-ghost"
+            title="Re-score jobs you have already scored, applying the current relevance filters"
+          >
+            {rescore.isPending ? <span className="spinner" /> : <span className="material-symbols-outlined" aria-hidden="true">restart_alt</span>}
+            <span className="topbar-btn-label">Re-score</span>
           </button>
           <button
             type="button"

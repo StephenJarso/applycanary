@@ -197,6 +197,9 @@ export interface Profile {
   llm_provider: string;
   llm_api_key_masked: string;
   preferred_work_type: string;
+  /** True once a mailbox + app password are stored; the password is never returned. */
+  email_sending_configured: boolean;
+  smtp_user: string;
 }
 
 export interface SourceHealth {
@@ -542,6 +545,17 @@ export const api = {
     body: Partial<Profile> & { github_token?: string; github_disconnect?: boolean },
   ) => request<Profile>("/profile", { method: "PUT", body: JSON.stringify(body) }),
 
+  saveEmailSending: (payload: {
+    smtp_user: string;
+    smtp_app_password?: string;
+    smtp_host?: string;
+    smtp_port?: number;
+    disconnect?: boolean;
+  }) =>
+    request<ActionResult>("/profile/email-sending", {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    }),
   uploadResume: (file: File) => {
     const form = new FormData();
     form.append("resume", file);
@@ -556,6 +570,8 @@ export const api = {
 
   poll: () => request<ActionResult>("/actions/poll", { method: "POST" }),
   score: () => request<ActionResult>("/actions/score", { method: "POST" }),
+  rescore: (limit = 50) =>
+    request<ActionResult>(`/actions/rescore?limit=${limit}`, { method: "POST" }),
   syncGithub: () => request<ActionResult>("/actions/github", { method: "POST" }),
   discover: () => request<ActionResult>("/actions/discover", { method: "POST" }),
   embedAll: (limit = 100) =>

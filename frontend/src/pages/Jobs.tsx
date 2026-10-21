@@ -81,6 +81,30 @@ export default function Jobs() {
         </div>
       </div>
 
+      {/* Relevance filters only exist once the profile carries the facts they
+          compare against. Say which ones are off instead of silently serving a
+          worldwide, any-seniority feed. */}
+      {profile && (() => {
+        const missing = [
+          !profile.location && "your location",
+          profile.target_locations.length === 0 && "target locations",
+          profile.years_experience === null && "years of experience",
+        ].filter(Boolean) as string[];
+        if (missing.length === 0) return null;
+        return (
+          <div className="card" style={{ marginTop: 20, padding: 14, display: "flex", gap: 12, alignItems: "baseline", flexWrap: "wrap" }}>
+            <strong style={{ fontSize: 14 }}>Sharpen this feed</strong>
+            <span className="cell-dim" style={{ fontSize: 13, flex: "1 1 320px" }}>
+              Missing {missing.join(", ")}. Until they are set, remote roles restricted to another
+              country and roles above your experience level cannot be filtered out.
+            </span>
+            <Link to="/profile" className="btn-ghost" style={{ fontSize: 12, padding: "3px 10px" }}>
+              Update profile
+            </Link>
+          </div>
+        );
+      })()}
+
       {/* dashboard_1: Job Search Status glass card with three metric tiles. */}
       <div className="glass-card stat-panel" style={{ marginTop: 20 }}>
         <div className="stat-panel-head">
@@ -330,7 +354,7 @@ export default function Jobs() {
                           else navigate(`/job/${job.id}`);
                         }}
                       >
-                        Auto-Apply
+                        Apply
                       </button>
                       <button
                         className="btn-ai btn-sm"

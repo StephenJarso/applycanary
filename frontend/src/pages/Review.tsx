@@ -21,7 +21,13 @@ export default function Review() {
     void qc.invalidateQueries({ queryKey: ["review"] });
     void qc.invalidateQueries({ queryKey: ["status"] });
   };
-  const submit = useMutation({ mutationFn: (id: number) => api.submit(id), onSuccess: refresh });
+  // One-click approval: the click *is* the consent, so force=true. Without it
+  // the gate only dry-runs, which is why this button used to appear to do
+  // nothing. The email submitter still refuses unless a mailbox is connected.
+  const submit = useMutation({
+    mutationFn: (id: number) => api.submit(id, true),
+    onSuccess: refresh,
+  });
   const skip = useMutation({ mutationFn: (id: number) => api.skip(id), onSuccess: refresh });
 
   const totalPages = useMemo(
@@ -84,10 +90,14 @@ export default function Review() {
                     <div style={{ display: "flex", gap: 6 }}>
                       <button
                         className="btn-primary btn-sm"
-                        onClick={() => submit.mutate(job.id)}
+                        onClick={() => {
+                          if (confirm(`Send this application for ${job.title} at ${job.company}?`)) {
+                            submit.mutate(job.id);
+                          }
+                        }}
                         disabled={submit.isPending}
                       >
-                        Submit
+                        Approve &amp; send
                       </button>
                       <Link to={`/job/${job.id}`} className="btn btn-sm">Review</Link>
                       <button

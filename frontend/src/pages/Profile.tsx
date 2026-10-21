@@ -27,6 +27,11 @@ export default function ProfilePage() {
   // constant `value=""` makes typing and pasting appear to do nothing.
   const [llmKey, setLlmKey] = useState("");
   const [githubToken, setGithubToken] = useState("");
+  // The app password is write-only: the API stores it encrypted and only
+  // returns whether a mailbox is connected, so it needs its own state.
+  const [smtpUser, setSmtpUser] = useState("");
+  const [smtpPassword, setSmtpPassword] = useState("");
+  const [smtpMessage, setSmtpMessage] = useState("");
   const [notifPermission, setNotifPermission] = useState(getNotificationPermission());
   const [hasPushSub, setHasPushSub] = useState(false);
   const [pushBusy, setPushBusy] = useState(false);
@@ -45,6 +50,10 @@ export default function ProfilePage() {
     if (data) setForm(data);
   }, [data]);
 
+  useEffect(() => {
+    if (data?.smtp_user) setSmtpUser(data.smtp_user);
+  }, [data?.smtp_user]);
+
   const invalidate = () => {
     void qc.invalidateQueries({ queryKey: ["profile"] });
     void qc.invalidateQueries({ queryKey: ["status"] });
@@ -59,6 +68,19 @@ export default function ProfilePage() {
         delete (next as { llm_api_key?: string }).llm_api_key;
         return next;
       });
+      invalidate();
+    },
+  });
+  const saveEmailSending = useMutation({
+    mutationFn: (disconnect: boolean) =>
+      api.saveEmailSending({
+        smtp_user: disconnect ? "" : smtpUser,
+        smtp_app_password: disconnect ? "" : smtpPassword,
+        disconnect,
+      }),
+    onSuccess: (res) => {
+      setSmtpPassword("");
+      setSmtpMessage(res.message);
       invalidate();
     },
   });
@@ -503,6 +525,74 @@ export default function ProfilePage() {
         {save.isError && <ErrorBox error={save.error} />}
         {save.isSuccess && <div className="banner banner-ok" role="status">Profile saved.</div>}
       </form>
+
+      <div className="card" style={{ marginTop: 16 }}>
+        <h3 className="card-title">Send applications from my inbox</h3>
+        <p className="cell-dim" style={{ marginTop: 0 }}>
+          Postings that ask for a CV by email are sent from your own mailbox, so replies
+          land where you already read them. For Gmail, turn on 2-Step Verification, create
+          an App Password (Google Account → Security → App passwords) and paste it here.
+          Each application is only sent after you approve it in Discovery.
+        </p>
+        {data?.email_sending_configured ? (
+          <div className="banner banner-ok" role="status">
+            Connected as {data.smtp_user}. Email applications can be sent.
+          </div>
+        ) : (
+          <div className="banner banner-warn" role="status">
+            No mailbox connected yet — email applications are drafted but not sent.
+          </div>
+        )}
+        <div className="grid2">
+          <div className="field">
+            <label htmlFor="smtp-user">Sending address</label>
+            <input
+              id="smtp-user"
+              type="email"
+              placeholder="you@gmail.com"
+              value={smtpUser}
+              onChange={(e) => setSmtpUser(e.target.value)}
+            />
+          </div>
+          <div className="field">
+            <label htmlFor="smtp-password">Gmail app password</label>
+            <input
+              id="smtp-password"
+              type="password"
+              autoComplete="new-password"
+              placeholder={
+                data?.email_sending_configured
+                  ? "Leave blank to keep the stored password"
+                  : "16-character app password"
+              }
+              value={smtpPassword}
+              onChange={(e) => setSmtpPassword(e.target.value)}
+            />
+          </div>
+        </div>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <button
+            type="button"
+            className="btn-primary"
+            disabled={saveEmailSending.isPending || !smtpUser.trim()}
+            onClick={() => saveEmailSending.mutate(false)}
+          >
+            {saveEmailSending.isPending && <span className="spinner" />} Save mailbox
+          </button>
+          {data?.email_sending_configured && (
+            <button
+              type="button"
+              className="btn-ghost"
+              disabled={saveEmailSending.isPending}
+              onClick={() => saveEmailSending.mutate(true)}
+            >
+              Disconnect
+            </button>
+          )}
+        </div>
+        {saveEmailSending.isError && <ErrorBox error={saveEmailSending.error} />}
+        {smtpMessage && <div className="banner banner-ok" role="status">{smtpMessage}</div>}
+      </div>
     </>
   );
 }
