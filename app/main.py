@@ -60,8 +60,8 @@ async def lifespan(app: FastAPI):  # noqa: ANN201, ARG001
         )
     if not settings.email_enabled:
         log.warning(
-            "no email backend configured (set RESEND_API_KEY or SMTP_HOST) — "
-            "digests will be logged, not emailed"
+            "no email backend configured (set BREVO_API_KEY, RESEND_API_KEY "
+            "or SMTP_HOST) — digests will be logged, not emailed"
         )
     if settings.enable_auto_submit:
         log.warning(

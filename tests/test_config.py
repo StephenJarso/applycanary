@@ -55,12 +55,16 @@ def test_llm_warning_lists_all_providers() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Email backend: Resend preferred, SMTP legacy fallback.
+# Email backend: Brevo preferred, then Resend, then SMTP legacy fallback.
 # ---------------------------------------------------------------------------
 
 
 def test_email_disabled_without_backend() -> None:
     assert not Settings().email_enabled
+
+
+def test_email_enabled_with_brevo_key() -> None:
+    assert Settings(brevo_api_key="xkeysib-test").email_enabled
 
 
 def test_email_enabled_with_resend_key() -> None:
@@ -82,6 +86,11 @@ def test_email_warning_when_disabled() -> None:
 
 def test_no_email_warning_when_resend_configured() -> None:
     s = Settings(resend_api_key="re_test")
+    assert not any("No email backend" in w for w in s.startup_warnings())
+
+
+def test_no_email_warning_when_brevo_configured() -> None:
+    s = Settings(brevo_api_key="xkeysib-test")
     assert not any("No email backend" in w for w in s.startup_warnings())
 
 

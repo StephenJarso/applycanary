@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, type AdminUserItem, type FeedbackItem } from "./api";
 import { ErrorBox, Loading } from "./components";
+import { useAuth } from "./context/AuthContext";
 
 function relTime(iso: string | null): string {
   if (!iso) return "Never";
@@ -15,6 +16,7 @@ function relTime(iso: string | null): string {
 
 export function AdminPanel() {
   const qc = useQueryClient();
+  const { user: currentUser } = useAuth();
   const [activeTab, setActiveTab] = useState<"services" | "users" | "feedback" | "sources">("services");
   const [feedbackStatus, setFeedbackStatus] = useState<string>("all");
   const [testedProviders, setTestedProviders] = useState<Record<string, { ok: boolean; msg: string }>>({});
@@ -508,36 +510,42 @@ export function AdminPanel() {
                       <td>{relTime(u.last_login_at)}</td>
                       <td>{new Date(u.created_at).toLocaleDateString()}</td>
                       <td>
-                        <div style={{ display: "flex", gap: 4 }}>
-                          <button
-                            type="button"
-                            className="btn-ghost"
-                            style={{ fontSize: 11, padding: "2px 6px" }}
-                            onClick={() => setUserRole.mutate({ userId: u.id, payload: { is_admin: !u.is_admin } })}
-                            title="Toggle Admin role"
-                          >
-                            {u.is_admin ? "Demote" : "Make Admin"}
-                          </button>
-                          <button
-                            type="button"
-                            className="btn-ghost"
-                            style={{ fontSize: 11, padding: "2px 6px" }}
-                            onClick={() => setUserRole.mutate({ userId: u.id, payload: { is_active: !u.is_active } })}
-                            title="Toggle active status"
-                          >
-                            {u.is_active ? "Deactivate" : "Activate"}
-                          </button>
-                          <button
-                            type="button"
-                            className="btn-ghost"
-                            style={{ fontSize: 11, padding: "2px 6px", color: "var(--bad)" }}
-                            onClick={() => {
-                              if (confirm(`Delete account for ${u.email}?`)) deleteUser.mutate(u.id);
-                            }}
-                          >
-                            Delete
-                          </button>
-                        </div>
+                        {currentUser?.id === u.id ? (
+                          <span className="chip" title="You cannot demote, deactivate or delete your own account">
+                            You
+                          </span>
+                        ) : (
+                          <div style={{ display: "flex", gap: 4 }}>
+                            <button
+                              type="button"
+                              className="btn-ghost"
+                              style={{ fontSize: 11, padding: "2px 6px" }}
+                              onClick={() => setUserRole.mutate({ userId: u.id, payload: { is_admin: !u.is_admin } })}
+                              title="Toggle Admin role"
+                            >
+                              {u.is_admin ? "Demote" : "Make Admin"}
+                            </button>
+                            <button
+                              type="button"
+                              className="btn-ghost"
+                              style={{ fontSize: 11, padding: "2px 6px" }}
+                              onClick={() => setUserRole.mutate({ userId: u.id, payload: { is_active: !u.is_active } })}
+                              title="Toggle active status"
+                            >
+                              {u.is_active ? "Deactivate" : "Activate"}
+                            </button>
+                            <button
+                              type="button"
+                              className="btn-ghost"
+                              style={{ fontSize: 11, padding: "2px 6px", color: "var(--bad)" }}
+                              onClick={() => {
+                                if (confirm(`Delete account for ${u.email}?`)) deleteUser.mutate(u.id);
+                              }}
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        )}
                       </td>
                     </tr>
                   ))}

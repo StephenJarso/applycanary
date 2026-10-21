@@ -67,8 +67,9 @@ services:
       # Require a verified email before any sign-in gets a session (register
       # returns session_started=false; login 403s with a resend prompt until
       # the emailed link is clicked). Turning this on REQUIRES a mail backend
-      # (RESEND_API_KEY or SMTP): with the gate on and no mail backend, every
-      # signup is locked out and the resend path fails silently. Verify a
+      # (BREVO_API_KEY, RESEND_API_KEY or SMTP): with the gate on and no mail
+      # backend, every signup is locked out and the resend path fails
+      # silently. Verify a
       # confirmation mail arrives for your own address before inviting others.
       - key: REQUIRE_EMAIL_VERIFICATION
         value: "true"
@@ -81,15 +82,25 @@ services:
         sync: false
         # harmless to keep; only used by scripts/ccloud/* tooling
       # Email: on Render's free plan SMTP ports (25/465/587) are blocked, so use
-      # RESEND_API_KEY (HTTPS API) rather than SMTP_*. Required when
+      # an HTTPS API provider rather than SMTP_*. Required when
       # REQUIRE_EMAIL_VERIFICATION is on (see that block above).
+      #
+      # BREVO_API_KEY is used first and is the easiest to start with: Brevo
+      # verifies a single sender *address*, so no domain is needed. Add the
+      # address at app.brevo.com → Senders & IP → Senders, put the same address
+      # in EMAIL_FROM, and new signups can verify immediately. Free tier: 300
+      # emails/day. (If both keys are set, Brevo wins.)
+      - key: BREVO_API_KEY
+        sync: false
+      # Resend alternative: verify a whole domain at resend.com/domains. Its
+      # default @resend.dev sandbox sender only reaches YOUR inbox.
       - key: RESEND_API_KEY
         sync: false
       - key: EMAIL_FROM
         value: ApplyCanary@resend.dev
-        # For production deliveries: verify a domain at resend.com/domains and
-        # change this to a real sender, e.g. "ApplyCanary <noreply@your-domain>".
-        # The default @resend.dev sandbox sender only reaches YOUR inbox.
+        # Set this to the sender you verified with whichever provider you use,
+        # e.g. "ApplyCanary <you@gmail.com>" (Brevo, verified address) or
+        # "ApplyCanary <noreply@your-domain>" (Resend, verified domain).
       # Optional: prefill a shared signup code while on open registration.
       - key: DEFAULT_INVITE_CODE
         sync: false

@@ -16,6 +16,7 @@ import pytest
 from sqlmodel import Session, select
 
 from app.auth import hash_password
+from app.config import Settings
 from app.db import engine, init_db
 from app.models import (
     Application,
@@ -177,3 +178,80 @@ def test_digest_empty_profile_has_no_send(monkeypatch):
 
     assert ok is False
     assert calls == []
+
+
+# ---------------------------------------------------------------------------
+# Provider selection: Brevo verifies a sender *address*, so it is the backend
+# that works before the operator owns a domain.
+# ---------------------------------------------------------------------------
+
+
+def test_parse_sender_name_and_address():
+    assert notify._parse_sender('ApplyCanary <noreply@example.com>') == (
+        "ApplyCanary", "noreply@example.com",
+    )
+
+
+def test_parse_sender_bare_address():
+    assert notify._parse_sender("noreply@example.com") == ("", "noreply@example.com")
+
+
+def test_send_uses_brevo_when_configured(monkeypatch):
+    captured: dict = {}
+
+    async def fake_brevo(**kwargs) -> str:
+        captured.update(kwargs)
+        return "message-1"
+
+    monkeypatch.setattr(notify, "_send_brevo", fake_brevo)
+    monkeypatch.setattr(
+        notify,
+        "get_settings",
+        lambda: Settings(
+            brevo_api_key="xkeysib-test",
+            email_from="ApplyCanary <noreply@example.com>",
+        ),
+    )
+
+    ok = asyncio_run(
+        notify.send("Verify", "<p>click</p>", "click", to="user@example.com")
+    )
+
+    assert ok
+    assert captured["to"] == "user@example.com"
+    assert captured["sender_email"] == "noreply@example.com"
+    assert captured["sender_name"] == "ApplyCanary"
+    assert captured["subject"] == "Verify"
+
+
+def test_brevo_failure_falls_back_to_resend(monkeypatch):
+    sent: dict = {}
+
+    async def broken_brevo(**_kwargs) -> str:
+        raise RuntimeError("sender not verified")
+
+    def fake_resend_send(payload: dict) -> dict:
+        sent.update(payload)
+        return {"id": "resend-1"}
+
+    monkeypatch.setattr(notify, "_send_brevo", broken_brevo)
+    monkeypatch.setattr(
+        notify,
+        "get_settings",
+        lambda: Settings(
+            brevo_api_key="xkeysib-test",
+            resend_api_key="re_test",
+            email_from="ApplyCanary <noreply@example.com>",
+        ),
+    )
+
+    import resend
+
+    monkeypatch.setattr(resend.Emails, "send", fake_resend_send)
+
+    ok = asyncio_run(
+        notify.send("Verify", "<p>click</p>", "click", to="user@example.com")
+    )
+
+    assert ok
+    assert sent["to"] == ["user@example.com"]

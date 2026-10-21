@@ -101,10 +101,12 @@ class Settings(BaseSettings):
     github_token: str = ""
 
     # --- email ---
-    # Preferred: Resend (resend_api_key + email_from). Falls back to SMTP
-    # when RESEND_API_KEY is empty. EMAIL_FROM defaults to Resend's sandbox
-    # domain; switch to a verified domain (or set a custom FROM in production)
-    # for production.
+    # BREVO_API_KEY is used first when present: Brevo verifies a single sender
+    # address instead of a whole domain, so it works before you own a domain.
+    # Otherwise Resend (resend_api_key + email_from), then SMTP. EMAIL_FROM is
+    # the sender for all three backends; with Resend's sandbox @resend.dev it
+    # only reaches the account owner until a domain is verified.
+    brevo_api_key: str = ""
     resend_api_key: str = ""
     email_from: str = "ApplyCanary@resend.dev"
     smtp_host: str = ""
@@ -250,11 +252,15 @@ class Settings(BaseSettings):
     def email_enabled(self) -> bool:
         """True when a send backend is configured.
 
-        Resend is preferred; SMTP is the legacy fallback. A recipient is not
-        checked here — per-user routing resolves profile.email → user.email →
+        Brevo is preferred, then Resend, then SMTP. A recipient is not checked
+        here — per-user routing resolves profile.email → user.email →
         profile.digest_to → settings.digest_to at send time.
         """
-        return bool(self.resend_api_key or (self.smtp_host and self.smtp_user))
+        return bool(
+            self.brevo_api_key
+            or self.resend_api_key
+            or (self.smtp_host and self.smtp_user)
+        )
 
     @property
     def email_link_base(self) -> str:
@@ -338,8 +344,8 @@ class Settings(BaseSettings):
             )
         if not self.email_enabled:
             warnings.append(
-                "No email backend configured (set RESEND_API_KEY or SMTP_HOST): "
-                "digests will be logged, not sent."
+                "No email backend configured (set BREVO_API_KEY, RESEND_API_KEY "
+                "or SMTP_HOST): digests will be logged, not sent."
             )
         if not self.github_username:
             warnings.append(

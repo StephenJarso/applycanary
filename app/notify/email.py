@@ -1,8 +1,13 @@
 """Email digests and high-score alerts.
 
-Prefers Resend (RESEND_API_KEY) over legacy SMTP (SMTP_HOST).  When neither
-is configured the message is logged only, so the pipeline is testable without
-credentials and a missing password never loses information.
+Prefers Brevo (BREVO_API_KEY) when configured, then Resend (RESEND_API_KEY),
+then legacy SMTP (SMTP_HOST).  When none is configured the message is logged
+only, so the pipeline is testable without credentials and a missing password
+never loses information.
+
+Brevo and Resend both send over HTTPS (port 443), which is the only way out on
+platforms that block SMTP ports (e.g. Render's free plan). Brevo's advantage is
+that it verifies a single sender *address* rather than requiring a domain.
 
 Templates use inline CSS — every major client strips <style> blocks.
 """
@@ -359,8 +364,52 @@ def _build_email_changed_email(old_email: str) -> tuple[str, str, str]:
 #  Low-level send
 # ---------------------------------------------------------------------------
 
+def _parse_sender(value: str) -> tuple[str, str]:
+    """Split EMAIL_FROM into (name, address).
+
+    Accepts both `"Name <user@example.com>"` and a bare address, since the
+    providers differ in what they want ("from" string vs sender object).
+    """
+    value = (value or "").strip()
+    if value.endswith(">") and "<" in value:
+        name, _, address = value.rpartition("<")
+        return name.strip().strip('"'), address[:-1].strip()
+    return "", value
+
+
+async def _send_brevo(
+    *, api_key: str, sender_name: str, sender_email: str,
+    to: str, subject: str, html: str, text: str,
+) -> str:
+    """POST one message to Brevo's transactional API; return its message id.
+
+    Raises on any non-2xx so the caller can fall through to the next backend.
+    """
+    import httpx
+
+    sender: dict[str, str] = {"email": sender_email}
+    if sender_name:
+        sender["name"] = sender_name
+    payload = {
+        "sender": sender,
+        "to": [{"email": to}],
+        "subject": subject,
+        "htmlContent": html,
+        "textContent": text,
+    }
+    async with httpx.AsyncClient(timeout=20) as client:
+        response = await client.post(
+            "https://api.brevo.com/v3/smtp/email",
+            headers={"api-key": api_key, "accept": "application/json"},
+            json=payload,
+        )
+        response.raise_for_status()
+        data = response.json()
+    return str(data.get("messageId") or "?")
+
+
 async def send(subject: str, html: str, text: str, *, to: str = "") -> bool:
-    """Send one message.  Resend preferred; SMTP fallback; log-only when unconfigured."""
+    """Send one message. Brevo → Resend → SMTP; log-only when unconfigured."""
     settings = get_settings()
     to = to or settings.digest_to
     if not settings.email_enabled:
@@ -370,7 +419,29 @@ async def send(subject: str, html: str, text: str, *, to: str = "") -> bool:
         log.warning("email: no recipient for %r (set profile email or DIGEST_TO)", subject)
         return False
 
-    # --- Resend (preferred) -----------------------------------------------
+    # --- Brevo (preferred: verifies a sender address, not a domain) --------
+    if settings.brevo_api_key:
+        sender_name, sender_email = _parse_sender(settings.email_from)
+        if not sender_email:
+            log.error("Brevo send failed (%s): EMAIL_FROM is empty", subject)
+        else:
+            try:
+                message_id = await _send_brevo(
+                    api_key=settings.brevo_api_key,
+                    sender_name=sender_name,
+                    sender_email=sender_email,
+                    to=to,
+                    subject=subject,
+                    html=html,
+                    text=text,
+                )
+                log.info("email sent via Brevo (%s): %s", message_id, subject)
+                return True
+            except Exception as exc:  # noqa: BLE001
+                log.error("Brevo send failed (%s): %s — falling back", subject, exc)
+                # Fall through to Resend/SMTP so one bad provider is not fatal.
+
+    # --- Resend -----------------------------------------------------------
     if settings.resend_api_key:
         try:
             import resend as _resend
@@ -419,14 +490,14 @@ async def send(subject: str, html: str, text: str, *, to: str = "") -> bool:
             log.error("email send failed (%s): %s", subject, exc)
             return False
 
-    # Only reachable when Resend failed (or its import broke) and SMTP is not
-    # configured — every configured path returned above. Without this line the
-    # earlier "falling back to SMTP" message hides that the mail was dropped,
-    # e.g. Resend's sandbox only emails the account owner until a domain is
-    # verified at resend.com/domains.
+    # Only reachable when every configured API backend failed and SMTP is not
+    # configured — each configured path returns above. Without this line the
+    # earlier "falling back" messages hide that the mail was dropped, e.g.
+    # Resend's sandbox only emails the account owner until a domain is verified
+    # at resend.com/domains.
     log.warning(
-        "email: DROPPED %r — no working backend (Resend failed; SMTP_HOST/SMTP_USER unset)",
-        subject,
+        "email: DROPPED %r — no working backend (Brevo/Resend failed; "
+        "SMTP_HOST/SMTP_USER unset)", subject,
     )
     return False
 

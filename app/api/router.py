@@ -1512,7 +1512,12 @@ def admin_system_status(
         },
         "email": {
             "configured": settings.email_enabled,
-            "backend": "resend" if settings.resend_api_key else ("smtp" if settings.smtp_host else "none"),
+            "backend": (
+                "brevo" if settings.brevo_api_key
+                else "resend" if settings.resend_api_key
+                else "smtp" if settings.smtp_host
+                else "none"
+            ),
         },
     }
 
@@ -1720,19 +1725,42 @@ def admin_set_user_role(
     admin: User = Depends(require_admin),
     session: Session = Depends(get_session),
 ) -> dict:
-    """Toggle admin status or active status for a user."""
+    """Toggle admin status or active status for a user.
+
+    Self-service demotion/deactivation is refused: it is a one-click way to
+    lock yourself out, and another admin can always make the change instead.
+    The last *active* admin is protected in both directions, including when
+    the other admins exist but are deactivated.
+    """
     u = session.get(User, user_id)
     if not u:
         raise HTTPException(404, "User not found")
+
+    def other_active_admins() -> int:
+        return session.exec(
+            select(func.count(User.id)).where(
+                User.is_admin.is_(True),
+                User.is_active.is_(True),
+                User.id != u.id,
+            )
+        ).one()
+
     if "is_admin" in body:
-        # Prevent removing the last admin
-        if not bool(body["is_admin"]):
-            admin_count = session.exec(select(func.count(User.id)).where(User.is_admin.is_(True))).one()
-            if admin_count <= 1 and u.is_admin:
-                raise HTTPException(400, "Cannot remove the only administrator")
-        u.is_admin = bool(body["is_admin"])
+        make_admin = bool(body["is_admin"])
+        if u.is_admin and not make_admin:
+            if u.id == admin.id:
+                raise HTTPException(400, "You cannot remove your own admin role")
+            if u.is_active and other_active_admins() == 0:
+                raise HTTPException(400, "Cannot remove the only active administrator")
+        u.is_admin = make_admin
     if "is_active" in body:
-        u.is_active = bool(body["is_active"])
+        active = bool(body["is_active"])
+        if u.is_admin and not active:
+            if u.id == admin.id:
+                raise HTTPException(400, "You cannot deactivate your own account")
+            if other_active_admins() == 0:
+                raise HTTPException(400, "Cannot deactivate the only active administrator")
+        u.is_active = active
     session.add(u)
     session.commit()
     return {"ok": True}
@@ -1754,6 +1782,16 @@ def admin_delete_user(
         admin_count = session.exec(select(func.count(User.id)).where(User.is_admin.is_(True))).one()
         if admin_count <= 1:
             raise HTTPException(400, "Cannot delete the only administrator")
+        if u.is_active:
+            other_active = session.exec(
+                select(func.count(User.id)).where(
+                    User.is_admin.is_(True),
+                    User.is_active.is_(True),
+                    User.id != u.id,
+                )
+            ).one()
+            if other_active == 0:
+                raise HTTPException(400, "Cannot delete the only active administrator")
     session.delete(u)
     session.commit()
     return {"ok": True}

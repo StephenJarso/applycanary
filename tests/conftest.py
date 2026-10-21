@@ -42,7 +42,8 @@ for _k in (
     "ANTHROPIC_API_KEY",
     "AWS_ACCESS_KEY_ID",
     # Email: same rationale as LLM keys — a developer .env with SMTP or
-    # Resend creds would make the suite attempt real sends.
+    # Brevo/Resend creds would make the suite attempt real sends.
+    "BREVO_API_KEY",
     "RESEND_API_KEY",
     "SMTP_HOST",
     "SMTP_USER",

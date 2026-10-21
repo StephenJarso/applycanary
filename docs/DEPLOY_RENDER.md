@@ -24,7 +24,8 @@ Before deploying, know the three free-plan limitations that ApplyCanary hits
    (`.github/workflows/keepalive.yml`) that pings `/health` every 5 minutes;
    see [Keep-alive](#keep-alive) below.
 3. **Outbound SMTP ports (25/465/587) are blocked.** Use an HTTP email API —
-   the app already prefers Resend (`RESEND_API_KEY`) over SMTP when set.
+   the app prefers Brevo (`BREVO_API_KEY`), then Resend (`RESEND_API_KEY`),
+   over SMTP when set.
 
 For durable data on the free plan, pair the web service with a hosted
 Postgres. **Supabase** is a good pick: free tier, no credit card, 500 MB
@@ -57,9 +58,10 @@ Postgres with pgvector for job embeddings:
      signup — see the email-verification section below for why.
    - At least one LLM key: `GEMINI_API_KEY` (or `XAI_API_KEY`, `GROQ_API_KEY`,
      `ANTHROPIC_API_KEY`). Without one, scoring falls back to keyword-only.
-   - `RESEND_API_KEY` for email (verification, alerts, digest). REQUIRED when
-     `REQUIRE_EMAIL_VERIFICATION` is on — see below for the lockout risk if
-     the gate is on without a mail backend.
+   - `BREVO_API_KEY` (no domain needed: verify a sender address) or
+     `RESEND_API_KEY` (requires a verified domain) for email — verification,
+     alerts, digests. REQUIRED when `REQUIRE_EMAIL_VERIFICATION` is on — see
+     below for the lockout risk if the gate is on without a mail backend.
 4. Click **Apply**. The first build takes a few minutes (frontend `npm build`
    plus the Python venv); subsequent builds cache layers and are faster.
 
@@ -121,17 +123,29 @@ silently:
 
 1. **A mail backend must be live.** With the gate on and no mail backend,
    the verification email is dropped (`email.py` logs `DROPPED`) and no one
-   can ever cross the gate — the resend button fails the same way. Set
-   `RESEND_API_KEY` (free tier: 100/day, no card: resend.com → API Keys).
+   can ever cross the gate — the resend button fails the same way.
+   - **No domain yet → Brevo** (easiest): create a key at
+     app.brevo.com → SMTP & API → API Keys, add your address under
+     Senders & IP → Senders (Brevo emails you a confirmation link), then set
+     `BREVO_API_KEY` and `EMAIL_FROM` to that same address. Free tier: 300/day.
+     It is tried first and works for any recipient without owning a domain.
+   - **Have a domain → Resend**: set `RESEND_API_KEY` (free tier: 100/day,
+     no card) and verify the domain at resend.com/domains.
+
+   Note: a verified sender address on a free mailbox (e.g. Gmail) can land in
+   spam because the domain's DMARC does not align; a verified custom domain
+   has much better deliverability. Either way, Brevo unblocks signups today.
 2. **`PUBLIC_BASE_URL` must be set before any signup.** The verify/reset
    links in emails are built from it (an absolute origin in `email.py`'s
    `_link()`); without it the mail is skipped rather than sent with a dead
    link. Set it the moment the Render URL exists, redeploy once.
 3. **Test on yourself first.** Register your own address, confirm the
    verification mail actually arrives and the link works, THEN invite
-   others. resend's default `@resend.dev` sandbox sender only reaches the
+   others. Resend's default `@resend.dev` sandbox sender only reaches the
    inbox that owns the Resend account; verify a custom domain at
    resend.com/domains and set `EMAIL_FROM` before sending to strangers.
+   Brevo has no sandbox: any address you have verified as a sender can reach
+   arbitrary recipients, so test one real signup before opening registration.
 
 To turn the gate off (open signup without email confirmation), set
 `REQUIRE_EMAIL_VERIFICATION=false` in the Render environment — never commit
