@@ -493,7 +493,7 @@ export function AdminPanel() {
                       <td><strong>{u.email}</strong></td>
                       <td>
                         <span className={`chip ${u.is_admin ? "chip-hit" : ""}`}>
-                          {u.is_admin ? "Admin" : "User"}
+                          {u.is_superuser ? "Superuser" : u.is_admin ? "Admin" : "User"}
                         </span>
                       </td>
                       <td>
@@ -510,7 +510,11 @@ export function AdminPanel() {
                       <td>{relTime(u.last_login_at)}</td>
                       <td>{new Date(u.created_at).toLocaleDateString()}</td>
                       <td>
-                        {currentUser?.id === u.id ? (
+                        {u.is_superuser ? (
+                          <span className="chip" title="The superuser account cannot be demoted, deactivated or deleted">
+                            Protected
+                          </span>
+                        ) : currentUser?.id === u.id ? (
                           <span className="chip" title="You cannot demote, deactivate or delete your own account">
                             You
                           </span>

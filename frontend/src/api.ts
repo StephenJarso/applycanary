@@ -713,6 +713,7 @@ export interface AdminUserItem {
   id: number;
   email: string;
   is_admin: boolean;
+  is_superuser: boolean;
   is_active: boolean;
   email_verified: boolean;
   plan: "paid" | "free";

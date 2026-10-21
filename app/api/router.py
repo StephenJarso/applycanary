@@ -1362,6 +1362,7 @@ def admin_system_status(
     users_verified = session.exec(select(func.count(User.id)).where(User.email_verified.is_(True))).one()
     users_admin = session.exec(select(func.count(User.id)).where(User.is_admin.is_(True))).one()
 
+    owner_id = _superuser_id(session)
     users_rows = session.exec(select(User).order_by(User.created_at.desc())).all()
     profiles_map = {p.user_id: p for p in session.exec(select(Profile)).all()}
     user_list = [
@@ -1369,6 +1370,9 @@ def admin_system_status(
             "id": u.id,
             "email": u.email,
             "is_admin": u.is_admin,
+            # The first admin (lowest id) is the instance owner. It cannot be
+            # demoted, deactivated or deleted by anyone, including itself.
+            "is_superuser": u.id == owner_id,
             "is_active": u.is_active,
             "email_verified": u.email_verified,
             "plan": "paid" if getattr(profiles_map.get(u.id), "llm_api_key", "") else "free",
@@ -1718,6 +1722,19 @@ def unwatch_opp(
 # ---------------------------------------------------------------- admin management
 
 
+def _superuser_id(session: Session) -> int | None:
+    """Id of the instance owner: the earliest admin still holding the role.
+
+    There is no separate column, so "the first admin" is the stable identity.
+    It is protected from demotion/deactivation/deletion by every admin —
+    otherwise an accidental click (or a hostile second admin) can orphan the
+    instance. Use the bootstrap account for this role.
+    """
+    return session.exec(
+        select(func.min(User.id)).where(User.is_admin.is_(True))
+    ).one()
+
+
 @router.patch("/admin/users/{user_id}/role")
 def admin_set_user_role(
     user_id: int,
@@ -1745,11 +1762,14 @@ def admin_set_user_role(
             )
         ).one()
 
+    superuser_id = _superuser_id(session)
     if "is_admin" in body:
         make_admin = bool(body["is_admin"])
         if u.is_admin and not make_admin:
             if u.id == admin.id:
                 raise HTTPException(400, "You cannot remove your own admin role")
+            if u.id == superuser_id:
+                raise HTTPException(400, "The superuser account cannot be demoted")
             if u.is_active and other_active_admins() == 0:
                 raise HTTPException(400, "Cannot remove the only active administrator")
         u.is_admin = make_admin
@@ -1758,6 +1778,8 @@ def admin_set_user_role(
         if u.is_admin and not active:
             if u.id == admin.id:
                 raise HTTPException(400, "You cannot deactivate your own account")
+            if u.id == superuser_id:
+                raise HTTPException(400, "The superuser account cannot be deactivated")
             if other_active_admins() == 0:
                 raise HTTPException(400, "Cannot deactivate the only active administrator")
         u.is_active = active
@@ -1779,6 +1801,8 @@ def admin_delete_user(
     if not u:
         raise HTTPException(404, "User not found")
     if u.is_admin:
+        if u.id == _superuser_id(session):
+            raise HTTPException(400, "The superuser account cannot be deleted")
         admin_count = session.exec(select(func.count(User.id)).where(User.is_admin.is_(True))).one()
         if admin_count <= 1:
             raise HTTPException(400, "Cannot delete the only administrator")
