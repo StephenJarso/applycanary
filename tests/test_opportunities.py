@@ -21,6 +21,7 @@ from fastapi.testclient import TestClient
 
 from app.main import create_app
 from app.opportunities import (
+    CURATED_EVENTS,
     INTERNSHIPS,
     PAID_PROGRAMS,
     CardEvent,
@@ -30,6 +31,7 @@ from app.opportunities import (
     _fetch_gdg,
     _gdg_item,
     _to_item,
+    _upcoming_curated_events,
     parse_card_date,
     parse_event_cards,
     parse_event_detail,
@@ -331,6 +333,9 @@ def test_endpoint_serves_events_and_programs_sorted_by_deadline(client, monkeypa
     # their own endpoint and tab.
     assert {p["title"] for p in PAID_PROGRAMS} <= set(titles)
     assert not ({i["title"] for i in INTERNSHIPS} & set(titles))
+    # Dated African conferences that never reach the community calendars are
+    # curated with dates read from their official sites.
+    assert {e["title"] for e in _upcoming_curated_events()} <= set(titles)
 
     # Nearest deadline first: the dated event precedes the 2027 program
     # deadlines, and rolling programs (no dates at all) sort last.
@@ -353,7 +358,10 @@ def test_endpoint_still_serves_programs_when_the_feed_is_down(client, monkeypatc
 
     assert body["events_live"] is False
     assert body["items"], "paid programs must survive an event-feed outage"
-    assert {i["kind"] for i in body["items"]} == {"Paid program"}
+    # Static curated events do not depend on the live feed either, but nothing
+    # from TGK/GDG should appear when their fetch failed.
+    assert {i["kind"] for i in body["items"]} <= {"Paid program", "Event"}
+    assert {i["source"] for i in body["items"] if i["kind"] == "Event"} <= {"Curated"}
 
 
 def test_endpoint_flags_a_stale_event_list(client, monkeypatch):
@@ -373,9 +381,8 @@ def test_endpoint_flags_a_stale_event_list(client, monkeypatch):
     assert res.status_code == 200
     body = res.json()
     assert body["events_live"] is False
-    assert [i["title"] for i in body["items"] if i["kind"] == "Event"] == [
-        "GOPHERCON AFRICA 2026"
-    ]
+    event_titles = [i["title"] for i in body["items"] if i["kind"] == "Event"]
+    assert "GOPHERCON AFRICA 2026" in event_titles
     assert body["events_updated_at"] is not None
 
 
@@ -398,7 +405,7 @@ def test_feed_failure_never_fails_the_endpoint(client, monkeypatch):
     body = res.json()
     assert body["events_live"] is False
     assert body["items"], "paid programs must survive a total feed outage"
-    assert {i["kind"] for i in body["items"]} == {"Paid program"}
+    assert {i["kind"] for i in body["items"]} <= {"Paid program", "Event"}
 
 
 def test_endpoint_waits_at_most_bounded_for_a_slow_feed(client, monkeypatch):
@@ -458,6 +465,25 @@ def test_a_timed_out_fetch_gates_followup_requests(client, monkeypatch):
     # The fast path answers from memory in milliseconds; a restarted slow
     # fetch would cost the full (capped) 0.5 s wait.
     assert second_cost < 0.45
+
+
+def test_curated_events_carry_iso_dates():
+    # A card counts down to this date, so it must be a real ISO day, not prose.
+    for item in CURATED_EVENTS:
+        datetime.fromisoformat(item["date"])
+        assert item["when"]
+
+
+def test_curated_events_expire_when_they_start(monkeypatch):
+    monkeypatch.setattr(
+        "app.opportunities.CURATED_EVENTS",
+        [
+            {**CURATED_EVENTS[0], "title": "Past conf", "date": "2020-01-01"},
+            {**CURATED_EVENTS[0], "title": "Future conf", "date": "2030-01-01"},
+        ],
+    )
+    titles = [item["title"] for item in _upcoming_curated_events()]
+    assert titles == ["Future conf"]
 
 
 def test_internships_are_split_from_programs_and_state_compensation():

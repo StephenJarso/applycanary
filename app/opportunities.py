@@ -313,6 +313,33 @@ PAID_PROGRAMS: list[dict] = [
     },
     {
         "kind": "Paid program",
+        "title": "Internet Society Fellowship 2027",
+        "org": "Internet Society",
+        "when": "10-month fellowship · Feb–Dec 2027",
+        "opens": "2026-09-23",
+        "closes": "2026-12-18",
+        "steps": [
+            "Enrol in pre-fellowship training by 22 Nov 2026",
+            "Complete the modules to receive the application link",
+            "Apply by 18 Dec 2026 (rolling once modules are done)",
+            "Notifications 19 Feb 2027 · kick-off 22 Feb 2027",
+            "Mentored project Jun–Nov 2027",
+        ],
+        "city": "Online",
+        "tags": ["Paid", "Fellowship", "Internet policy", "Security", "Africa"],
+        "stipend": "Paid: up to USD 5,000 project stipend + event travel support",
+        "source": "Official",
+        "url": "https://www.internetsociety.org/fellowship/",
+        "desc": (
+            "10-month Internet leadership fellowship across policy, connectivity "
+            "and safety/security tracks, with a mentor, project funding and travel "
+            "to a global or regional Internet event. Open to applicants from any "
+            "country; the self-paced pre-fellowship training (23 Sep–22 Nov 2026) "
+            "must be completed before the application link is issued."
+        ),
+    },
+    {
+        "kind": "Paid program",
         "title": "GitHub Campus Experts",
         "org": "GitHub",
         "when": "Annual cohort",
@@ -374,6 +401,102 @@ INTERNSHIPS.append(
 PAID_PROGRAMS = [
     program for program in PAID_PROGRAMS if program["title"] not in _INTERNSHIP_TITLES
 ]
+
+
+# ------------------------------------------------------------- curated events
+#
+# Conferences with their own ticketing site never reach the TGK/GDG calendars,
+# so the big African events are curated here. Every date below was read from
+# the official event site — an invented date sends someone to an empty venue.
+# Only upcoming entries are served; add a new edition when dates are published.
+
+CURATED_EVENTS: list[dict] = [
+    {
+        "kind": "Event",
+        "title": "Africa Tech Festival 2026",
+        "org": "Informa Tech",
+        "date": "2026-11-17",
+        "when": "17–19 Nov 2026",
+        "city": "Cape Town",
+        "tags": ["Conference", "Telecom", "Africa"],
+        "source": "Curated",
+        "url": "https://africatechfestival.com/",
+        "stipend": None,
+        "desc": (
+            "Africa's largest telecom and technology gathering (AfricaCom and "
+            "AfricaTech) at the CTICC: operators, investors, startups and "
+            "enterprise buyers."
+        ),
+    },
+    {
+        "kind": "Event",
+        "title": "Africa Tech Summit Nairobi 2027",
+        "org": "Africa Tech Summit",
+        "date": "2027-02-10",
+        "when": "10–11 Feb 2027 · Founders Day 9 Feb",
+        "city": "Nairobi",
+        "tags": ["Conference", "Startups", "Networking", "Africa"],
+        "source": "Curated",
+        "url": "https://www.africatechsummit.com/nairobi/",
+        "stipend": None,
+        "desc": (
+            "The 9th Africa Tech Summit at the Sarit Expo Centre connects African "
+            "and international startups, investors and corporates, with a "
+            "founders-only day before the main conference."
+        ),
+    },
+    {
+        "kind": "Event",
+        "title": "PyCon Namibia 2027",
+        "org": "Python Namibia",
+        "date": "2027-02-26",
+        "when": "26 Feb–4 Mar 2027",
+        "city": "Windhoek",
+        "tags": ["Conference", "Python", "Community"],
+        "source": "Curated",
+        "url": "https://na.pycon.org/2027/",
+        "stipend": None,
+        "desc": (
+            "Namibia's Python conference at NIPAM in Windhoek: tutorials, talks "
+            "and sprints, with a strong beginner and open-source focus."
+        ),
+    },
+    {
+        "kind": "Event",
+        "title": "GITEX Africa 2027",
+        "org": "GITEX Africa",
+        "date": "2027-04-26",
+        "when": "26–28 Apr 2027",
+        "city": "Marrakech",
+        "tags": ["Expo", "Startups", "AI", "Africa"],
+        "source": "Curated",
+        "url": "https://gitexafrica.com/",
+        "stipend": None,
+        "desc": (
+            "The continent's largest tech and startup show, at the Palais des "
+            "Congrès in Marrakech: exhibitors, government delegations and a "
+            "startup pitch programme."
+        ),
+    },
+]
+
+
+def _upcoming_curated_events() -> list[dict]:
+    """Curated events that have not started yet, in the timezone they happen in.
+
+    Static data goes stale silently, so past editions drop out automatically
+    instead of sitting on the page as a dead link.
+    """
+    today = datetime.now(EAT).date()
+    upcoming: list[dict] = []
+    for item in CURATED_EVENTS:
+        try:
+            start = datetime.fromisoformat(str(item["date"])).date()
+        except (KeyError, ValueError):
+            continue
+        if start >= today:
+            upcoming.append({**item, "opens": None, "closes": None, "steps": None})
+    return upcoming
 
 
 # ------------------------------------------------------------------ parsing
@@ -847,7 +970,9 @@ async def get_opportunities() -> dict:
         # wait_for cancels the waiter only; the scheduler still refreshes on
         # its own schedule and the next request reuses a warm cache.
         feed = _feed
-    items = [*feed.items, *PAID_PROGRAMS]
+    # Curated events are static, so they are served even when the live feed is
+    # down — a verified conference date does not depend on TGK being reachable.
+    items = [*feed.items, *_upcoming_curated_events(), *PAID_PROGRAMS]
     items.sort(key=_sort_key)
     return {
         "items": items,

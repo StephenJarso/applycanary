@@ -89,6 +89,22 @@ each one. A high proportion of `tier2_llm` means the local filters are too
 permissive. Also confirm prompt caching is working — the resume prefix is
 identical across a cycle and should be a cache hit after the first call.
 
+## Curated opportunities
+
+`app/opportunities.py` serves two curated lists next to the live TGK/GDG
+calendars: programs and internships (`PAID_PROGRAMS`, `INTERNSHIPS`) and dated
+African conferences (`CURATED_EVENTS`).
+
+**Read every date from the official event or program page** before adding it —
+a wrong date sends someone to an empty venue. If a program has not published
+its next window yet, leave `opens`/`closes` as `None` (the entry sorts last)
+rather than guessing; a countdown to an invented deadline is worse than no
+countdown.
+
+Curated events are filtered by start date on every request, so a past edition
+drops out of the feed without a code change. Add the next edition when its
+dates are announced.
+
 ## When something breaks
 
 **A source returns nothing.** Boards change API shapes without notice. Run
