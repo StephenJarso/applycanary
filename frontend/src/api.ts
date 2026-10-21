@@ -175,6 +175,33 @@ export interface PublicJobList {
   total: number;
   sources: string[];
 }
+export interface EntryLevelRole {
+  slug: string;
+  title: string;
+  employer: string;
+  location: string;
+  category: string;
+  employer_type: string;
+  agency: string;
+  seniority: string;
+  work_mode: string;
+  is_remote: boolean;
+  salary_disclosed: boolean;
+  closing_at: string | null;
+  closing_label: string;
+  summary: string;
+  /** Employer's own advert, extracted by work.ke from the original posting. */
+  apply_url: string;
+  /** The work.ke listing, kept for provenance. */
+  source_url: string;
+}
+
+export interface EntryLevelFeed {
+  roles: EntryLevelRole[];
+  fetched_at: string;
+  source: string;
+  warnings: string[];
+}
 
 export interface Profile {
   full_name: string;
@@ -539,6 +566,8 @@ export const api = {
   publicJobs: (filters: { q?: string; source?: string; remote_only?: boolean; sort?: "newest" | "oldest" } = {}) => request<PublicJobList>(`/public/jobs${qs(filters as JobFilters)}`),
   opportunities: () => request<Opportunities>("/public/opportunities"),
   internships: () => request<Opportunities>("/public/internships"),
+  entryLevel: (refresh = false) =>
+    request<EntryLevelFeed>(`/public/entry-level${refresh ? "?refresh=true" : ""}`),
   job: (id: number) => request<JobDetail>(`/jobs/${id}`),
   review: (params: { limit?: number; offset?: number } = {}) => request<ReviewList>(`/review${qs(params)}`),
   applications: () => request<Job[]>("/applications"),

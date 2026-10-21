@@ -16,6 +16,7 @@ import VerifyEmail from "./pages/VerifyEmail";
 import Landing from "./pages/Landing";
 import Opportunities from "./pages/Opportunities";
 import Internships from "./pages/Internships";
+import EntryLevel from "./pages/EntryLevel";
 import { useAuth } from "./context/AuthContext";
 import { FeedbackModal } from "./FeedbackModal";
 import {
@@ -37,6 +38,9 @@ import { fmtDate } from "./OpportunityCard";
 const NAV = [
   { to: "/jobs", label: "Home", icon: "dashboard", end: true, mobile: true },
   { to: "/review", label: "Discovery", icon: "search", mobile: true },
+  // work.ke's entry-level technology feed: the first-rung roles the broad
+  // boards bury under senior postings.
+  { to: "/entry-level", label: "Entry level", icon: "work", mobile: true },
   { to: "/internships", label: "Internships & Opportunities", short: "Internships", icon: "school", end: true },
   { to: "/opportunities", label: "Programs", icon: "event", end: true },
   { to: "/memory", label: "Memory", icon: "psychology", mobile: true },
@@ -388,6 +392,7 @@ function Dashboard({ page }: { page?: "internships" | "programs" }) {
               <Route path="/jobs" element={<Jobs />} />
               <Route path="/job/:id" element={<JobDetail />} />
               <Route path="/job/:id/interview" element={<InterviewStudio />} />
+              <Route path="/entry-level" element={<EntryLevel />} />
               <Route path="/memory" element={<Memory />} />
               <Route path="/review" element={<Review />} />
               <Route path="/applications" element={<Applications />} />

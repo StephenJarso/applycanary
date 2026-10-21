@@ -2974,6 +2974,41 @@ input[type="range"]::-moz-range-thumb {
   color: var(--text-dim);
 }
 
+/* Entry-level tab: live work.ke cards. The card body is the shared .opp-card;
+ * only the action row and the deadline treatment are specific to this page. */
+.entry-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.entry-summary {
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.entry-deadline-soon {
+  border-color: var(--bad);
+  background: var(--bad-bg);
+  color: var(--bad);
+  font-weight: 600;
+}
+.entry-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: auto;
+}
+.entry-actions .btn { padding: 7px 12px; font-size: 13px; text-decoration: none; }
+.entry-fineprint {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-faint);
+}
+
 
 /* ------------------------------------------------------------ phone polish
  *
