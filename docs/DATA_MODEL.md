@@ -39,6 +39,7 @@ Defined once in `app/models.py` and reused across the pipeline.
 | Value | Meaning |
 |---|---|
 | `api` | Submitted through a sanctioned public endpoint |
+| `email` | Emailed from the user's own mailbox to the posting's application address |
 | `manual` | Review queue; a human clicked submit |
 | `dry_run` | Prepared but deliberately not sent |
 
@@ -60,6 +61,12 @@ the base resume (`base_resume_path`, `base_resume_text`) and search preferences
 `skills` and `github_evidence` are JSON columns holding the parsed skill list and
 the cached GitHub scan. `github_synced_at` records the last scan so it can be
 refreshed on a schedule rather than per request.
+
+Outbound email applications use four more columns: `smtp_host`, `smtp_port`,
+`smtp_user` and `smtp_app_password_encrypted`. The password is encrypted with a
+key derived from `SECRET_KEY` (`app/secrets.py`) and is never serialised by the
+API — `ProfileOut` exposes only `smtp_user` and `email_sending_configured`. The
+GitHub token and the personal LLM key are stored the same way.
 
 ### `job`
 

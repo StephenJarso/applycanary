@@ -30,6 +30,17 @@ happen to carry. Search is tokenized across title/company/description, so
 "go developer" finds "Senior Golang Engineer" and surfaces matches even before
 the scheduler has scored them.
 
+**Filters the wrong roles out — not just down.** A profession filter rejects the
+sales, marketing, legal, finance, HR and program-management titles that share
+vocabulary with a developer resume but are not that job at all. Geography rules
+drop remote roles restricted to a country you cannot work from, and onsite roles
+abroad that offer no visa or relocation support. Because these rules improve,
+**Re-score** in the top bar re-evaluates jobs that were already scored instead of
+leaving yesterday's mistakes at the top of the feed. If the profile has no
+location, target locations or years of experience, the dashboard says which
+filters are inactive rather than silently showing a worldwide, any-seniority
+list.
+
 **Scores against *your* resume.** Two tiers: free local filters (hard
 knockouts, keyword overlap) then an LLM that reasons about fit using the actual
 job description and your actual experience. Grounded, calibrated, and cached.
@@ -56,6 +67,16 @@ it's found (profile email → account email → your digest override), and a
 per-user daily digest summarises applications, the review queue and new
 matches. Per-user filtering means one user's activity never leaks into
 another's mail.
+
+**Applies from your own inbox.** Many employers — especially smaller companies
+and Kenyan firms — ask for a CV by email rather than through a form. Connect a
+mailbox once on the profile page (Gmail address + app password, encrypted at
+rest and never returned by the API) and Discovery's **Approve & send** emails
+the tailored CV and cover letter from your own address, so replies land where
+you already read them. Only postings that actually state an application address
+qualify, nothing sends without an approval click (unless you turn auto-submit
+on), and the truthcheck gate, daily cap and duplicate check still apply. ATS
+postings stay manual by design.
 
 ---
 

@@ -131,17 +131,49 @@ Not implementing it is the safer choice. This is documented rather than hidden
 so it is fixed intentionally, after checking the real API, rather than
 discovered when an application silently arrives empty.
 
+### Email applications
+
+`app/apply/email_smtp.py` covers the postings that ask for a CV by email. It is
+deliberately narrow:
+
+* **The posting must name the address.** A `mailto:` apply URL wins; otherwise
+  an address in the description only counts when apply/send/CV language sits
+  next to it. No-reply, privacy and unsubscribe addresses are ignored. A
+  posting that points at a form never becomes an email application.
+* **It sends from the user's own mailbox.** Credentials are the user's Gmail
+  address plus an app password, stored encrypted and never returned by the API.
+  Replies go straight to the inbox they already monitor.
+* **The gates still apply.** The email path is a `BaseSubmitter`, so
+  `SubmitGate.check` runs first: no send after a failed truthcheck, no duplicate
+  submission, daily cap enforced, score threshold enforced when auto-submit is
+  on. Attachments come from the tailored `resume_version` (PDF first, then
+  DOCX).
+* **Approval is explicit.** From Discovery, **Approve & send** is the consent
+  (it passes `force`), which is why it confirms before sending. Unattended
+  sending only happens when the profile enables auto-submit.
+
 ---
 
 ## 4. Data and credentials
 
-**The dashboard has no authentication.** It exposes the resume, scores, and full
-application history. `app/config.py` emits a startup warning when `HOST` is not
-loopback. Do not expose it to a network without authentication in front of it.
+**The dashboard requires authentication**, and every per-user row is scoped by
+`user_id`: a missing row means "not yet seen", never another user's data.
+Admin-only actions additionally require `is_admin`. Do not run with
+authentication disabled on a public bind — `AUTH_ENABLED=false` serves the
+local-user fallback and exposes a single account's resume, scores and
+application history to anyone who reaches the port.
 
 Secrets live in `.env`, which is gitignored: `ANTHROPIC_API_KEY`,
 `SMTP_PASSWORD`, `GITHUB_TOKEN`. `data/` is gitignored too — it holds the
 database, uploaded resumes, and generated CVs.
+
+Credentials a *user* grants in the UI are stored encrypted with a key derived
+from the deployment's `SECRET_KEY` (`app/secrets.py`): the GitHub token, the
+personal LLM key, and the Gmail app password used for email applications. The
+API returns only a masked value or a configured/not-configured flag, so a
+database-only leak does not expose them without the deployment secret. Rotating
+`SECRET_KEY` invalidates all stored credentials — users reconnect their
+accounts afterwards.
 
 If a token is ever pasted into a chat, a log, a screenshot, or a commit,
 treat it as compromised and revoke it. Rotation is cheap; a leaked token with

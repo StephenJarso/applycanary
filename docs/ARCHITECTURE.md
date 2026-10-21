@@ -188,6 +188,15 @@ tailored CV, cover letter, and pre-filled form answers, then queues the job for
 review. That preserves most of the speed advantage without automating a
 submission the platform has not sanctioned.
 
+`email_smtp.py` covers postings that ask for a CV by email — common with smaller
+employers that never appear in an ATS feed. `application_email()` extracts the
+address only from a `mailto:` apply URL or from description text where apply/CV
+language sits next to it, and the submitter sends from the user's own mailbox
+(SMTP, Gmail app password) with the tailored PDF/DOCX attached. The runner
+prefers a real platform submitter and only falls back to email when no
+platform-specific submitter exists *and* the posting names an address, so a
+Greenhouse posting is never emailed by accident.
+
 Resume file attachment is deliberately unimplemented in the SmartRecruiters
 submitter — the multipart contract could not be verified against the live API,
 and a guessed shape fails in the worst way available: looking like a successful

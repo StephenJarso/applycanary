@@ -52,6 +52,13 @@ Skills most relevant to this codebase:
 5. **Verify with the real tools:** `pytest`, `ruff check app/ tests/ scripts/`,
    and `cd frontend && npm run build`.
 
+## Commit messages
+
+Write conventional-commit subjects (`fix(email): ...`, `feat(admin): ...`) with
+a short body explaining *why*. **No AI attribution:** do not add
+`Generated with Codebuff`, `Co-Authored-By` or any similar trailer to commits in
+this repository.
+
 ## Tool access to the cluster
 
 - **MCP server** (read-only, audited): `mcp/cockroachdb-mcp.json`.

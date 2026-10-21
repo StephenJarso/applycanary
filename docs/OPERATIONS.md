@@ -60,6 +60,24 @@ all. If genuinely good matches are being rejected before tier 2, the keyword
 vocabulary is the cause. If everything scores highly, the rubric is not
 discriminating — raise `AUTO_SUBMIT_MIN_SCORE` rather than trusting the spread.
 
+**Too many "wrong profession" rejections?** The profession filter
+(`non_engineering_role_reason` in `app/pipeline/relevance.py`) uses a curated
+word list, not a model. A genuine software title that trips it needs a word
+added to `TECH_COMPOUND_TITLES` or removed from
+`NON_ENGINEERING_TITLE_WORDS`, plus a test in `tests/test_relevance.py`. Do not
+disable the filter to surface one posting.
+
+**Geography filters look inert.** They need facts to compare against:
+`profile.location` for remote-role eligibility, and `target_locations` for
+onsite roles. With either empty, the corresponding rule is skipped and the Jobs
+page shows a "Sharpen this feed" banner listing what is missing.
+
+**Filter changes are not showing up.** Scoring is persisted, so improving a
+rule only affects new postings. Click **Re-score** in the top bar (or call
+`POST /api/actions/rescore?limit=50`) — it re-evaluates existing scores,
+highest first, 50 per call. A rule change without a re-score looks like it did
+nothing.
+
 **Duplicates getting through.** Check `job_alias` to see which layer matched. If
 near-identical titles slip past layer 3, the fuzzy threshold is too strict. If
 distinct requisitions are being merged, it is too loose — that direction is worse,
@@ -95,20 +113,43 @@ version. Common cause: the base resume is thin, so tailoring has little
 verifiable material to work from. Adding a GitHub token widens the evidence base.
 Do not work around this by loosening the checker.
 
+## Email applications
+
+Postings that ask for a CV by email are handled by `app/apply/email_smtp.py`.
+Setup, per user:
+
+1. Turn on 2-Step Verification on the Google account.
+2. Create an App Password (Google Account → Security → App passwords).
+3. Profile → **Send applications from my inbox** → address + app password →
+   **Save mailbox**. The password is encrypted with `SECRET_KEY` and never
+   returned; the card shows "Connected as …" when it is stored.
+4. In Discovery, **Approve & send** sends one application from that mailbox.
+   The confirmation names the posting; the recipient address is whatever the
+   posting states.
+
+If a send fails, the application row carries the SMTP error. Gmail rejects the
+app password (not the account password) after a password change or when 2FA is
+off — reconnect the mailbox. No email is sent for postings that only provide a
+form; those stay in the review queue as before.
+
 ## Schema changes
 
-There are no migrations. `init_db()` calls `create_all`, which creates missing
-tables but never alters existing ones. Adding a column to a populated database
-means either writing the `ALTER TABLE` by hand or recreating the database:
+There are no migrations in the Alembic sense, but `init_db()` now calls
+`sync_schema()`, which is **additive only**: it issues
+`ALTER TABLE … ADD COLUMN` for columns present on the models but missing from a
+live table, including on CockroachDB. New nullable/defaulted fields — such as
+`smtp_user` or `smtp_app_password_encrypted` on `profile` — therefore appear on
+restart without touching existing rows.
+
+Renames, type changes and drops are deliberately not handled; guessing at those
+risks destroying user data. For those, back up and migrate by hand:
 
 ```bash
 cp data/applycanary.db data/applycanary.db.backup
-rm data/applycanary.db
-python run.py
 ```
 
-That loses history. Back up first. If the schema starts changing often, add
-Alembic rather than repeating this.
+If schema changes become routine, add Alembic rather than extending
+`sync_schema()`.
 
 ## Backups
 
