@@ -25,6 +25,7 @@ from app.sources import (  # noqa: F401,E402
     remotive,
     smartrecruiters,
     websearch,
+    workke,
 )
 from app.sources.base import (  # noqa: F401
     BaseSource,

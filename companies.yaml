@@ -214,6 +214,12 @@ aggregators:
     enabled: true
     search_terms: []
 
+  # work.ke's curated entry-level technology collection. Small by design and
+  # linked to each employer's own advert, so it complements the broad boards
+  # with roles a first-time IT applicant can actually enter.
+  - source: workke
+    enabled: true
+
   # --- Off-platform coverage via web search -----------------------------------
   # DuckDuckGo lite searches the public web for postings a board connector
   # cannot reach (e.g. jobs only on a company's own careers site). No API key

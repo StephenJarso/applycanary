@@ -157,6 +157,40 @@ class OpportunitiesOut(BaseModel):
     events_updated_at: datetime | None = None
 
 
+class EntryLevelRoleOut(BaseModel):
+    """One role from work.ke's entry-level technology collection.
+
+    ``apply_url`` is the employer's own advert, taken from the work.ke detail
+    page; ``source_url`` is the work.ke listing for provenance. A role with no
+    published deadline keeps its ``closing_label`` and a null ``closing_at`` —
+    that means the employer published no date, not that it is open forever.
+    """
+
+    slug: str
+    title: str
+    employer: str
+    location: str
+    category: str = ""
+    employer_type: str = ""
+    agency: str = ""
+    seniority: str = ""
+    work_mode: str = ""
+    is_remote: bool = False
+    salary_disclosed: bool = False
+    closing_at: datetime | None = None
+    closing_label: str = ""
+    summary: str = ""
+    apply_url: str
+    source_url: str
+
+
+class EntryLevelFeedOut(BaseModel):
+    roles: list[EntryLevelRoleOut]
+    fetched_at: datetime
+    source: str
+    warnings: list[str] = Field(default_factory=list)
+
+
 class ProfileOut(BaseModel):
     full_name: str = ""
     email: str = ""
@@ -505,6 +539,28 @@ def public_internships() -> OpportunitiesOut:
     from app.opportunities import get_internships
 
     return OpportunitiesOut(**get_internships())
+
+
+@router.get("/public/entry-level", response_model=EntryLevelFeedOut)
+async def public_entry_level(refresh: bool = False) -> EntryLevelFeedOut:
+    """Entry-level IT and tech roles curated by work.ke.
+
+    Public like ``/public/jobs``: the roles carry no user data, and the page is
+    useful before someone signs in. work.ke is fetched behind a 30-minute cache;
+    ``refresh=true`` bypasses it. If the site is unreachable and no cached copy
+    exists, say so plainly instead of showing an empty feed as "no roles".
+    """
+    from app.entry_level import get_entry_level
+
+    try:
+        feed = await get_entry_level(force=refresh)
+    except Exception as exc:  # noqa: BLE001 - map any upstream failure to 503
+        log.warning("entry-level feed failed: %s", exc)
+        raise HTTPException(
+            status_code=503,
+            detail="work.ke could not be reached; try again in a few minutes.",
+        ) from exc
+    return EntryLevelFeedOut(**feed)
 
 
 @router.get("/jobs", response_model=JobListOut)
