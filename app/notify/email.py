@@ -408,6 +408,48 @@ async def _send_brevo(
     return str(data.get("messageId") or "?")
 
 
+async def brevo_delivery_events(
+    email: str, *, days: int = 30, limit: int = 20,
+) -> list[dict[str, str]]:
+    """Brevo's delivery events for one recipient, newest first.
+
+    `send()` only proves the provider *accepted* the message. Whether it was
+    delivered, deferred or blocked is decided afterwards by the receiving
+    server, and that verdict is what explains a user reporting "no email"
+    even though the logs say the send succeeded. Raises when Brevo is not
+    configured or the API errors, so callers can surface the reason.
+    """
+    settings = get_settings()
+    if not settings.brevo_api_key:
+        raise RuntimeError("BREVO_API_KEY is not configured; delivery events need Brevo")
+
+    import httpx
+
+    async with httpx.AsyncClient(timeout=15) as client:
+        response = await client.get(
+            "https://api.brevo.com/v3/smtp/statistics/events",
+            headers={"api-key": settings.brevo_api_key, "accept": "application/json"},
+            params={"email": email, "days": days, "limit": limit, "sort": "desc"},
+        )
+        response.raise_for_status()
+        data = response.json()
+
+    # Keep the shape small and stable: the admin UI only needs what happened,
+    # when, and why. `requests` is Brevo's "accepted" event; anything else is
+    # the receiver's verdict.
+    return [
+        {
+            "date": str(item.get("date") or ""),
+            "event": str(item.get("event") or ""),
+            "reason": str(item.get("reason") or ""),
+            "subject": str(item.get("subject") or ""),
+            "message_id": str(item.get("messageId") or ""),
+        }
+        for item in (data.get("events") or [])
+        if isinstance(item, dict)
+    ]
+
+
 async def send(subject: str, html: str, text: str, *, to: str = "") -> bool:
     """Send one message. Brevo → Resend → SMTP; log-only when unconfigured."""
     settings = get_settings()

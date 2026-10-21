@@ -608,6 +608,8 @@ export const api = {
       method: "DELETE",
     }),
   systemStatus: () => request<SystemStatus>("/admin/system-status"),
+  emailEvents: (email: string) =>
+    request<EmailDeliveryReport>(`/admin/email-events?email=${encodeURIComponent(email)}`),
   setUserRole: (userId: number, payload: { is_admin?: boolean; is_active?: boolean }) =>
     request<{ ok: boolean }>(`/admin/users/${userId}/role`, {
       method: "PATCH",
@@ -751,7 +753,36 @@ export interface SystemStatus {
   email: {
     configured: boolean;
     backend: string;
+    /** Sender address from EMAIL_FROM; a free mailbox (gmail.com, …) is a
+     *  common reason receivers spam-folder verification mail. */
+    from: string;
+    /** Absolute origin for verify/reset links; empty means sends are skipped. */
+    link_base: string;
+    verification_required: boolean;
   };
+}
+
+export interface EmailDeliveryEvent {
+  date: string;
+  /** Brevo event: requests, delivered, deferred, blocked, hardBounces, spam… */
+  event: string;
+  /** Bounce reason, when Brevo reports one. */
+  reason: string;
+  subject: string;
+  message_id: string;
+}
+
+export interface EmailDeliveryReport {
+  ok: boolean;
+  email: string;
+  events: EmailDeliveryEvent[];
+  config: {
+    backend: string;
+    from: string;
+    link_base: string;
+    verification_required: boolean;
+  };
+  error: string;
 }
 
 export interface TestLlmResult {

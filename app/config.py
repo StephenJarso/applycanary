@@ -347,6 +347,14 @@ class Settings(BaseSettings):
                 "No email backend configured (set BREVO_API_KEY, RESEND_API_KEY "
                 "or SMTP_HOST): digests will be logged, not sent."
             )
+        if self.require_email_verification and not self.email_link_base:
+            # _link() refuses to mail a relative URL, so every verification
+            # send is skipped and each new signup is stranded at the gate.
+            warnings.append(
+                "REQUIRE_EMAIL_VERIFICATION is on but no absolute origin is "
+                "configured (set PUBLIC_BASE_URL): verification emails are "
+                "skipped, so new signups cannot confirm their address."
+            )
         if not self.github_username:
             warnings.append(
                 "GITHUB_USERNAME is unset: no server-side GitHub fallback is "

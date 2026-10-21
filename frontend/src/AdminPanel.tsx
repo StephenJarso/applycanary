@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { api, type AdminUserItem, type FeedbackItem } from "./api";
+import { api, type AdminUserItem, type EmailDeliveryReport, type FeedbackItem } from "./api";
 import { ErrorBox, Loading } from "./components";
 import { useAuth } from "./context/AuthContext";
 
@@ -21,6 +21,9 @@ export function AdminPanel() {
   const [feedbackStatus, setFeedbackStatus] = useState<string>("all");
   const [testedProviders, setTestedProviders] = useState<Record<string, { ok: boolean; msg: string }>>({});
   const [editingNotes, setEditingNotes] = useState<Record<number, string>>({});
+  const [probeEmail, setProbeEmail] = useState("");
+  const [deliveryReport, setDeliveryReport] = useState<EmailDeliveryReport | null>(null);
+  const [deliveryError, setDeliveryError] = useState("");
 
   // LLM keys form state
   const [showKeyForm, setShowKeyForm] = useState(false);
@@ -117,6 +120,17 @@ export function AdminPanel() {
     mutationFn: (userId: number) => api.deleteUser(userId),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["admin", "system-status"] });
+    },
+  });
+
+  // Asks Brevo what actually happened to one recipient's mail. "Sent" in the
+  // logs only means the provider accepted it; this shows delivered/blocked.
+  const checkEmailDelivery = useMutation({
+    mutationFn: (address: string) => api.emailEvents(address),
+    onSuccess: (res) => setDeliveryReport(res),
+    onError: (err) => {
+      setDeliveryReport(null);
+      setDeliveryError(err instanceof Error ? err.message : String(err));
     },
   });
 
@@ -246,6 +260,86 @@ export function AdminPanel() {
                 Backend: <code>{data.email.backend}</code>
               </div>
             </div>
+          </div>
+
+          {/* Email delivery diagnostics */}
+          <div className="card" style={{ background: "var(--bg-raised, #f8fafc)", padding: 12, margin: 0 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+              <span style={{ fontWeight: 600, fontSize: 13 }}>Email Delivery Check</span>
+              <span className={`chip ${data.email.configured ? "chip-hit" : "chip-miss"}`}>
+                {data.email.backend}
+              </span>
+            </div>
+            <div className="cell-dim" style={{ fontSize: 12, marginTop: 6 }}>
+              Sender: <code>{data.email.from || "unset"}</code> · Links: <code>{data.email.link_base || "unset"}</code>
+              {" · "}Verification gate: {data.email.verification_required ? "on" : "off"}
+            </div>
+            {!data.email.link_base && (
+              <div style={{ fontSize: 12, marginTop: 6, color: "var(--bad)" }}>
+                PUBLIC_BASE_URL is not absolute, so verification links cannot be built and no mail is sent.
+              </div>
+            )}
+            <form
+              style={{ display: "flex", gap: 6, marginTop: 10, flexWrap: "wrap" }}
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (!probeEmail.trim()) return;
+                setDeliveryError("");
+                checkEmailDelivery.mutate(probeEmail.trim());
+              }}
+            >
+              <input
+                type="email"
+                placeholder="user@example.com"
+                value={probeEmail}
+                onChange={(e) => setProbeEmail(e.target.value)}
+                style={{ flex: "1 1 240px", fontSize: 12, padding: "5px 8px" }}
+              />
+              <button
+                type="submit"
+                className="btn-ghost"
+                style={{ fontSize: 12, padding: "3px 10px" }}
+                disabled={checkEmailDelivery.isPending}
+              >
+                {checkEmailDelivery.isPending ? "Checking…" : "Check delivery"}
+              </button>
+            </form>
+            {deliveryError && (
+              <div style={{ fontSize: 12, marginTop: 6, color: "var(--bad)" }}>{deliveryError}</div>
+            )}
+            {deliveryReport && (
+              <div style={{ marginTop: 8 }}>
+                {deliveryReport.ok && deliveryReport.events.length === 0 && (
+                  <div className="cell-dim" style={{ fontSize: 12 }}>
+                    Brevo has no events for {deliveryReport.email} in the last 30 days — it never accepted a message for that address.
+                  </div>
+                )}
+                {!deliveryReport.ok && (
+                  <div style={{ fontSize: 12, color: "var(--bad)" }}>{deliveryReport.error}</div>
+                )}
+                {deliveryReport.events.map((ev, i) => (
+                  <div
+                    key={`${ev.message_id}-${ev.event}-${i}`}
+                    style={{ fontSize: 12, display: "flex", gap: 6, alignItems: "baseline", marginTop: 3, flexWrap: "wrap" }}
+                  >
+                    <span
+                      className={`chip ${
+                        ev.event === "delivered"
+                          ? "chip-hit"
+                          : ["blocked", "spam", "invalid", "hardBounces", "error"].includes(ev.event)
+                            ? "chip-miss"
+                            : ""
+                      }`}
+                      style={{ padding: "1px 6px" }}
+                    >
+                      {ev.event}
+                    </span>
+                    <span className="cell-dim">{ev.date ? relTime(ev.date) : ""}</span>
+                    {ev.reason ? <span className="cell-dim">· {ev.reason}</span> : null}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* LLM Providers telemetry & probe */}

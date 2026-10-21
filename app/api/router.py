@@ -1522,8 +1522,53 @@ def admin_system_status(
                 else "smtp" if settings.smtp_host
                 else "none"
             ),
+            # Delivery problems are almost always visible in these three: an
+            # unverified sender, a sandbox sender that only reaches the account
+            # owner, or no absolute origin (which skips the send entirely).
+            "from": settings.email_from,
+            "link_base": settings.email_link_base,
+            "verification_required": settings.require_email_verification,
         },
     }
+
+
+@router.get("/admin/email-events")
+async def admin_email_events(
+    email: str = Query(..., min_length=3, max_length=320),
+    admin: User = Depends(require_admin),
+) -> dict:
+    """Delivery verdict from Brevo for one recipient's messages.
+
+    The send call only proves the provider accepted the message; the receiving
+    server decides afterwards whether it is delivered, deferred or blocked. A
+    user reporting "I never got the verification email" is usually answered
+    here — blocked sender authentication, a sandbox sender, or a hard bounce —
+    rather than by guessing.
+    """
+    from app.notify import email as mail
+
+    recipient = email.strip().lower()
+    settings = get_settings()
+    config = {
+        "backend": (
+            "brevo" if settings.brevo_api_key
+            else "resend" if settings.resend_api_key
+            else "smtp" if settings.smtp_host
+            else "none"
+        ),
+        "from": settings.email_from,
+        "link_base": settings.email_link_base,
+        "verification_required": settings.require_email_verification,
+    }
+    try:
+        events = await mail.brevo_delivery_events(recipient)
+    except Exception as exc:  # noqa: BLE001 — the reason *is* the payload here
+        log.warning("email delivery events unavailable for %s: %s", recipient, exc)
+        return {
+            "ok": False, "email": recipient, "events": [],
+            "config": config, "error": str(exc),
+        }
+    return {"ok": True, "email": recipient, "events": events, "config": config, "error": ""}
 
 
 @router.post("/admin/test-llm")

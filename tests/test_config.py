@@ -94,6 +94,27 @@ def test_no_email_warning_when_brevo_configured() -> None:
     assert not any("No email backend" in w for w in s.startup_warnings())
 
 
+def test_verification_without_absolute_origin_warns_about_skipped_mail() -> None:
+    # _link() skips the send rather than mail a relative URL, so the gate would
+    # strand every signup without anyone noticing.
+    s = Settings(
+        brevo_api_key="xkeysib-test",
+        require_email_verification=True,
+        public_base_url="",
+        frontend_base_url="/",
+    )
+    assert any("verification emails are skipped" in w for w in s.startup_warnings())
+
+
+def test_no_link_warning_when_absolute_origin_is_set() -> None:
+    s = Settings(
+        brevo_api_key="xkeysib-test",
+        require_email_verification=True,
+        public_base_url="https://apply.example.com",
+    )
+    assert not any("verification emails are skipped" in w for w in s.startup_warnings())
+
+
 # ---------------------------------------------------------------------------
 # Bind-address and GitHub warnings: noise control for managed platforms.
 # ---------------------------------------------------------------------------
