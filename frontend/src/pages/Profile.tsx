@@ -32,6 +32,8 @@ export default function ProfilePage() {
   const [smtpUser, setSmtpUser] = useState("");
   const [smtpPassword, setSmtpPassword] = useState("");
   const [smtpMessage, setSmtpMessage] = useState("");
+  const [saveMessage, setSaveMessage] = useState("");
+  const [missingFilters, setMissingFilters] = useState<string[]>([]);
   const [notifPermission, setNotifPermission] = useState(getNotificationPermission());
   const [hasPushSub, setHasPushSub] = useState(false);
   const [pushBusy, setPushBusy] = useState(false);
@@ -59,6 +61,17 @@ export default function ProfilePage() {
     void qc.invalidateQueries({ queryKey: ["status"] });
   };
 
+  // Saved preferences only affect postings scored after the save, so re-score
+  // the top of the existing feed automatically. Bounded to 20: a full sweep is
+  // a separate, repeatable click and would make saving feel broken.
+  const rescoreAfterSave = useMutation({
+    mutationFn: () => api.rescore(20),
+    onSuccess: (res) => {
+      setSaveMessage(res.message);
+      void qc.invalidateQueries();
+    },
+  });
+
   const save = useMutation({
     mutationFn: () => api.saveProfile(form),
     onSuccess: () => {
@@ -68,7 +81,15 @@ export default function ProfilePage() {
         delete (next as { llm_api_key?: string }).llm_api_key;
         return next;
       });
+      const missing = [
+        !form.location?.trim() && "location",
+        !(form.target_locations ?? []).length && "target locations",
+        form.years_experience == null && "years of experience",
+      ].filter(Boolean) as string[];
+      setMissingFilters(missing);
+      setSaveMessage("Profile saved. Re-scoring your existing matches…");
       invalidate();
+      rescoreAfterSave.mutate();
     },
   });
   const saveEmailSending = useMutation({
@@ -523,7 +544,27 @@ export default function ProfilePage() {
           {save.isPending && <span className="spinner" />} Save profile
         </button>
         {save.isError && <ErrorBox error={save.error} />}
-        {save.isSuccess && <div className="banner banner-ok" role="status">Profile saved.</div>}
+        {save.isSuccess && (
+          <div
+            className={`banner ${missingFilters.length ? "banner-warn" : "banner-ok"}`}
+            role="status"
+          >
+            {saveMessage || "Profile saved."}
+            {missingFilters.length > 0 && (
+              <>
+                {" "}Still missing {missingFilters.join(", ")} — those filters stay off until set.
+              </>
+            )}
+          </div>
+        )}
+        {rescoreAfterSave.isError && (
+          <div className="banner banner-warn" role="status">
+            Profile saved, but re-scoring failed:{" "}
+            {rescoreAfterSave.error instanceof Error
+              ? rescoreAfterSave.error.message
+              : String(rescoreAfterSave.error)}
+          </div>
+        )}
       </form>
 
       <div className="card" style={{ marginTop: 16 }}>
