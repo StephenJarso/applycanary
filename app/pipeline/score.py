@@ -23,7 +23,12 @@ from app.models import Job, JobScore, JobStatus, Profile, UserJob, utcnow
 from app.pipeline.ats_rules import evaluate as evaluate_ats
 from app.pipeline.freshness import fresh_clause, is_fresh
 from app.pipeline.keywords import keyword_overlap
-from app.pipeline.relevance import relevance_disqualifier, title_mismatch_penalty
+from app.pipeline.relevance import (
+    location_eligibility_reason,
+    non_engineering_role_reason,
+    relevance_disqualifier,
+    title_mismatch_penalty,
+)
 
 log = logging.getLogger(__name__)
 
@@ -71,15 +76,20 @@ def hard_disqualifier(job: Job, profile: Profile) -> str:
                 f"your floor ({profile.min_salary:,})"
             )
 
-    if profile.target_locations and not job.is_remote:
-        wanted = [loc.strip().lower() for loc in profile.target_locations if loc.strip()]
-        if wanted and job.location:
-            haystack = job.location.lower()
-            if not any(loc in haystack for loc in wanted):
-                return f"location {job.location!r} is outside your target locations"
+    reason = location_eligibility_reason(job, profile)
+    if reason:
+        return reason
 
     if not (job.description or "").strip():
         return "posting has no description to evaluate"
+
+    # A title from another profession is not the job the seeker is after, no
+    # matter how much of the JD's vocabulary their resume shares. This is the
+    # filter that keeps marketing/sales/finance roles out of a backend feed.
+    targets = [t for t in (profile.target_titles or []) if t.strip()]
+    reason = non_engineering_role_reason(job.title, targets)
+    if reason:
+        return reason
 
     reason = relevance_disqualifier(job, profile)
     if reason:
@@ -305,6 +315,46 @@ async def score_pending(session: Session, *, user_id: int, limit: int = 25) -> i
         session.commit()
 
     return scored
+
+
+async def rescore_scored(session: Session, *, user_id: int, limit: int = 50) -> int:
+    """Re-run scoring for jobs this user already has a score for.
+
+    Filters and prompts change; stored decisions do not. Without this, a fixed
+    relevance rule only affects postings discovered afterwards and the dashboard
+    keeps showing yesterday's mistakes at the top. Highest scores first, because
+    those are the rows the user actually sees.
+    """
+    profile = session.exec(
+        select(Profile).where(Profile.user_id == user_id)
+    ).first()
+    if profile is None:
+        log.info("user %s has no profile; skipping rescore", user_id)
+        return 0
+
+    jobs = session.exec(
+        select(Job)
+        .join(
+            JobScore,
+            (JobScore.job_id == Job.id) & (JobScore.user_id == user_id),
+        )
+        .order_by(JobScore.total.desc())
+        .limit(limit)
+    ).all()
+
+    rescored = 0
+    for job in jobs:
+        try:
+            decision = await score_job(session, job, profile, user_id=user_id)
+        except Exception:  # noqa: BLE001 — one bad posting must not abort the sweep
+            log.exception("rescoring job %s failed", job.id)
+            session.rollback()
+            continue
+        _persist_decision(session, job, decision, user_id=user_id)
+        session.commit()
+        rescored += 1
+
+    return rescored
 
 
 def _persist_decision(

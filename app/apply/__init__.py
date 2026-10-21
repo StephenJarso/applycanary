@@ -5,7 +5,7 @@ Importing this package registers every submitter.
 
 from __future__ import annotations
 
-from app.apply import manual, smartrecruiters  # noqa: F401,E402
+from app.apply import email_smtp, manual, smartrecruiters  # noqa: F401,E402
 from app.apply.base import (  # noqa: F401
     BaseSubmitter,
     GateResult,

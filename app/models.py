@@ -37,6 +37,7 @@ class JobStatus(StrEnum):
 
 class ApplyMethod(StrEnum):
     API = "api"                # sanctioned public endpoint
+    EMAIL = "email"            # sent from the user's own mailbox
     MANUAL = "manual"          # review queue, human clicks submit
     DRY_RUN = "dry_run"        # built but deliberately not sent
 
@@ -179,6 +180,14 @@ class Profile(SQLModel, table=True):
     # Stored encrypted at rest (future), sent to the client only masked.
     llm_provider: str = ""       # xai | gemini | openrouter | groq | anthropic
     llm_api_key: str = ""
+
+    # Outbound applications from the user's own mailbox. Gmail over SMTP with an
+    # app password is the default because it needs no OAuth app review. The
+    # password is encrypted with the deployment secret and never returned.
+    smtp_host: str = "smtp.gmail.com"
+    smtp_port: int = 587
+    smtp_user: str = ""
+    smtp_app_password_encrypted: str = ""
 
     # Job subscription preferences: what work arrangement the user wants.
     preferred_work_type: str = "any"  # any | remote | hybrid | onsite

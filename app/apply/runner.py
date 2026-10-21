@@ -15,7 +15,8 @@ import logging
 from sqlmodel import Session, select
 
 from app.apply.base import BaseSubmitter, SubmitGate, SubmitResult, get_submitter
-from app.apply.manual import build_form_answers
+from app.apply.email_smtp import EmailSubmitter, application_email
+from app.apply.manual import ManualSubmitter, build_form_answers
 from app.deps import user_job
 from app.llm.client import get_llm
 from app.llm.prompts import COVER_LETTER_SYSTEM, build_cover_letter_user
@@ -135,6 +136,12 @@ async def submit(
         )
 
     submitter: BaseSubmitter = get_submitter(job.ats_platform)
+    # Plenty of postings accept applications by email rather than through an
+    # ATS. When no platform-specific submitter exists and the posting states an
+    # address, send from the user's own mailbox instead of parking the job in
+    # the manual queue.
+    if isinstance(submitter, ManualSubmitter) and application_email(job):
+        submitter = EmailSubmitter()
     dry_run = gate.dry_run or not submitter.can_auto_submit
 
     app.attempts += 1

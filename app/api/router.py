@@ -178,6 +178,18 @@ class ProfileOut(BaseModel):
     llm_api_key_masked: str = ""  # masked, never the raw key
     # Job subscription preferences
     preferred_work_type: str = "any"
+    # Email applications: whether a mailbox is connected. The password is never
+    # returned — only this flag and the address it belongs to.
+    email_sending_configured: bool = False
+    smtp_user: str = ""
+
+
+class EmailSendingIn(BaseModel):
+    smtp_user: str = ""
+    smtp_app_password: str = ""
+    smtp_host: str = "smtp.gmail.com"
+    smtp_port: int = 587
+    disconnect: bool = False
 
 
 class ProfileIn(BaseModel):
@@ -843,6 +855,10 @@ def get_profile(
         llm_provider="" if user.is_admin else profile.llm_provider,
         llm_api_key_masked=masked,
         preferred_work_type=profile.preferred_work_type,
+        email_sending_configured=bool(
+            profile.smtp_user and profile.smtp_app_password_encrypted
+        ),
+        smtp_user=profile.smtp_user,
     )
 
 
@@ -899,6 +915,53 @@ def save_profile(
     session.add(profile)
     session.commit()
     return get_profile(session, user)
+
+
+@router.put("/profile/email-sending", response_model=ActionResult)
+def save_email_sending(
+    payload: EmailSendingIn,
+    session: Session = Depends(get_session),
+    user: User = Depends(current_user),
+) -> ActionResult:
+    """Connect the mailbox that applications are emailed from.
+
+    Gmail needs an app password (2-Step Verification on). The password is
+    encrypted with the deployment secret and never returned; the API only
+    reports whether a mailbox is connected. Sending still happens from the
+    review queue, one approved application at a time.
+    """
+    from app.secrets import encrypt_secret
+
+    profile = session.exec(
+        select(Profile).where(Profile.user_id == user.id)
+    ).first() or Profile(user_id=user.id)
+
+    if payload.disconnect:
+        profile.smtp_user = ""
+        profile.smtp_app_password_encrypted = ""
+    else:
+        address = payload.smtp_user.strip()
+        if "@" not in address:
+            raise HTTPException(400, "Enter the email address applications are sent from")
+        profile.smtp_user = address
+        profile.smtp_host = (payload.smtp_host or "smtp.gmail.com").strip()
+        profile.smtp_port = payload.smtp_port or 587
+        # An empty password means "keep the stored one": the UI never receives
+        # the secret, so it cannot echo it back on an unrelated save.
+        if payload.smtp_app_password.strip():
+            profile.smtp_app_password_encrypted = encrypt_secret(
+                payload.smtp_app_password.strip()
+            )
+
+    profile.updated_at = utcnow()
+    session.add(profile)
+    session.commit()
+    configured = bool(profile.smtp_user and profile.smtp_app_password_encrypted)
+    return ActionResult(
+        ok=True,
+        message="Email sending connected." if configured else "Email sending disconnected.",
+        detail={"configured": configured, "smtp_user": profile.smtp_user},
+    )
 
 
 @router.post("/profile/resume", response_model=ActionResult)
@@ -1177,6 +1240,28 @@ async def trigger_score(
 
     count = await score_pending(session, user_id=user.id, limit=50)
     return ActionResult(ok=True, message=f"Scored {count} jobs.", detail={"scored": count})
+
+
+@router.post("/actions/rescore", response_model=ActionResult)
+async def trigger_rescore(
+    limit: int = Query(50, ge=1, le=200),
+    session: Session = Depends(get_session),
+    user: User = Depends(current_user),
+) -> ActionResult:
+    """Re-evaluate this user's already-scored jobs.
+
+    Filters and prompts improve; persisted decisions do not update themselves,
+    so without this a relevance fix only helps postings found later while the
+    dashboard keeps ranking the old mistakes at the top.
+    """
+    from app.pipeline.score import rescore_scored
+
+    count = await rescore_scored(session, user_id=user.id, limit=limit)
+    return ActionResult(
+        ok=True,
+        message=f"Re-scored {count} jobs against the current filters.",
+        detail={"rescored": count},
+    )
 
 
 @router.post("/actions/discover", response_model=ActionResult)

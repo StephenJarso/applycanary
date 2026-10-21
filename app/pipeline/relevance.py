@@ -14,6 +14,7 @@ human-readable reason so the user can audit it.
 from __future__ import annotations
 
 import logging
+import re
 
 from rapidfuzz import fuzz
 
@@ -46,6 +47,62 @@ SCOPE_WORDS = {
     "manager", "lead", "head", "director", "vp", "principal", "staff",
     "intern", "internship", "graduate", "junior", "senior", "sr", "jr",
     "architect", "consultant", "chief",
+}
+
+# Titles that describe another profession. Tier-1 keyword overlap cannot tell
+# "Global Controller" from "Backend Engineer" — both can share vocabulary with a
+# resume, and when a JD lists no recognisable skills the fallback term overlap
+# scored unrelated roles at 100. These markers only disqualify titles that are
+# clearly not software work; anything with an engineering signal stays
+# scoreable, so an oddly titled Go role is still surfaced.
+NON_ENGINEERING_TITLE_WORDS = {
+    "sales", "marketing", "account", "executive", "recruiter", "recruiting",
+    "talent", "controller", "finance", "financial", "accountant", "legal",
+    "counsel", "support", "success", "program", "project", "coordinator",
+    "specialist", "analyst", "consultant", "writer", "editor", "social",
+    "media", "content", "brand", "growth", "partnerships", "customer",
+    "operations", "admin", "administrator", "entry", "clerk", "assistant",
+    "relations",
+}
+# "Engineer" alone is not enough (Sales Engineer, Customer Engineer), but these
+# compounds are genuine software titles and must not trip the marker above.
+TECH_COMPOUND_TITLES = (
+    "product engineer", "product security", "platform engineer",
+    "solutions engineer", "solution engineer", "salesforce developer",
+    "technical staff", "member of technical staff",
+)
+ENGINEERING_TITLE_WORDS = {
+    "engineer", "engineering", "developer", "programmer", "sde", "swe",
+    "architect", "devops", "sre", "software", "backend", "frontend",
+    "fullstack", "full", "stack", "platform", "infrastructure", "systems",
+    "cloud", "data", "database", "security", "qa", "test", "automation",
+    "mobile", "android", "ios", "embedded", "firmware", "machine",
+    "learning", "ml", "ai", "api", "microservices", "blockchain", "game",
+    "graphics", "distributed",
+}
+
+# Remote roles are only useful abroad when the employer will hire where the
+# seeker lives. These appear in the posting's location or description.
+GLOBAL_REMOTE_SIGNALS = (
+    "worldwide", "work from anywhere", "anywhere in the world", "global remote",
+    "globally remote", "location independent", "remote-first", "fully remote",
+    "emea", "africa", "international candidates",
+)
+FOREIGN_REGION_PATTERN = re.compile(
+    r"\b(?:united states|usa|u\.s\.?|us|canada|india|europe|united kingdom|uk|"
+    r"germany|poland|brazil|australia|singapore|japan|china|mexico|ireland|"
+    r"israel|philippines|pakistan|nigeria)\b"
+)
+# An onsite role abroad is acceptable when the employer will move or sponsor the
+# candidate — the relocation case the seeker explicitly asks for.
+VISA_OR_RELOCATION_SIGNALS = (
+    "visa sponsorship", "visa support", "sponsorship available", "we sponsor",
+    "relocation package", "relocation assistance", "relocation support",
+    "relocation to", "work permit", "right to work", "relocate",
+)
+_NON_LOCATION_WORDS = {
+    "remote", "hybrid", "onsite", "site", "any", "anywhere", "worldwide",
+    "the", "and", "for",
 }
 
 
@@ -118,6 +175,89 @@ def seniority_matches(title: str, years_experience: int | None) -> bool:
     if years_experience is None:
         return True
     return title_rank(title) <= max_rank_for_experience(years_experience)
+
+
+def non_engineering_role_reason(title: str, targets: list[str]) -> str:
+    """Reason to reject a title from a clearly different profession, else "".
+
+    Only fatal when the seeker has target titles configured and the title is
+    neither a target match nor a software title; a target list written as
+    keywords ("golang", "backend") keeps its meaning because those titles still
+    carry an engineering signal.
+    """
+    if not targets:
+        return ""
+    if title_matches_target(title, targets):
+        return ""
+    low = norm_title(title)
+    if any(compound in low for compound in TECH_COMPOUND_TITLES):
+        return ""
+    tokens = _tokens(title)
+    if tokens & NON_ENGINEERING_TITLE_WORDS:
+        return f"role {title!r} is not a software engineering position"
+    if not (tokens & ENGINEERING_TITLE_WORDS):
+        return f"role {title!r} has no software engineering signal"
+    return ""
+
+
+def _home_words(profile: Profile) -> set[str]:
+    """Country/city words the seeker can work from without relocation."""
+    words: set[str] = set()
+    for value in (profile.location, *profile.target_locations):
+        for word in re.findall(r"[a-z]+", (value or "").lower()):
+            if len(word) < 3 or word in _NON_LOCATION_WORDS:
+                continue
+            words.add(word)
+    return words
+
+
+def location_eligibility_reason(job: Job, profile: Profile) -> str:
+    """Reject postings the seeker cannot legally take without a relocation.
+
+    Two cases matter for someone applying from Kenya:
+
+    * **Remote, but restricted abroad.** "Remote, US" roles pass a plain
+      ``is_remote`` check and then fill the feed with jobs that require US work
+      authorization. Only reject when the location names a foreign region and
+      nothing in the posting says worldwide/EMEA/Africa eligible.
+    * **Onsite abroad without sponsorship.** The seeker will relocate only when
+      the employer sponsors the visa or pays for the move, so such a posting is
+      only allowed when the description says so.
+
+    An unknown location is never fatal: absence of data is not evidence.
+    """
+    location = (job.location or "").strip()
+    loc_low = location.lower()
+    desc_low = (job.description or "").lower()
+    home = _home_words(profile)
+
+    if job.is_remote:
+        if not loc_low or not home:
+            return ""
+        if any(word in loc_low for word in home):
+            return ""
+        if any(signal in desc_low for signal in GLOBAL_REMOTE_SIGNALS):
+            return ""
+        if any(signal in loc_low for signal in GLOBAL_REMOTE_SIGNALS):
+            return ""
+        if FOREIGN_REGION_PATTERN.search(loc_low):
+            return (
+                f"remote role is limited to {location!r}; you are based in "
+                f"{profile.location or 'another region'}"
+            )
+        return ""
+
+    targets = [loc.strip().lower() for loc in profile.target_locations if loc.strip()]
+    if not targets or not location:
+        return ""
+    if any(target in loc_low for target in targets):
+        return ""
+    if any(signal in desc_low for signal in VISA_OR_RELOCATION_SIGNALS):
+        return ""
+    return (
+        f"location {location!r} is outside your target locations and the "
+        "posting offers no visa sponsorship or relocation support"
+    )
 
 
 def relevance_disqualifier(job: Job, profile: Profile) -> str:

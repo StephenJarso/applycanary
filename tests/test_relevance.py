@@ -1,6 +1,8 @@
 from app.models import Job, Profile
 from app.pipeline.relevance import (
+    location_eligibility_reason,
     max_rank_for_experience,
+    non_engineering_role_reason,
     seniority_matches,
     title_matches_target,
     title_mismatch_penalty,
@@ -122,3 +124,130 @@ def test_hard_disqualifier_accepts_matching_role_and_level() -> None:
         skills=["react", "node"],
     )
     assert hard_disqualifier(_job("Senior Frontend Engineer"), profile) == ""
+
+
+# ---------------------------------------------------------------------------
+# Non-engineering titles: the fix for marketing/sales/finance roles showing up
+# as 100% matches because the JD shared generic vocabulary with the resume.
+# ---------------------------------------------------------------------------
+
+
+def _kenyan_seeker(**overrides) -> Profile:
+    values = {
+        "full_name": "Stephen",
+        "location": "Nairobi, Kenya",
+        "target_titles": ["Backend Engineer", "Software Engineer"],
+        "target_locations": ["Nairobi", "Kenya", "Remote"],
+        "years_experience": 2,
+        "base_resume_text": "golang postgres docker kubernetes",
+        "skills": ["go", "postgresql", "docker"],
+    }
+    values.update(overrides)
+    return Profile(**values)
+
+
+def _posting(title: str, *, location: str = "", remote: bool = False, description: str = "") -> Job:
+    return Job(
+        title=title,
+        company="Acme",
+        location=location,
+        is_remote=remote,
+        description=description or "Build and operate backend services in Go.",
+        fingerprint=f"fp-{title}-{location}",
+    )
+
+
+def test_non_engineering_titles_are_rejected() -> None:
+    targets = ["Backend Engineer", "Software Engineer"]
+    for title in (
+        "Global Controller",
+        "Product Marketing Manager, Market Intelligence",
+        "Sales Engineer - Central",
+        "Account Executive Product - Radar",
+        "Technical Program Manager",
+        "Director, Social Media",
+    ):
+        assert non_engineering_role_reason(title, targets), title
+
+
+def test_engineering_titles_survive_the_profession_filter() -> None:
+    targets = ["Backend Engineer"]
+    for title in (
+        "Backend Engineer",
+        "Software Engineer GO",
+        "Senior Software Engineer / Fullstack (m/w/d)",
+        "C, Golang Software Engineer working on dqlite",
+        "Product Engineer",
+        "Member of Technical Staff",
+        "DevOps Engineer",
+    ):
+        assert non_engineering_role_reason(title, targets) == "", title
+
+
+def test_profession_filter_is_opt_in() -> None:
+    assert non_engineering_role_reason("Global Controller", []) == ""
+
+
+def test_hard_disqualifier_rejects_non_engineering_role() -> None:
+    profile = _kenyan_seeker()
+    reason = hard_disqualifier(
+        _posting("Global Controller", location="Remote", remote=True), profile
+    )
+    assert "not a software engineering position" in reason
+
+
+# ---------------------------------------------------------------------------
+# Geography: remote abroad only when the employer hires there, onsite abroad
+# only with visa/relocation support.
+# ---------------------------------------------------------------------------
+
+
+def test_remote_role_restricted_to_another_country_is_rejected() -> None:
+    reason = location_eligibility_reason(
+        _posting("Backend Engineer", location="Remote, US", remote=True),
+        _kenyan_seeker(),
+    )
+    assert "limited to" in reason
+
+
+def test_remote_role_open_worldwide_is_accepted() -> None:
+    job = _posting(
+        "Backend Engineer",
+        location="Remote, US",
+        remote=True,
+        description="Fully remote, we hire worldwide including Africa.",
+    )
+    assert location_eligibility_reason(job, _kenyan_seeker()) == ""
+
+
+def test_remote_role_with_unknown_location_is_accepted() -> None:
+    job = _posting("Backend Engineer", location="", remote=True)
+    assert location_eligibility_reason(job, _kenyan_seeker()) == ""
+
+
+def test_onsite_abroad_without_sponsorship_is_rejected() -> None:
+    reason = location_eligibility_reason(
+        _posting("Backend Engineer", location="Berlin, Germany"),
+        _kenyan_seeker(),
+    )
+    assert "no visa sponsorship or relocation" in reason
+
+
+def test_onsite_abroad_with_visa_sponsorship_is_accepted() -> None:
+    job = _posting(
+        "Backend Engineer",
+        location="Hengelo, Netherlands",
+        description="Relocation package and visa sponsorship provided. Go backend role.",
+    )
+    assert location_eligibility_reason(job, _kenyan_seeker()) == ""
+
+
+def test_onsite_at_home_is_accepted() -> None:
+    job = _posting("Backend Engineer", location="Nairobi, Kenya")
+    assert location_eligibility_reason(job, _kenyan_seeker()) == ""
+
+
+def test_hard_disqualifier_rejects_us_remote_backend_role() -> None:
+    job = _posting("Backend Engineer", location="Remote, United States", remote=True)
+    reason = hard_disqualifier(job, _kenyan_seeker())
+    assert "limited to" in reason
