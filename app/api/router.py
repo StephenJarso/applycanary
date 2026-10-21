@@ -1764,28 +1764,59 @@ def admin_update_llm_keys(
     body: dict = Body(...),
     admin: User = Depends(require_admin),
 ) -> dict:
-    """Persist LLM provider API keys to the process-level settings in memory."""
+    """Persist LLM provider API keys and model names to the process-level settings in memory."""
+    import app.llm.client as client_mod
     from app.config import get_settings
 
     s = get_settings()
     updated: list[str] = []
+
+    # API key fields
     key_map = {
         "xai": "xai_api_key",
         "gemini": "gemini_api_key",
         "openrouter": "openrouter_api_key",
         "groq": "groq_api_key",
         "anthropic": "anthropic_api_key",
-        "openai": "openai_api_key",
     }
     for provider, field in key_map.items():
         val = body.get(provider)
         if isinstance(val, str) and val.strip():
             object.__setattr__(s, field, val.strip())
             updated.append(provider)
+
+    # Model name fields (optional; only applied when non-empty)
+    model_fields = [
+        "xai_triage_model",
+        "xai_tailor_model",
+        "gemini_model",
+        "gemini_tailor_model",
+        "openrouter_triage_model",
+        "openrouter_tailor_model",
+        "groq_triage_model",
+        "groq_tailor_model",
+        "ollama_host",
+        "ollama_triage_model",
+        "ollama_tailor_model",
+        "model_triage",
+        "model_tailor",
+    ]
+    models_updated: list[str] = []
+    for field in model_fields:
+        val = body.get(field)
+        if isinstance(val, str) and val.strip():
+            object.__setattr__(s, field, val.strip())
+            models_updated.append(field)
+
+    # Re-initialize the LLM client so new keys/models take effect immediately
+    if updated or models_updated:
+        client_mod._client = None
+
     return {
         "ok": True,
         "updated": updated,
-        "note": "Keys updated in live process cache. Set environment variables to persist across server restarts.",
+        "models_updated": models_updated,
+        "note": "Keys and models updated live. Set environment variables to persist across server restarts.",
     }
 
 
