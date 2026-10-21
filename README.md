@@ -41,6 +41,13 @@ location, target locations or years of experience, the dashboard says which
 filters are inactive rather than silently showing a worldwide, any-seniority
 list.
 
+**Starts at entry level.** A dedicated **Entry level** tab reads work.ke's
+curated Kenyan entry-level technology collection and shows each role with its
+employer, location, pay disclosure and closing date, then links straight to the
+employer's own advert — work.ke does not collect applications. The same roles
+enter the normal feed through the `workke` connector, so they can be scored and
+tailored like any other posting.
+
 **Scores against *your* resume.** Two tiers: free local filters (hard
 knockouts, keyword overlap) then an LLM that reasons about fit using the actual
 job description and your actual experience. Grounded, calibrated, and cached.
