@@ -141,8 +141,13 @@ export interface JobList {
   sources: string[];
 }
 
+export interface ReviewJob extends Job {
+  /** Address an email application would be sent to; empty for form-only postings. */
+  apply_email: string;
+}
+
 export interface ReviewList {
-  jobs: Job[];
+  jobs: ReviewJob[];
   total: number;
 }
 

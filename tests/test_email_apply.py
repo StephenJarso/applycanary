@@ -18,7 +18,15 @@ from app.apply.email_smtp import EmailSubmitter, application_email
 from app.auth import SESSION_COOKIE_NAME, create_session_token
 from app.db import engine, init_db
 from app.main import create_app
-from app.models import ApplyMethod, Job, Profile, ResumeVersion, User
+from app.models import (
+    Application,
+    ApplyMethod,
+    Job,
+    Profile,
+    ResumeVersion,
+    User,
+    utcnow,
+)
 from app.secrets import decrypt_secret
 
 
@@ -262,3 +270,49 @@ def test_email_sending_input_defaults_are_gmail():
     payload = EmailSendingIn()
     assert payload.smtp_host == "smtp.gmail.com"
     assert payload.smtp_port == 587
+
+
+# ---------------------------------------------------------------- review rows
+
+
+def _queued_job(user_id: int, description: str, *, apply_url: str = "") -> int:
+    with Session(engine) as session:
+        job = Job(
+            title="Backend Engineer",
+            company="Acme",
+            source="test",
+            location="Nairobi, Kenya",
+            description=description,
+            apply_url=apply_url,
+            fingerprint=f"review-{uuid4().hex}",
+            posted_at=utcnow(),
+            first_seen_at=utcnow(),
+        )
+        session.add(job)
+        session.commit()
+        session.refresh(job)
+        job_id = job.id
+        session.add(Application(job_id=job_id, user_id=user_id))
+        session.commit()
+        return job_id
+
+
+def test_review_row_shows_the_destination_email(mailbox):
+    client, user_id = mailbox
+    job_id = _queued_job(user_id, "Send your CV and cover letter to jobs@acme.co.ke")
+
+    res = client.get("/api/review")
+
+    assert res.status_code == 200
+    row = next(item for item in res.json()["jobs"] if item["id"] == job_id)
+    assert row["apply_email"] == "jobs@acme.co.ke"
+
+
+def test_review_row_has_no_email_for_form_only_postings(mailbox):
+    client, user_id = mailbox
+    job_id = _queued_job(user_id, "Apply through our careers portal.")
+
+    res = client.get("/api/review")
+
+    row = next(item for item in res.json()["jobs"] if item["id"] == job_id)
+    assert row["apply_email"] == ""

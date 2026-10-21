@@ -110,8 +110,17 @@ class JobListOut(BaseModel):
     sources: list[str]
 
 
+class ReviewJobOut(JobOut):
+    """A review row plus the address an email application would go to.
+
+    Empty when the posting only offers a form; the UI shows it before the
+    approval click so the user knows who receives their CV.
+    """
+    apply_email: str = ""
+
+
 class ReviewListOut(BaseModel):
-    jobs: list[JobOut]
+    jobs: list[ReviewJobOut]
     total: int
 
 
@@ -737,10 +746,18 @@ def review_queue(
     )
     from sqlalchemy import func as sa_func
 
+    from app.apply.email_smtp import application_email
+
     total = session.exec(select(sa_func.count()).select_from(stmt.subquery())).one()
     rows = session.exec(stmt.offset(offset).limit(limit)).all()
     return ReviewListOut(
-        jobs=[_job_out(job, score, uj) for job, score, uj in rows],
+        jobs=[
+            ReviewJobOut(
+                **_job_out(job, score, uj).model_dump(),
+                apply_email=application_email(job),
+            )
+            for job, score, uj in rows
+        ],
         total=total,
     )
 

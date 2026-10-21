@@ -83,6 +83,15 @@ export default function Review() {
                     {job.score?.missing_keywords.length ? (
                       <Chips items={job.score.missing_keywords} variant="miss" max={4} />
                     ) : null}
+                    {job.apply_email ? (
+                      <div className="cell-dim" style={{ fontSize: 12 }}>
+                        Will email <strong>{job.apply_email}</strong>
+                      </div>
+                    ) : (
+                      <div className="cell-dim" style={{ fontSize: 12 }}>
+                        Opens the posting&rsquo;s own application form
+                      </div>
+                    )}
                   </td>
                   <td>{job.company}</td>
                   <td className="cell-dim num">{relTime(job.posted_at ?? job.first_seen_at)}</td>
@@ -91,7 +100,8 @@ export default function Review() {
                       <button
                         className="btn-primary btn-sm"
                         onClick={() => {
-                          if (confirm(`Send this application for ${job.title} at ${job.company}?`)) {
+                          const recipient = job.apply_email ? ` to ${job.apply_email}` : "";
+                          if (confirm(`Send this application for ${job.title} at ${job.company}${recipient}?`)) {
                             submit.mutate(job.id);
                           }
                         }}
