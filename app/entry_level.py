@@ -329,7 +329,7 @@ async def fetch_entry_level(client: httpx.AsyncClient | None = None) -> dict[str
                         is_remote = (
                             work_mode.lower() == "remote"
                             or _looks_remote(location)
-                            or any(_looks_remote(str(l)) for l in location_labels)
+                            or any(_looks_remote(str(lbl)) for lbl in location_labels)
                         )
 
                         source_url = f"{BASE_URL}/jobs/{slug}"
