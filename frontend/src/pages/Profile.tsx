@@ -156,6 +156,7 @@ export default function ProfilePage() {
   const [hasPushSub, setHasPushSub] = useState(false);
   const [pushBusy, setPushBusy] = useState(false);
   const [testNotifMsg, setTestNotifMsg] = useState("");
+  const [showResumePreview, setShowResumePreview] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -272,14 +273,24 @@ export default function ProfilePage() {
       {user?.is_admin && <AdminPanel />}
 
       <div className="card">
-        <h3 className="card-title">Resume</h3>
+        <h3 className="card-title">
+          <span className="material-symbols-outlined" aria-hidden="true">description</span>
+          Resume / CV
+        </h3>
         {data?.has_resume ? (
-          <p className="cell-dim">
-            {data.resume_words} words · {data.skills.length} skills detected
-          </p>
+          <div style={{ marginBottom: 12 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4, flexWrap: "wrap" }}>
+              <span className="material-symbols-outlined" style={{ color: "var(--accent)" }}>article</span>
+              <strong>{data.base_resume_filename || "Uploaded resume"}</strong>
+              <span className="chip chip-hit">active CV</span>
+            </div>
+            <p className="cell-dim" style={{ margin: "2px 0 0" }}>
+              {data.resume_words} words extracted · {data.skills.length} skills detected
+            </p>
+          </div>
         ) : (
           <p className="cell-dim">
-            No resume yet. Scoring and tailoring both need one.
+            No resume uploaded yet. Scoring, ATS check, and tailoring all require your resume.
           </p>
         )}
 
@@ -293,14 +304,58 @@ export default function ProfilePage() {
             if (file) upload.mutate(file);
           }}
         />
-        <button onClick={() => fileRef.current?.click()} disabled={upload.isPending}>
-          {upload.isPending && <span className="spinner" />}
-          {data?.has_resume ? "Replace resume" : "Upload resume"}
-        </button>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+          {data?.has_resume && (
+            <a
+              href={api.baseResumeDownloadUrl()}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn btn-primary"
+              style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: 18 }}>visibility</span>
+              View / Download uploaded CV
+            </a>
+          )}
+          <button onClick={() => fileRef.current?.click()} disabled={upload.isPending} className="btn-secondary">
+            {upload.isPending && <span className="spinner" />}
+            {data?.has_resume ? "Replace resume" : "Upload resume"}
+          </button>
+          {data?.has_resume && data.base_resume_text && (
+            <button
+              type="button"
+              className="btn-ghost"
+              onClick={() => setShowResumePreview(!showResumePreview)}
+            >
+              {showResumePreview ? "Hide extracted text" : "Preview extracted text"}
+            </button>
+          )}
+        </div>
 
         {upload.isError && <ErrorBox error={upload.error} />}
         {upload.isSuccess && (
           <div className="banner banner-ok" role="status">{upload.data.message}</div>
+        )}
+
+        {showResumePreview && data?.base_resume_text && (
+          <div style={{ marginTop: 14 }}>
+            <label>Parsed ATS resume text</label>
+            <pre
+              className="doc"
+              style={{
+                maxHeight: 320,
+                overflowY: "auto",
+                whiteSpace: "pre-wrap",
+                fontSize: "0.85em",
+                background: "var(--surface)",
+                padding: 12,
+                borderRadius: 6,
+                border: "1px solid var(--border)",
+              }}
+            >
+              {data.base_resume_text}
+            </pre>
+          </div>
         )}
 
         {data?.skills.length ? (
@@ -444,32 +499,34 @@ export default function ProfilePage() {
 
       <div className="card">
         <h3 className="card-title">
-          GitHub evidence
+          GitHub evidence &amp; projects
           {data?.github_connected && <span className="chip chip-hit">connected</span>}
         </h3>
         <p className="cell-dim">
-          Connect GitHub so CV tailoring can use real repositories as evidence.
-          A fine-grained token with read-only access to public repositories is
-          enough. It is stored encrypted and never shown back.
+          Connect GitHub so CV tailoring can ground your projects and skills in real code evidence.
+          To allow ApplyCanary full view of your projects including private repositories, provide a
+          Personal Access Token with the <strong>repo</strong> scope (or a fine-grained token with
+          "All repositories" and Read access to Contents &amp; Metadata).
+          Tokens are stored encrypted at rest and never shown back.
         </p>
         {!form.github_username && (
           <p className="cell-dim">Add your GitHub username under Details first.</p>
         )}
         <div className="field">
-          <label htmlFor="github-token">GitHub access token (optional)</label>
+          <label htmlFor="github-token">GitHub access token (supports public &amp; private repos)</label>
           <input
             id="github-token"
             type="password"
             value={githubToken}
             onChange={(e) => setGithubToken(e.target.value)}
-            placeholder="github_pat_… (read-only)"
+            placeholder="github_pat_… or ghp_… (repo read scope)"
             autoComplete="off"
             spellCheck={false}
           />
         </div>
         {data?.github_synced_at ? (
           <p className="cell-dim">
-            {data.github_repo_count} repos · synced {new Date(data.github_synced_at).toLocaleString()}
+            {data.github_repo_count} repositories synced (public &amp; private) · synced {new Date(data.github_synced_at).toLocaleString()}
           </p>
         ) : null}
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>

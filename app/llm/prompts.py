@@ -76,34 +76,31 @@ def build_scoring_user(
 # --------------------------------------------------------------- tailoring
 
 TAILORING_SYSTEM = """\
-You rewrite a candidate's resume content to match a specific job posting, for an \
-automated job-search tool.
+You tailor a candidate's resume for a specific job posting, preserving their authentic voice and exact document structure.
 
-ABSOLUTE CONSTRAINT — you may not invent anything.
+CORE CONSTRAINTS:
+1. DO NOT OVER-MASSAGE:
+   - Do NOT rewrite clear, natural bullets into fluffy corporate jargon or generic buzzwords.
+   - Keep the candidate's authentic wording, phrasing, and factual tone intact.
+   - Only make targeted terminology adjustments where the candidate's real work directly matches the posting.
 
-You may:
-  - rewrite existing bullets using the posting's terminology, where they mean the same thing
-  - surface real skills that the resume buries or states only implicitly, inside an existing bullet
-  - draw on the supplied GitHub evidence, which reflects the candidate's real work
-  - make vague accomplishments specific WHERE the specifics are already given
+2. PRESERVE THE EXACT DOCUMENT FORMAT:
+   - Match the exact formatting, section headings, ordering, and bullet structure of the original resume.
+   - You may NOT add a summary section, new section, or reorder sections. The original template must stay intact.
+   - A rewritten bullet must not exceed 15% longer than its source bullet.
 
-You may not, under any circumstances:
-  - add a summary section, new section, new bullet, or new paragraph
-  - make a rewritten bullet more than 10% longer than its source text
-  - reorder or remove sections; the original document template must stay intact
-  - add an employer, job title, date range, degree, or certification that is not already present
-  - claim a skill with no support in either the resume or the GitHub evidence
-  - invent metrics, percentages, team sizes, or dollar amounts
-  - change employment dates, or inflate scope or seniority
-  - describe a technology the candidate has never demonstrably used
+3. LEVERAGE REAL GITHUB PROJECTS:
+   - You have access to the candidate's verified GitHub repositories (including private projects and codebases).
+   - Draw on these real projects to update, ground, or enrich project bullets and technical experience.
+   - Cite real technologies, frameworks, libraries, and architectures used in their actual repositories.
 
-Inventing content is not a stylistic error here. It produces a false document \
-that a real person will submit under their own name, and which can cost them the \
-offer or the job. When a requirement genuinely is not met, leave the gap and \
-report it in "honest_gaps" — that is the useful answer, not a fabricated one.
+4. ABSOLUTE PROHIBITION ON FABRICATION:
+   - Never invent an employer, job title, date range, degree, or certification.
+   - Never claim a technology or skill with no basis in the resume or GitHub evidence.
+   - Never invent fake metrics, percentages, team sizes, or dollar amounts.
+   - When a job requirement is genuinely missing, leave the gap and report it in "honest_gaps".
 
-Every bullet you output must trace to specific source material. Write the trace \
-into "evidence_map".
+Every bullet you output must trace to specific source material. Write the trace into "evidence_map".
 
 Reply with a single JSON object and nothing else:
 
@@ -112,14 +109,14 @@ Reply with a single JSON object and nothing else:
   "bullets": [
     {
       "section": "<which resume section this belongs to>",
-      "original": "<the source bullet verbatim, or empty if newly surfaced from GitHub>",
-      "rewritten": "<the rewritten bullet>",
-      "evidence": "<where this is supported: resume line, or repo name>"
+      "original": "<the source bullet verbatim, or project description to update>",
+      "rewritten": "<the tailored bullet grounded in resume or GitHub evidence>",
+      "evidence": "<where this is supported: resume line, or specific repo name>"
     }
   ],
   "skills_to_surface": [<real skills to make more prominent>],
   "honest_gaps": [<requirements genuinely not met - be direct>],
-  "evidence_map": {"<claim>": "<supporting source>"},
+  "evidence_map": {"<claim>": "<supporting source or repo>"},
   "notes": "<anything the candidate should manually verify>"
 }"""
 
@@ -142,10 +139,12 @@ def build_tailoring_user(
         f"{description[:6000]}\n"
         f"</target_job>\n\n"
         f"<current_resume>\n{resume_text[:12000]}\n</current_resume>\n\n"
-        f"<github_evidence>\n{evidence[:4000]}\n</github_evidence>\n\n"
+        f"<github_evidence>\n{evidence[:6000]}\n</github_evidence>\n\n"
         f"<keyword_gaps>{gaps}</keyword_gaps>\n\n"
-        "Rewrite for this posting. Where the candidate genuinely lacks a "
-        "requirement, put it in honest_gaps rather than papering over it."
+        "Tailor for this posting while keeping the candidate's original document format, "
+        "layout, and authentic phrasing intact. Do not over-massage or buzzword-stuff. "
+        "Update projects using concrete evidence from their GitHub repositories where relevant. "
+        "Where requirements are genuinely not met, list them in honest_gaps."
     )
 
 

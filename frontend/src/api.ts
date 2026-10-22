@@ -225,6 +225,8 @@ export interface Profile {
   open_to_relocation: boolean;
   has_resume: boolean;
   resume_words: number;
+  base_resume_filename?: string;
+  base_resume_text?: string;
   skills: string[];
   github_synced_at: string | null;
   github_repo_count: number;
@@ -601,6 +603,7 @@ export const api = {
     form.append("resume", file);
     return request<ActionResult>("/profile/resume", { method: "POST", body: form });
   },
+  baseResumeDownloadUrl: () => `${API_BASE}/api/profile/resume/download`,
 
   tailor: (id: number) => request<ActionResult>(`/jobs/${id}/tailor`, { method: "POST" }),
   submit: (id: number, force = false) =>

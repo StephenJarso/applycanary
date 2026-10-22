@@ -84,7 +84,7 @@ async def tailor_for_job(
     system = cached_system(
         TAILORING_SYSTEM,
         f"\n\n<source_material>\n{resume_text[:12000]}\n\n"
-        f"{evidence_text[:4000]}\n</source_material>",
+        f"{evidence_text[:8000]}\n</source_material>",
     )
     user = build_tailoring_user(
         title=job.title,
@@ -197,9 +197,9 @@ def _conservative_rewrites(parsed: dict) -> dict:
 def _rebuild_text(original: str, parsed: dict) -> str:
     """Apply the model's rewrites to the resume text.
 
-    Substitution is exact-match only. A fuzzy replace risks corrupting unrelated
-    lines, and a resume is a document the user will submit as-is. Summary blocks
-    and new bullets are ignored on purpose: they change the template.
+    Substitution is exact-match only, preserving original whitespace and
+    document layout. Summary blocks and new sections are ignored on purpose:
+    the candidate's original resume template and format must stay intact.
     """
     text = original
     bullets = parsed.get("bullets")
@@ -209,8 +209,17 @@ def _rebuild_text(original: str, parsed: dict) -> str:
                 continue
             src = str(entry.get("original") or "").strip()
             dst = str(entry.get("rewritten") or "").strip()
-            if src and dst and src in text:
+            if not src or not dst:
+                continue
+            if src in text:
                 text = text.replace(src, dst, 1)
+            else:
+                # Handle leading bullet character differences (e.g. text has '• ' but src stripped it)
+                for prefix in ("• ", "- ", "* ", "▪ ", "‣ "):
+                    if f"{prefix}{src}" in text:
+                        clean_dst = dst if dst.startswith(prefix) else f"{prefix}{dst.lstrip('•-*▪‣ ')}"
+                        text = text.replace(f"{prefix}{src}", clean_dst, 1)
+                        break
     return text
 
 

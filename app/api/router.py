@@ -214,6 +214,8 @@ class ProfileOut(BaseModel):
     open_to_relocation: bool = False
     has_resume: bool = False
     resume_words: int = 0
+    base_resume_filename: str = ""
+    base_resume_text: str = ""
     skills: list[str] = Field(default_factory=list)
     github_synced_at: datetime | None = None
     github_repo_count: int = 0
@@ -927,6 +929,8 @@ def get_profile(
         open_to_relocation=profile.open_to_relocation,
         has_resume=bool(profile.base_resume_text),
         resume_words=len((profile.base_resume_text or "").split()),
+        base_resume_filename=(profile.resume_meta or {}).get("original_filename") or (Path(profile.base_resume_path).name if profile.base_resume_path else ""),
+        base_resume_text=profile.base_resume_text or "",
         skills=list(profile.skills or []),
         github_synced_at=profile.github_synced_at,
         github_repo_count=len(evidence.get("repos") or []),
@@ -1088,6 +1092,7 @@ async def upload_resume(
         **parsed.template,
         "file_type": parsed.file_type,
         "pages": parsed.pages,
+        "original_filename": Path(upload.filename).name,
     }
     profile.skills = sorted(extract_skills(parsed.text) | set(profile.skills or []))
     if not profile.email and parsed.emails:
@@ -1100,7 +1105,47 @@ async def upload_resume(
     return ActionResult(
         ok=True,
         message=f"Parsed {parsed.word_count} words, found {len(profile.skills)} skills.",
-        detail={"words": parsed.word_count, "skills": profile.skills},
+        detail={
+            "words": parsed.word_count,
+            "skills": profile.skills,
+            "filename": Path(upload.filename).name,
+        },
+    )
+
+
+@router.get("/profile/resume/download")
+def download_base_resume(
+    session: Session = Depends(get_session),
+    user: User = Depends(current_user),
+) -> FileResponse:
+    """Serve the user's uploaded base resume/CV directly."""
+    profile = _profile_or_404(session, user)
+    if not profile.base_resume_path:
+        raise HTTPException(404, "no resume uploaded yet")
+    path = Path(profile.base_resume_path)
+    if not path.is_file():
+        raise HTTPException(404, "uploaded resume file not found on disk")
+
+    filename = (
+        (profile.resume_meta or {}).get("original_filename")
+        or path.name
+        or f"resume{path.suffix}"
+    )
+    ext = path.suffix.lower()
+    media_type = (
+        "application/pdf"
+        if ext == ".pdf"
+        else (
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            if ext == ".docx"
+            else "text/plain"
+        )
+    )
+    return FileResponse(
+        str(path),
+        filename=filename,
+        media_type=media_type,
+        content_disposition_type="inline",
     )
 
 

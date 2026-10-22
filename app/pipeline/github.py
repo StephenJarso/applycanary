@@ -34,6 +34,7 @@ README_CHARS = 1200
 @dataclass(slots=True)
 class RepoEvidence:
     name: str
+    full_name: str = ""
     description: str = ""
     language: str = ""
     languages: list[str] = field(default_factory=list)
@@ -41,11 +42,13 @@ class RepoEvidence:
     stars: int = 0
     readme_excerpt: str = ""
     url: str = ""
+    is_private: bool = False
     is_archived: bool = False
     pushed_at: str = ""
 
     def as_prompt_block(self) -> str:
-        lines = [f"Repository: {self.name}"]
+        privacy = " (private project)" if self.is_private else ""
+        lines = [f"Repository: {self.name}{privacy}"]
         if self.languages:
             lines.append(f"  Languages: {', '.join(self.languages)}")
         elif self.language:
@@ -74,14 +77,16 @@ class GithubEvidence:
     def ok(self) -> bool:
         return not self.error and bool(self.repos)
 
-    def as_prompt_text(self, limit: int = 12) -> str:
+    def as_prompt_text(self, limit: int = 15) -> str:
         """Flatten to the text block handed to the tailoring prompt."""
         if not self.repos:
             return ""
         blocks = [r.as_prompt_block() for r in self.repos[:limit]]
+        private_count = sum(1 for r in self.repos if r.is_private)
+        meta_note = f" (including {private_count} private repositories)" if private_count else ""
         header = (
-            f"Public GitHub repositories for {self.username} "
-            f"(verifiable evidence of real work):\n\n"
+            f"GitHub repositories and verified projects for {self.username}{meta_note} "
+            f"(real verifiable evidence of code, architecture, and projects to ground tailoring):\n\n"
         )
         return header + "\n\n".join(blocks)
 
@@ -131,7 +136,7 @@ async def scan(
         timeout=DEFAULT_TIMEOUT, headers=headers, follow_redirects=True
     ) as client:
         try:
-            repos = await _list_repos(client, username, include_forks)
+            repos = await _list_repos(client, username, include_forks, has_token=bool(auth_token))
         except httpx.HTTPStatusError as exc:
             code = exc.response.status_code
             if code == 404:
@@ -167,14 +172,37 @@ async def scan(
 
 
 async def _list_repos(
-    client: httpx.AsyncClient, username: str, include_forks: bool
+    client: httpx.AsyncClient,
+    username: str,
+    include_forks: bool,
+    *,
+    has_token: bool = False,
 ) -> list[RepoEvidence]:
-    resp = await client.get(
-        f"{API}/users/{username}/repos",
-        params={"sort": "pushed", "per_page": 100, "type": "owner"},
-    )
-    resp.raise_for_status()
-    payload = resp.json()
+    payload: list | None = None
+
+    # When an authenticated token is provided, query /user/repos to list
+    # BOTH public and private repositories of the user with full visibility.
+    if has_token:
+        try:
+            resp = await client.get(
+                f"{API}/user/repos",
+                params={"visibility": "all", "affiliation": "owner", "sort": "pushed", "per_page": 100},
+            )
+            if resp.status_code == 200:
+                data = resp.json()
+                if isinstance(data, list) and data:
+                    payload = data
+        except Exception as exc:  # noqa: BLE001
+            log.debug("github: /user/repos failed (%s), falling back to /users/{username}/repos", exc)
+
+    if payload is None:
+        resp = await client.get(
+            f"{API}/users/{username}/repos",
+            params={"sort": "pushed", "per_page": 100, "type": "owner"},
+        )
+        resp.raise_for_status()
+        payload = resp.json()
+
     if not isinstance(payload, list):
         raise ValueError("unexpected /repos payload")
 
@@ -187,11 +215,13 @@ async def _list_repos(
             continue
         repos.append(RepoEvidence(
             name=str(item.get("name") or ""),
+            full_name=str(item.get("full_name") or f"{username}/{item.get('name')}"),
             description=str(item.get("description") or "")[:300],
             language=str(item.get("language") or ""),
             topics=[str(t) for t in (item.get("topics") or []) if t][:10],
             stars=int(item.get("stargazers_count") or 0),
             url=str(item.get("html_url") or ""),
+            is_private=bool(item.get("private")),
             is_archived=bool(item.get("archived")),
             pushed_at=str(item.get("pushed_at") or ""),
         ))
@@ -209,8 +239,9 @@ async def _enrich(
 
     async def one(repo: RepoEvidence) -> None:
         async with sem:
+            repo_path = repo.full_name or f"{username}/{repo.name}"
             try:
-                langs = await client.get(f"{API}/repos/{username}/{repo.name}/languages")
+                langs = await client.get(f"{API}/repos/{repo_path}/languages")
                 if langs.status_code == 200 and isinstance(data := langs.json(), dict):
                     # Ordered by bytes of code, so the primary stack comes first.
                     repo.languages = [
@@ -221,7 +252,7 @@ async def _enrich(
 
             try:
                 readme = await client.get(
-                    f"{API}/repos/{username}/{repo.name}/readme",
+                    f"{API}/repos/{repo_path}/readme",
                     headers={"Accept": "application/vnd.github.raw+json"},
                 )
                 if readme.status_code == 200:
