@@ -489,6 +489,141 @@ def status(
     )
 
 
+def _apply_common_filters(
+    stmt: Any,
+    *,
+    experience_level: str = "",
+    work_arrangement: str = "",
+    location: str = "",
+    employment_type: str = "",
+    visa_sponsorship: bool = False,
+    min_salary: int = 0,
+) -> Any:
+    if experience_level:
+        exp = experience_level.lower().strip()
+        if exp in ("entry", "junior"):
+            stmt = stmt.where(
+                or_(
+                    Job.title.ilike("%intern%"),
+                    Job.title.ilike("%junior%"),
+                    Job.title.ilike("%jr%"),
+                    Job.title.ilike("%entry%"),
+                    Job.title.ilike("%graduate%"),
+                    Job.title.ilike("%trainee%"),
+                    Job.title.ilike("%associate%"),
+                    Job.description.ilike("%entry level%"),
+                    Job.description.ilike("%0-1 year%"),
+                    Job.description.ilike("%0-2 year%"),
+                )
+            )
+        elif exp == "mid":
+            stmt = stmt.where(
+                or_(
+                    Job.title.ilike("%mid%"),
+                    Job.title.ilike("%intermediate%"),
+                    Job.description.ilike("%2-4 year%"),
+                    Job.description.ilike("%3-5 year%"),
+                    and_(
+                        ~Job.title.ilike("%senior%"),
+                        ~Job.title.ilike("%sr.%"),
+                        ~Job.title.ilike("%sr %"),
+                        ~Job.title.ilike("%lead%"),
+                        ~Job.title.ilike("%staff%"),
+                        ~Job.title.ilike("%principal%"),
+                        ~Job.title.ilike("%manager%"),
+                        ~Job.title.ilike("%director%"),
+                        ~Job.title.ilike("%intern%"),
+                        ~Job.title.ilike("%junior%"),
+                        ~Job.title.ilike("%entry%"),
+                    ),
+                )
+            )
+        elif exp == "senior":
+            stmt = stmt.where(
+                or_(
+                    Job.title.ilike("%senior%"),
+                    Job.title.ilike("%sr.%"),
+                    Job.title.ilike("%sr %"),
+                    Job.title.ilike("%lead%"),
+                    Job.description.ilike("%5+ year%"),
+                    Job.description.ilike("%6+ year%"),
+                )
+            )
+        elif exp in ("lead", "staff", "principal"):
+            stmt = stmt.where(
+                or_(
+                    Job.title.ilike("%staff%"),
+                    Job.title.ilike("%principal%"),
+                    Job.title.ilike("%architect%"),
+                )
+            )
+        elif exp in ("manager", "executive", "director"):
+            stmt = stmt.where(
+                or_(
+                    Job.title.ilike("%manager%"),
+                    Job.title.ilike("%director%"),
+                    Job.title.ilike("%head%"),
+                    Job.title.ilike("%vp%"),
+                    Job.title.ilike("%chief%"),
+                    Job.title.ilike("%cto%"),
+                )
+            )
+
+    if work_arrangement:
+        wa = work_arrangement.lower().strip()
+        if wa == "remote":
+            stmt = stmt.where(or_(Job.is_remote == True, Job.location.ilike("%remote%")))  # noqa: E712
+        elif wa == "hybrid":
+            stmt = stmt.where(or_(Job.location.ilike("%hybrid%"), Job.description.ilike("%hybrid%")))
+        elif wa == "onsite":
+            stmt = stmt.where(
+                and_(
+                    Job.is_remote == False,  # noqa: E712
+                    ~Job.location.ilike("%remote%"),
+                    ~Job.location.ilike("%hybrid%"),
+                )
+            )
+
+    if location:
+        stmt = stmt.where(Job.location.ilike(f"%{location.strip()}%"))
+
+    if employment_type:
+        et = employment_type.lower().strip()
+        if et in ("full-time", "fulltime"):
+            stmt = stmt.where(or_(Job.employment_type.ilike("%full%"), Job.description.ilike("%full-time%"), Job.description.ilike("%full time%")))
+        elif et == "contract":
+            stmt = stmt.where(or_(Job.employment_type.ilike("%contract%"), Job.description.ilike("%contract%")))
+        elif et in ("internship", "intern"):
+            stmt = stmt.where(or_(Job.employment_type.ilike("%intern%"), Job.title.ilike("%intern%")))
+        elif et in ("part-time", "parttime"):
+            stmt = stmt.where(or_(Job.employment_type.ilike("%part%"), Job.description.ilike("%part-time%")))
+
+    if visa_sponsorship:
+        stmt = stmt.where(
+            or_(
+                Job.description.ilike("%visa sponsorship%"),
+                Job.description.ilike("%relocation package%"),
+                Job.description.ilike("%relocation assistance%"),
+                Job.description.ilike("%relocation support%"),
+                Job.description.ilike("%sponsorship available%"),
+                Job.description.ilike("%we sponsor%"),
+                Job.description.ilike("%work permit%"),
+                Job.description.ilike("%flight%"),
+                Job.description.ilike("%airfare%"),
+            )
+        )
+
+    if min_salary:
+        stmt = stmt.where(
+            or_(
+                Job.salary_min >= min_salary,
+                Job.salary_max >= min_salary,
+            )
+        )
+
+    return stmt
+
+
 @router.get("/public/jobs")
 def public_jobs(
     session: Session = Depends(get_session),
@@ -496,6 +631,12 @@ def public_jobs(
     source: str = "",
     remote_only: bool = False,
     sort: Literal["newest", "oldest"] = "newest",
+    experience_level: str = "",
+    work_arrangement: str = "",
+    location: str = "",
+    employment_type: str = "",
+    visa_sponsorship: bool = False,
+    min_salary: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=200),
     offset: int = Query(0, ge=0),
 ) -> dict:
@@ -507,6 +648,17 @@ def public_jobs(
         stmt = stmt.where(Job.is_remote == True)  # noqa: E712 - SQL, not Python
     if q:
         stmt = _apply_text_search(stmt, q)
+
+    stmt = _apply_common_filters(
+        stmt,
+        experience_level=experience_level,
+        work_arrangement=work_arrangement,
+        location=location,
+        employment_type=employment_type,
+        visa_sponsorship=visa_sponsorship,
+        min_salary=min_salary,
+    )
+
     stmt = stmt.order_by(Job.first_seen_at.desc() if sort == "newest" else Job.first_seen_at.asc())
     rows = session.exec(stmt.offset(offset).limit(limit)).all()
     sources = sorted(session.exec(select(Job.source).distinct()).all())
@@ -584,6 +736,12 @@ def list_jobs(
     include_all: bool = False,
     posted_within: int = Query(30, ge=0, le=3650),
     sort: Literal["score", "newest", "oldest"] = "score",
+    experience_level: str = "",
+    work_arrangement: str = "",
+    location: str = "",
+    employment_type: str = "",
+    visa_sponsorship: bool = False,
+    min_salary: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=500),
     offset: int = Query(0, ge=0),
 ) -> JobListOut:
@@ -649,6 +807,16 @@ def list_jobs(
         stmt = _apply_text_search(stmt, q)
     if min_score:
         stmt = stmt.where(JobScore.total >= min_score)
+
+    stmt = _apply_common_filters(
+        stmt,
+        experience_level=experience_level,
+        work_arrangement=work_arrangement,
+        location=location,
+        employment_type=employment_type,
+        visa_sponsorship=visa_sponsorship,
+        min_salary=min_salary,
+    )
 
     if sort == "newest":
         stmt = stmt.order_by(Job.first_seen_at.desc())

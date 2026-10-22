@@ -297,6 +297,12 @@ export interface JobFilters {
   include_all?: boolean;
   posted_within?: number;
   sort?: "score" | "newest" | "oldest";
+  experience_level?: string;
+  work_arrangement?: string;
+  location?: string;
+  employment_type?: string;
+  visa_sponsorship?: boolean;
+  min_salary?: number;
   limit?: number;
   offset?: number;
 }

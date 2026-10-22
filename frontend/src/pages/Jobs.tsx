@@ -45,6 +45,31 @@ export default function Jobs() {
     setPage(0);
   };
 
+  const hasActiveFilters = Boolean(
+    search ||
+    filters.q ||
+    filters.experience_level ||
+    filters.work_arrangement ||
+    filters.location ||
+    filters.employment_type ||
+    filters.visa_sponsorship ||
+    filters.min_score ||
+    filters.source ||
+    filters.status ||
+    filters.prep_only ||
+    filters.remote_only ||
+    (filters.posted_within && filters.posted_within !== 30)
+  );
+
+  const resetFilters = () => {
+    setSearch("");
+    setFilters({
+      sort: "score",
+      posted_within: 30,
+    });
+    setPage(0);
+  };
+
   const totalPages = useMemo(
     () => Math.max(1, Math.ceil((data?.total ?? 0) / PAGE_SIZE)),
     [data?.total],
@@ -166,6 +191,50 @@ export default function Jobs() {
         />
 
         <select
+          value={filters.experience_level ?? ""}
+          onChange={(e) => set("experience_level", e.target.value || undefined)}
+          aria-label="Filter by experience level"
+        >
+          <option value="">All Experience Levels</option>
+          <option value="entry">Entry / Junior (0-2 yrs)</option>
+          <option value="mid">Mid Level (2-5 yrs)</option>
+          <option value="senior">Senior (5+ yrs)</option>
+          <option value="lead">Staff / Principal / Lead</option>
+          <option value="manager">Manager / Director</option>
+        </select>
+
+        <select
+          value={filters.work_arrangement ?? (filters.remote_only ? "remote" : "")}
+          onChange={(e) => {
+            const val = e.target.value;
+            set("work_arrangement", val || undefined);
+            if (val === "remote") {
+              set("remote_only", true);
+            } else {
+              set("remote_only", false);
+            }
+          }}
+          aria-label="Filter by work arrangement"
+        >
+          <option value="">All Work Arrangements</option>
+          <option value="remote">Remote Only</option>
+          <option value="hybrid">Hybrid</option>
+          <option value="onsite">Onsite</option>
+        </select>
+
+        <select
+          value={filters.employment_type ?? ""}
+          onChange={(e) => set("employment_type", e.target.value || undefined)}
+          aria-label="Filter by job type"
+        >
+          <option value="">All Job Types</option>
+          <option value="full-time">Full-time</option>
+          <option value="contract">Contract</option>
+          <option value="internship">Internship</option>
+          <option value="part-time">Part-time</option>
+        </select>
+
+        <select
           value={String(filters.posted_within ?? 0)}
           onChange={(e) => set("posted_within", Number(e.target.value) || undefined)}
           aria-label="Filter by posting date"
@@ -183,7 +252,7 @@ export default function Jobs() {
           onChange={(e) => set("source", e.target.value)}
           aria-label="Filter by source"
         >
-          <option value="">All Roles</option>
+          <option value="">All Sources</option>
           {data?.sources.map((s) => <option key={s} value={s}>{s}</option>)}
         </select>
 
@@ -204,28 +273,10 @@ export default function Jobs() {
           aria-label="Minimum score"
         >
           <option value="0">Any Score</option>
-          <option value="55">55+</option>
-          <option value="75">75+</option>
-          <option value="90">90+</option>
+          <option value="55">55+ (Good match)</option>
+          <option value="75">75+ (Strong match)</option>
+          <option value="90">90+ (Top match)</option>
         </select>
-
-        <label className="check" style={{ margin: 0 }}>
-          <input
-            type="checkbox"
-            checked={filters.remote_only ?? false}
-            onChange={(e) => set("remote_only", e.target.checked)}
-          />
-          Remote Only
-        </label>
-
-        <label className="check" style={{ margin: 0 }}>
-          <input
-            type="checkbox"
-            checked={filters.prep_only ?? false}
-            onChange={(e) => set("prep_only", e.target.checked)}
-          />
-          Interview prep ready
-        </label>
 
         <div className="seg" role="group" aria-label="Sort order">
           {SORTS.map((s) => (
@@ -240,6 +291,101 @@ export default function Jobs() {
           ))}
         </div>
       </form>
+
+      {/* Quick filter pills */}
+      <div className="ac-chip-row" style={{ marginTop: -4, marginBottom: 14 }}>
+        <button
+          type="button"
+          className={`ac-chip ${filters.visa_sponsorship ? "is-active" : ""}`}
+          onClick={() => set("visa_sponsorship", !filters.visa_sponsorship)}
+          style={{ cursor: "pointer", border: "1px solid var(--ac-outline-variant)" }}
+        >
+          <span className="material-symbols-outlined" style={{ fontSize: 15 }}>flight</span>
+          Visa &amp; Relocation
+        </button>
+
+        <button
+          type="button"
+          className={`ac-chip ${filters.work_arrangement === "remote" || filters.remote_only ? "is-active" : ""}`}
+          onClick={() => {
+            const next = filters.work_arrangement !== "remote";
+            set("work_arrangement", next ? "remote" : undefined);
+            set("remote_only", next);
+          }}
+          style={{ cursor: "pointer", border: "1px solid var(--ac-outline-variant)" }}
+        >
+          <span className="material-symbols-outlined" style={{ fontSize: 15 }}>public</span>
+          Remote Only
+        </button>
+
+        <button
+          type="button"
+          className={`ac-chip ${filters.location === "Kenya" ? "is-active" : ""}`}
+          onClick={() => set("location", filters.location === "Kenya" ? undefined : "Kenya")}
+          style={{ cursor: "pointer", border: "1px solid var(--ac-outline-variant)" }}
+        >
+          <span className="material-symbols-outlined" style={{ fontSize: 15 }}>location_on</span>
+          Kenya
+        </button>
+
+        <button
+          type="button"
+          className={`ac-chip ${filters.experience_level === "entry" ? "is-active" : ""}`}
+          onClick={() => set("experience_level", filters.experience_level === "entry" ? undefined : "entry")}
+          style={{ cursor: "pointer", border: "1px solid var(--ac-outline-variant)" }}
+        >
+          🌱 Entry / Junior
+        </button>
+
+        <button
+          type="button"
+          className={`ac-chip ${filters.experience_level === "mid" ? "is-active" : ""}`}
+          onClick={() => set("experience_level", filters.experience_level === "mid" ? undefined : "mid")}
+          style={{ cursor: "pointer", border: "1px solid var(--ac-outline-variant)" }}
+        >
+          ⚡ Mid-Level
+        </button>
+
+        <button
+          type="button"
+          className={`ac-chip ${filters.experience_level === "senior" ? "is-active" : ""}`}
+          onClick={() => set("experience_level", filters.experience_level === "senior" ? undefined : "senior")}
+          style={{ cursor: "pointer", border: "1px solid var(--ac-outline-variant)" }}
+        >
+          🚀 Senior (5+ yrs)
+        </button>
+
+        <button
+          type="button"
+          className={`ac-chip ${filters.min_score === 75 ? "is-active" : ""}`}
+          onClick={() => set("min_score", filters.min_score === 75 ? 0 : 75)}
+          style={{ cursor: "pointer", border: "1px solid var(--ac-outline-variant)" }}
+        >
+          🎯 75%+ Matches
+        </button>
+
+        <button
+          type="button"
+          className={`ac-chip ${filters.prep_only ? "is-active" : ""}`}
+          onClick={() => set("prep_only", !filters.prep_only)}
+          style={{ cursor: "pointer", border: "1px solid var(--ac-outline-variant)" }}
+        >
+          <span className="material-symbols-outlined" style={{ fontSize: 15 }}>mic</span>
+          Prep Ready
+        </button>
+
+        {hasActiveFilters && (
+          <button
+            type="button"
+            className="ac-chip"
+            onClick={resetFilters}
+            style={{ cursor: "pointer", background: "var(--surface-raised)", color: "var(--ac-primary)", borderColor: "var(--ac-primary)" }}
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: 15 }}>close</span>
+            Reset filters
+          </button>
+        )}
+      </div>
 
       {error && <ErrorBox error={error} />}
       {isPending && <TableSkeleton />}
