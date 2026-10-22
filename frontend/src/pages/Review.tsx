@@ -63,7 +63,7 @@ export default function Review() {
       )}
 
       {data && data.jobs.length > 0 && (
-        <div className="table-wrap">
+        <div className="table-wrap table-responsive-review">
           <table>
             <thead>
               <tr>
@@ -77,8 +77,8 @@ export default function Review() {
             <tbody>
               {data.jobs.map((job) => (
                 <tr key={job.id}>
-                  <td><ScoreBadge score={job.score} /></td>
-                  <td>
+                  <td className="col-score"><ScoreBadge score={job.score} /></td>
+                  <td className="col-role">
                     <Link to={`/job/${job.id}`} className="cell-title">{job.title}</Link>
                     {job.score?.missing_keywords.length ? (
                       <Chips items={job.score.missing_keywords} variant="miss" max={4} />
@@ -93,10 +93,10 @@ export default function Review() {
                       </div>
                     )}
                   </td>
-                  <td>{job.company}</td>
-                  <td className="cell-dim num">{relTime(job.posted_at ?? job.first_seen_at)}</td>
-                  <td>
-                    <div style={{ display: "flex", gap: 6 }}>
+                  <td className="col-company">{job.company}</td>
+                  <td className="col-age cell-dim num">{relTime(job.posted_at ?? job.first_seen_at)}</td>
+                  <td className="col-actions">
+                    <div className="review-action-btns" style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                       <button
                         className="btn-primary btn-sm"
                         onClick={() => {

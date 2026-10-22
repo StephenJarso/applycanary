@@ -46,8 +46,19 @@ const NAV = [
   { to: "/profile", label: "Profile", icon: "person" },
 ] as const;
 
-const MOBILE_MORE = NAV.filter((item) => !("mobile" in item && item.mobile));
-const MOBILE_MORE_PATHS = MOBILE_MORE.map((item) => item.to);
+const MOBILE_DRAWER_PAGES = [
+  { to: "/internships", label: "Internships & Opportunities", icon: "school", end: true },
+  { to: "/opportunities", label: "Programs", icon: "event", end: true },
+  { to: "/applications", label: "Applications", icon: "work_history", end: true },
+  { to: "/sources", label: "Sources Status", icon: "cable", end: true },
+  { to: "/profile", label: "Profile & Resume", icon: "person", end: true },
+] as const;
+
+const MOBILE_MORE_PATHS = [
+  ...NAV.filter((item) => !("mobile" in item && item.mobile)).map((item) => item.to),
+  "/applications",
+  "/sources",
+];
 
 function Dashboard({ page }: { page?: "internships" | "programs" | "kenya-jobs" }) {
   const { user, logout } = useAuth();
@@ -234,8 +245,18 @@ function Dashboard({ page }: { page?: "internships" | "programs" | "kenya-jobs" 
               </button>
             </div>
 
+            <div className="mobile-more-user-card">
+              <div className="sidebar-user-avatar">{user?.email?.[0]?.toUpperCase() ?? "A"}</div>
+              <div className="sidebar-user-info">
+                <div className="sidebar-user-name">{user?.email?.split("@")[0] ?? ""}</div>
+                <div className="sidebar-user-plan">
+                  {user?.is_admin ? "Administrator" : "Free Plan"}
+                </div>
+              </div>
+            </div>
+
             <nav className="mobile-more-links" aria-label="More pages">
-              {MOBILE_MORE.map((item) => (
+              {MOBILE_DRAWER_PAGES.map((item) => (
                 <NavLink
                   key={item.label}
                   to={item.to}
@@ -248,6 +269,44 @@ function Dashboard({ page }: { page?: "internships" | "programs" | "kenya-jobs" 
                 </NavLink>
               ))}
             </nav>
+
+            <div className="mobile-more-actions">
+              <button
+                type="button"
+                className="btn-ai mobile-more-action-btn"
+                onClick={() => {
+                  setMoreOpen(false);
+                  void score.mutate();
+                }}
+                disabled={busy}
+                title="Score unscored jobs against your resume"
+              >
+                <span className="material-symbols-outlined" aria-hidden="true">auto_fix_high</span>
+                Score Jobs
+              </button>
+              <button
+                type="button"
+                className="btn-ghost mobile-more-action-btn"
+                onClick={() => {
+                  setMoreOpen(false);
+                  setFeedbackOpen(true);
+                }}
+              >
+                <span className="material-symbols-outlined" aria-hidden="true">chat</span>
+                Feedback &amp; Help
+              </button>
+              <button
+                type="button"
+                className="btn-ghost mobile-more-action-btn mobile-more-logout"
+                onClick={() => {
+                  setMoreOpen(false);
+                  void logout();
+                }}
+              >
+                <span className="material-symbols-outlined" aria-hidden="true">logout</span>
+                Sign Out
+              </button>
+            </div>
           </aside>
         </div>
       )}

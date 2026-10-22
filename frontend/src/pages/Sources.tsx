@@ -36,7 +36,7 @@ export default function Sources() {
       )}
 
       {data && data.length > 0 && (
-        <div className="table-wrap">
+        <div className="table-wrap table-responsive-sources">
           <table>
             <thead>
               <tr>
@@ -53,21 +53,21 @@ export default function Sources() {
             <tbody>
               {data.map((s) => (
                 <tr key={s.source}>
-                  <td><span className={`dot ${s.ok ? "dot-ok" : "dot-bad"}`} /></td>
-                  <td>
+                  <td className="col-dot"><span className={`dot ${s.ok ? "dot-ok" : "dot-bad"}`} /></td>
+                  <td className="col-source">
                     <div className="cell-title">{s.source}</div>
                     {s.last_error && (
                       <div style={{ color: "var(--bad)", fontSize: 11.5 }}>{s.last_error}</div>
                     )}
                   </td>
-                  <td className="cell-dim num">{s.runs}</td>
-                  <td className="num" style={{ color: s.failures ? "var(--bad)" : "var(--text-dim)" }}>
+                  <td className="col-runs cell-dim num" data-label="Runs">{s.runs}</td>
+                  <td className="col-failures num" data-label="Failures" style={{ color: s.failures ? "var(--bad)" : "var(--text-dim)" }}>
                     {s.failures}
                   </td>
-                  <td className="cell-dim num">{s.found}</td>
-                  <td className="cell-dim num">{s.new_jobs}</td>
-                  <td className="cell-dim num">{relTime(s.last_run_at)}</td>
-                  <td className="cell-dim num">{s.last_duration_ms}ms</td>
+                  <td className="col-found cell-dim num" data-label="Found">{s.found}</td>
+                  <td className="col-new cell-dim num" data-label="New">{s.new_jobs}</td>
+                  <td className="col-last cell-dim num" data-label="Last run">{relTime(s.last_run_at)}</td>
+                  <td className="col-duration cell-dim num" data-label="Duration">{s.last_duration_ms}ms</td>
                 </tr>
               ))}
             </tbody>

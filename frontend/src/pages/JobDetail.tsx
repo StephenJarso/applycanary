@@ -72,26 +72,28 @@ export default function JobDetail() {
       <Link to="/jobs" className="btn-ghost btn-sm" style={{ marginBottom: 14 }}>← Jobs</Link>
 
       <div className="detail-head">
-        <div className="job-score-band band-strong" aria-hidden="true">
-          {job.score ? Math.round(job.score.total) : "—"}
-        </div>
-        <div>
-          <h2 className="detail-title">{job.title}</h2>
-          <div className="detail-meta">
-            <strong style={{ color: "var(--text)" }}>{job.company}</strong>
-            <span>·</span>
-            <span>{job.is_remote ? "Remote" : job.location || "Location not stated"}</span>
-            {salary && <><span>·</span><span>{salary}</span></>}
-            <span>·</span>
-            <span>{relTime(job.posted_at ?? job.first_seen_at)} old</span>
-            <span>·</span>
-            <span className="chip">{job.source}</span>
-            <span className="chip">{job.status}</span>
-            {job.seen_count > 1 && (
-              <span className="chip" title="Deduplicated sightings across boards">
-                seen {job.seen_count}×
-              </span>
-            )}
+        <div className="detail-head-main">
+          <div className="job-score-band band-strong" aria-hidden="true">
+            {job.score ? Math.round(job.score.total) : "—"}
+          </div>
+          <div className="detail-head-info">
+            <h2 className="detail-title">{job.title}</h2>
+            <div className="detail-meta">
+              <strong style={{ color: "var(--text)" }}>{job.company}</strong>
+              <span>·</span>
+              <span>{job.is_remote ? "Remote" : job.location || "Location not stated"}</span>
+              {salary && <><span>·</span><span>{salary}</span></>}
+              <span>·</span>
+              <span>{relTime(job.posted_at ?? job.first_seen_at)} old</span>
+              <span>·</span>
+              <span className="chip">{job.source}</span>
+              <span className="chip">{job.status}</span>
+              {job.seen_count > 1 && (
+                <span className="chip" title="Deduplicated sightings across boards">
+                  seen {job.seen_count}×
+                </span>
+              )}
+            </div>
           </div>
         </div>
 

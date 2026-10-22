@@ -53,7 +53,7 @@ export default function PublicNav({ localSections = false, onLogin, onSignup }: 
           <div className="landing-nav-actions">
             <button
               type="button"
-              className="landing-login"
+              className="landing-login landing-contact-btn"
               onClick={() => setFeedbackOpen(true)}
               style={{ background: "transparent", border: "1px solid var(--border)" }}
             >

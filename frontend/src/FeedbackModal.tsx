@@ -47,10 +47,14 @@ export function FeedbackModal({ isOpen, onClose }: Props) {
         onClick={(e) => e.stopPropagation()}
         style={{
           maxWidth: 480,
-          width: "90%",
+          width: "92%",
+          maxHeight: "min(92vh, 640px)",
+          overflowY: "auto",
+          WebkitOverflowScrolling: "touch",
           margin: "auto",
           background: "var(--ac-surface, #fff)",
           boxShadow: "0 10px 25px rgba(0,0,0,0.2)",
+          padding: "20px 18px",
         }}
       >
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>

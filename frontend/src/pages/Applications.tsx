@@ -30,7 +30,7 @@ export default function Applications() {
       )}
 
       {data && data.length > 0 && (
-        <div className="table-wrap">
+        <div className="table-wrap table-responsive-apps">
           <table>
             <caption className="sr-only">{data.length} submitted applications</caption>
             <thead>
@@ -45,13 +45,13 @@ export default function Applications() {
             <tbody>
               {data.map((job) => (
                 <tr key={job.id}>
-                  <td><ScoreBadge score={job.score} /></td>
-                  <td>
+                  <td className="col-score"><ScoreBadge score={job.score} /></td>
+                  <td className="col-role">
                     <Link to={`/job/${job.id}`} className="cell-title">{job.title}</Link>
                   </td>
-                  <td>{job.company}</td>
-                  <td className="cell-dim">{job.source}</td>
-                  <td className="cell-dim">
+                  <td className="col-company">{job.company}</td>
+                  <td className="col-source cell-dim">{job.source}</td>
+                  <td className="col-status cell-dim">
                     <span className="chip">{job.status}</span>
                   </td>
                 </tr>

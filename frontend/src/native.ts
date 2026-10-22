@@ -1,4 +1,6 @@
 import { Capacitor } from "@capacitor/core";
+import { App as CapApp } from "@capacitor/app";
+import { StatusBar, Style } from "@capacitor/status-bar";
 
 /**
  * Native-shell bootstrap. Runs once before React mounts (see main.tsx).
@@ -19,10 +21,44 @@ export async function initNative(): Promise<void> {
       "[ApplyCanary] No VITE_API_BASE set — API calls will fail in the native shell. " +
         "Rebuild with VITE_API_BASE=https://your-backend (or set localStorage['ac.api-base']).",
     );
-    return;
+  } else {
+    // Route fetch through native HTTP (no CORS preflights from the WebView).
+    const w = window as unknown as { CapacitorHttp?: { patchFetch?: () => void } };
+    w.CapacitorHttp?.patchFetch?.();
   }
 
-  // Route fetch through native HTTP (no CORS preflights from the WebView).
-  const w = window as unknown as { CapacitorHttp?: { patchFetch?: () => void } };
-  w.CapacitorHttp?.patchFetch?.();
+  // Mobile status bar styling
+  try {
+    await StatusBar.setStyle({ style: Style.Light });
+    if (Capacitor.getPlatform() === "android") {
+      await StatusBar.setOverlaysWebView({ overlay: false });
+    }
+  } catch (err) {
+    console.debug("[ApplyCanary] StatusBar configuration skipped:", err);
+  }
+
+  // Native Android hardware back-button handling
+  try {
+    await CapApp.addListener("backButton", ({ canGoBack }) => {
+      // Check if a modal is open
+      const modalBackdrop = document.querySelector(".modal-backdrop") as HTMLElement | null;
+      if (modalBackdrop) {
+        modalBackdrop.click();
+        return;
+      }
+      // Check if the more menu is open
+      const moreCloseBtn = document.querySelector(".mobile-more-close") as HTMLButtonElement | null;
+      if (moreCloseBtn) {
+        moreCloseBtn.click();
+        return;
+      }
+      if (canGoBack) {
+        window.history.back();
+      } else {
+        void CapApp.exitApp();
+      }
+    });
+  } catch (err) {
+    console.debug("[ApplyCanary] BackButton listener skipped:", err);
+  }
 }

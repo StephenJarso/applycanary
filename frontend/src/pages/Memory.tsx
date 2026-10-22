@@ -188,7 +188,7 @@ export default function Memory() {
             }
           />
         ) : (
-          <div className="table-wrap">
+          <div className="table-wrap table-responsive-memory">
             <table>
               <thead>
                 <tr>
@@ -201,16 +201,16 @@ export default function Memory() {
               <tbody>
                 {data.sessions.map((s) => (
                   <tr key={s.id} className="row-link">
-                    <td>
+                    <td className="col-job">
                       <JobLink jobId={s.job_id} />
                     </td>
-                    <td>
+                    <td className="col-score">
                       <span className={`score ${(s.avg_score ?? 0) >= 70 ? "score-strong" : (s.avg_score ?? 0) >= 40 ? "score-mid" : "score-weak"}`}>
                         {s.avg_score != null ? Math.round(s.avg_score) : "—"}
                       </span>
                     </td>
-                    <td className="cell-dim">{s.mode === "speech" ? "🎙 voice" : "⌨ typed"}</td>
-                    <td className="cell-dim">
+                    <td className="col-mode cell-dim">{s.mode === "speech" ? "🎙 voice" : "⌨ typed"}</td>
+                    <td className="col-when cell-dim">
                       {s.finished_at ? new Date(s.finished_at).toLocaleString() : "in progress"}
                     </td>
                   </tr>
