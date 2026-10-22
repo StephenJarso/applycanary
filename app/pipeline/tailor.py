@@ -261,6 +261,9 @@ def _render_cv_html(text: str) -> str:
     if not text:
         return ""
     import re
+
+    from app.resume.parse import normalize_bullets
+    text = normalize_bullets(text)
     lines = text.splitlines()
     html_parts = []
     first_line = True

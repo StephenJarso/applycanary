@@ -72,6 +72,26 @@ class ParsedResume:
         return re.findall(r"[a-zA-Z][a-zA-Z0-9+#.\-]*", self.text.lower())
 
 
+def normalize_bullets(text: str) -> str:
+    """Normalize PDF CID bullet glyphs and private-use characters to standard bullets.
+
+    PDF text extraction often maps custom font bullet glyphs to literal '(cid:127)'
+    or private-use unicode characters (e.g. \uf0b7) when the PDF lacks a ToUnicode CMap.
+    This replaces them with standard bullet points ('• ').
+    """
+    if not text:
+        return ""
+    # Map common font-encoding bullet CIDs to a bullet symbol
+    text = re.sub(r"\(cid:(?:127|143|144|0|1|2)\)", "•", text)
+    # Line-leading unmapped CID markers (e.g. '(cid:3) ') are bullet points
+    text = re.sub(r"(?m)^\s*\(cid:\d+\)\s*", "• ", text)
+    # Word / Symbol / Wingdings private-use area bullet glyphs
+    text = re.sub(r"[\uf0b7\uf0a7\uf076\uf0d8\uf0e0\uf0a8]", "•", text)
+    # Any residual (cid:\d+) in the document
+    text = re.sub(r"\(cid:\d+\)", "•", text)
+    return text
+
+
 def parse_resume(path: str | Path) -> ParsedResume:
     p = Path(path)
     if not p.exists():
@@ -87,6 +107,7 @@ def parse_resume(path: str | Path) -> ParsedResume:
     else:
         parsed = _parse_text(p)
 
+    parsed.text = normalize_bullets(parsed.text)
     _extract_content_signals(parsed)
     return parsed
 
