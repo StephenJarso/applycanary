@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback, KeyboardEvent, ClipboardEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, type Profile } from "../api";
 import { Chips, ErrorBox, Loading } from "../components";
@@ -16,6 +16,124 @@ import {
 import { AdminPanel } from "../AdminPanel";
 
 const CSV_FIELDS = ["skills", "target_titles", "target_locations", "excluded_companies"] as const;
+
+// ---------------------------------------------------------------------------
+// TagInput — chip-based replacement for the plain CSV text field.
+// The caller owns the string[] array; this component fires onChange whenever
+// the array changes.  Tags are added on Enter or comma, removed with the ×
+// button or Backspace when the draft input is empty.
+// ---------------------------------------------------------------------------
+interface TagInputProps {
+  id: string;
+  tags: string[];
+  onChange: (tags: string[]) => void;
+  placeholder?: string;
+}
+
+function TagInput({ id, tags, onChange, placeholder }: TagInputProps) {
+  const [draft, setDraft] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const commit = useCallback(
+    (raw: string) => {
+      const value = raw.trim();
+      if (value && !tags.includes(value)) {
+        onChange([...tags, value]);
+      }
+      setDraft("");
+    },
+    [tags, onChange],
+  );
+
+  const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter" || e.key === ",") {
+      e.preventDefault();
+      commit(draft);
+    } else if (e.key === "Backspace" && draft === "" && tags.length > 0) {
+      onChange(tags.slice(0, -1));
+    }
+  };
+
+  const handlePaste = (e: ClipboardEvent<HTMLInputElement>) => {
+    const text = e.clipboardData.getData("text");
+    if (text.includes(",")) {
+      e.preventDefault();
+      const parts = text.split(",").map((s) => s.trim()).filter(Boolean);
+      const next = [...tags];
+      for (const p of parts) {
+        if (!next.includes(p)) next.push(p);
+      }
+      onChange(next);
+      setDraft("");
+    }
+    // single value without comma: let browser paste normally
+  };
+
+  const remove = (tag: string) => onChange(tags.filter((t) => t !== tag));
+
+  return (
+    <div
+      className="tag-input"
+      onClick={() => inputRef.current?.focus()}
+      style={{
+        display: "flex",
+        flexWrap: "wrap",
+        gap: 6,
+        padding: "6px 10px",
+        border: "1px solid var(--border)",
+        borderRadius: 6,
+        background: "var(--surface)",
+        cursor: "text",
+        minHeight: 38,
+        alignItems: "center",
+      }}
+    >
+      {tags.map((tag) => (
+        <span
+          key={tag}
+          className="chip"
+          style={{ display: "inline-flex", alignItems: "center", gap: 4 }}
+        >
+          {tag}
+          <button
+            type="button"
+            aria-label={`Remove ${tag}`}
+            onClick={(e) => { e.stopPropagation(); remove(tag); }}
+            style={{
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              padding: "0 2px",
+              lineHeight: 1,
+              fontSize: "0.85em",
+              opacity: 0.7,
+            }}
+          >
+            ×
+          </button>
+        </span>
+      ))}
+      <input
+        ref={inputRef}
+        id={id}
+        type="text"
+        value={draft}
+        placeholder={tags.length === 0 ? (placeholder ?? "Type and press Enter or ,") : ""}
+        onChange={(e) => setDraft(e.target.value)}
+        onKeyDown={handleKeyDown}
+        onPaste={handlePaste}
+        style={{
+          border: "none",
+          outline: "none",
+          background: "transparent",
+          flexGrow: 1,
+          minWidth: 120,
+          padding: "2px 0",
+        }}
+      />
+    </div>
+  );
+}
 
 export default function ProfilePage() {
   const qc = useQueryClient();
@@ -309,8 +427,19 @@ export default function ProfilePage() {
             checked={form.remote_only ?? false}
             onChange={(e) => set("remote_only", e.target.checked)}
           />
-          Remote roles only (strict filter)
+          Remote roles only (strict filter — overrides location targets)
         </label>
+        <label className="check" style={{ marginBottom: 14 }}>
+          <input
+            type="checkbox"
+            checked={form.open_to_relocation ?? false}
+            onChange={(e) => set("open_to_relocation" as any, e.target.checked)}
+          />
+          Open to relocation or visa-sponsored roles worldwide
+        </label>
+        <p className="cell-dim" style={{ marginTop: -8, marginBottom: 14 }}>
+          When checked, onsite roles abroad that offer visa sponsorship or a relocation package are included in your feed.
+        </p>
       </div>
 
       <div className="card">
@@ -527,15 +656,13 @@ export default function ProfilePage() {
           <div className="field" key={field}>
             <label htmlFor={field}>
               {field.replace(/_/g, " ").replace(/^\w/, (c) => c.toUpperCase())}
-              <span className="cell-dim"> (comma separated)</span>
+              <span className="cell-dim"> (press Enter or comma to add)</span>
             </label>
-            <input
+            <TagInput
               id={field}
-              type="text"
-              value={(form[field] ?? []).join(", ")}
-              onChange={(e) =>
-                set(field, e.target.value.split(",").map((s) => s.trim()).filter(Boolean))
-              }
+              tags={(form[field] ?? []) as string[]}
+              onChange={(tags) => set(field, tags)}
+              placeholder="Type and press Enter or ,"
             />
           </div>
         ))}

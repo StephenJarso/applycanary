@@ -326,6 +326,13 @@ def main() -> int:
         print(f"owner account: id={owner_id} email={owner_email} is_admin=True")
 
         # --- 5. user_id columns + backfill -----------------------------------
+        # Add new profile preference columns if they do not already exist.
+        profile_cols = {c[1] for c in conn.execute("PRAGMA table_info(profile)")}
+        if "open_to_relocation" not in profile_cols:
+            conn.execute(
+                "ALTER TABLE profile ADD COLUMN open_to_relocation BOOLEAN NOT NULL DEFAULT FALSE"
+            )
+            print("profile.open_to_relocation column added")
         conn.execute("ALTER TABLE profile ADD COLUMN user_id INTEGER")
         conn.execute(
             "UPDATE profile SET user_id = ? WHERE user_id IS NULL", (owner_id,)

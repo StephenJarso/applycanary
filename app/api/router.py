@@ -211,6 +211,7 @@ class ProfileOut(BaseModel):
     work_authorization: str = ""
     years_experience: int | None = None
     remote_only: bool = False
+    open_to_relocation: bool = False
     has_resume: bool = False
     resume_words: int = 0
     skills: list[str] = Field(default_factory=list)
@@ -255,6 +256,7 @@ class ProfileIn(BaseModel):
     work_authorization: str = ""
     years_experience: int | None = None
     remote_only: bool = False
+    open_to_relocation: bool = False
     # User-confirmed skills supplement skills detected from the uploaded resume.
     skills: list[str] = Field(default_factory=list)
     # Email alerts: send immediately when a posting scores at/above this (0 = off).
@@ -922,6 +924,7 @@ def get_profile(
         work_authorization=profile.work_authorization,
         years_experience=profile.years_experience,
         remote_only=profile.remote_only,
+        open_to_relocation=profile.open_to_relocation,
         has_resume=bool(profile.base_resume_text),
         resume_words=len((profile.base_resume_text or "").split()),
         skills=list(profile.skills or []),

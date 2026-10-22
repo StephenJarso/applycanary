@@ -154,6 +154,7 @@ class Profile(SQLModel, table=True):
     target_titles: list[str] = Field(default_factory=list, sa_column=Column(JSON))
     target_locations: list[str] = Field(default_factory=list, sa_column=Column(JSON))
     remote_only: bool = False
+    open_to_relocation: bool = False
     work_authorization: str = ""
     years_experience: int | None = None
     excluded_companies: list[str] = Field(default_factory=list, sa_column=Column(JSON))

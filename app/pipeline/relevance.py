@@ -214,15 +214,18 @@ def _home_words(profile: Profile) -> set[str]:
 def location_eligibility_reason(job: Job, profile: Profile) -> str:
     """Reject postings the seeker cannot legally take without a relocation.
 
-    Two cases matter for someone applying from Kenya:
+    Two cases matter:
 
-    * **Remote, but restricted abroad.** "Remote, US" roles pass a plain
-      ``is_remote`` check and then fill the feed with jobs that require US work
-      authorization. Only reject when the location names a foreign region and
-      nothing in the posting says worldwide/EMEA/Africa eligible.
+    * **Remote, but restricted abroad.** ``is_remote`` postings that name a
+      specific foreign region (e.g. "Remote, US") are rejected unless the job
+      description signals worldwide/EMEA/Africa eligibility or the seeker's
+      home location matches the region.
     * **Onsite abroad without sponsorship.** The seeker will relocate only when
       the employer sponsors the visa or pays for the move, so such a posting is
       only allowed when the description says so.
+
+    Both checks are bypassed when ``profile.open_to_relocation`` is True —
+    the seeker has explicitly opted in to relocated/visa-sponsored roles.
 
     An unknown location is never fatal: absence of data is not evidence.
     """
@@ -230,6 +233,12 @@ def location_eligibility_reason(job: Job, profile: Profile) -> str:
     loc_low = location.lower()
     desc_low = (job.description or "").lower()
     home = _home_words(profile)
+
+    # Seeker explicitly opted in to relocation/visa-sponsored roles: let
+    # everything through.  Individual job descriptions are still evaluated by
+    # the LLM in tier-2, which will note the relocation requirement.
+    if getattr(profile, "open_to_relocation", False):
+        return ""
 
     if job.is_remote:
         if not loc_low or not home:

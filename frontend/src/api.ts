@@ -222,6 +222,7 @@ export interface Profile {
   work_authorization: string;
   years_experience: number | null;
   remote_only: boolean;
+  open_to_relocation: boolean;
   has_resume: boolean;
   resume_words: number;
   skills: string[];

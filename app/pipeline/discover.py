@@ -136,6 +136,14 @@ def build_queries(profile) -> list[str]:  # noqa: ANN001
             if len(queries) >= MAX_QUERIES_PER_PROFILE:
                 return queries[:MAX_QUERIES_PER_PROFILE]
 
+    # When the seeker is open to relocation, search for visa-sponsored postings
+    # in addition to local/remote ones.
+    if getattr(profile, "open_to_relocation", False) and primary:
+        for suffix in ("visa sponsorship", "relocation package"):
+            add(f"{primary} {suffix}", related=True)
+            if len(queries) >= MAX_QUERIES_PER_PROFILE:
+                return queries[:MAX_QUERIES_PER_PROFILE]
+
     role_added = False
     for skill in skills:
         role = _SKILL_ROLE_QUERIES.get(skill)
