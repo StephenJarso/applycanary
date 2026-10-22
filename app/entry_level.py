@@ -32,6 +32,7 @@ import httpx
 log = logging.getLogger(__name__)
 
 BASE_URL = "https://work.ke"
+JOB_INDEX_PATH = "/job-index.json"
 LISTING_PATHS = (
     "/jobs/entry-level-technology",
     "/jobs/junior-tech",
@@ -171,6 +172,9 @@ def _parse_tile(href: str, block: str) -> dict[str, Any]:
         "description": "",
         "seniority": "",
         "work_mode": "",
+        "employment_type": "",
+        "county": "",
+        "location_labels": [location.strip()] if location.strip() else [],
         "is_remote": _looks_remote(location),
         "apply_url": f"{BASE_URL}{href}",
     }
@@ -283,6 +287,88 @@ async def fetch_entry_level(client: httpx.AsyncClient | None = None) -> dict[str
         )
 
     try:
+        # Try work.ke's live job index first (complete Kenyan job catalog across all disciplines)
+        try:
+            res = await client.get(
+                f"{BASE_URL}{JOB_INDEX_PATH}",
+                headers={"Accept": "application/json, text/plain, */*"},
+            )
+            if res.status_code == 200:
+                raw_items = res.json()
+                if isinstance(raw_items, list) and len(raw_items) > 0:
+                    now = datetime.now(UTC)
+                    roles: list[dict[str, Any]] = []
+                    for item in raw_items:
+                        slug = item.get("slug") or item.get("id") or ""
+                        if not slug:
+                            continue
+                        closing_at = None
+                        raw_closing = item.get("closingAt")
+                        if raw_closing:
+                            try:
+                                closing_at = datetime.fromisoformat(
+                                    raw_closing.replace("Z", "+00:00")
+                                )
+                            except ValueError:
+                                pass
+
+                        seniority = item.get("seniority", "")
+                        if seniority == "Unknown":
+                            seniority = ""
+                        employment_type = item.get("employmentType", "")
+                        if employment_type == "Unknown":
+                            employment_type = ""
+                        work_mode = item.get("workMode", "")
+                        if work_mode == "Unknown":
+                            work_mode = ""
+
+                        location = (item.get("location") or "").strip()
+                        county = (item.get("county") or "").strip()
+                        location_labels = item.get("locationLabels") or []
+
+                        is_remote = (
+                            work_mode.lower() == "remote"
+                            or _looks_remote(location)
+                            or any(_looks_remote(str(l)) for l in location_labels)
+                        )
+
+                        source_url = f"{BASE_URL}/jobs/{slug}"
+                        apply_url = source_url
+
+                        roles.append({
+                            "slug": slug,
+                            "source_url": source_url,
+                            "title": item.get("title", "").strip(),
+                            "employer": item.get("employer", "").strip(),
+                            "location": location,
+                            "county": county,
+                            "category": (item.get("category") or "").strip(),
+                            "employer_type": (item.get("sourceName") or "").strip(),
+                            "agency": (item.get("sourceName") or "").strip()
+                            if item.get("sourceType") == "recruitment-agency"
+                            else "",
+                            "salary_disclosed": bool(item.get("salaryDisclosed")),
+                            "closing_label": (item.get("closingLabel") or "").strip(),
+                            "closing_at": closing_at,
+                            "summary": "",
+                            "description": "",
+                            "seniority": seniority.strip(),
+                            "work_mode": work_mode.strip(),
+                            "employment_type": employment_type.strip(),
+                            "location_labels": location_labels,
+                            "is_remote": is_remote,
+                            "apply_url": apply_url,
+                        })
+                    roles.sort(key=_sort_key)
+                    return {
+                        "roles": roles,
+                        "fetched_at": now,
+                        "source": "work.ke",
+                        "warnings": [],
+                    }
+        except Exception as exc:  # noqa: BLE001 - fallback to HTML scraping
+            log.warning("work.ke job-index.json fetch failed (%s); falling back to html scraping", exc)
+
         pages = await asyncio.gather(
             *(_get(client, f"{BASE_URL}{path}") for path in LISTING_PATHS),
             return_exceptions=True,

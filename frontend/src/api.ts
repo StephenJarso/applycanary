@@ -194,6 +194,9 @@ export interface EntryLevelRole {
   apply_url: string;
   /** The work.ke listing, kept for provenance. */
   source_url: string;
+  employment_type?: string;
+  county?: string;
+  location_labels?: string[];
 }
 
 export interface EntryLevelFeed {
@@ -566,6 +569,8 @@ export const api = {
   publicJobs: (filters: { q?: string; source?: string; remote_only?: boolean; sort?: "newest" | "oldest" } = {}) => request<PublicJobList>(`/public/jobs${qs(filters as JobFilters)}`),
   opportunities: () => request<Opportunities>("/public/opportunities"),
   internships: () => request<Opportunities>("/public/internships"),
+  kenyaJobs: (refresh = false) =>
+    request<EntryLevelFeed>(`/public/kenya-jobs${refresh ? "?refresh=true" : ""}`),
   entryLevel: (refresh = false) =>
     request<EntryLevelFeed>(`/public/entry-level${refresh ? "?refresh=true" : ""}`),
   job: (id: number) => request<JobDetail>(`/jobs/${id}`),

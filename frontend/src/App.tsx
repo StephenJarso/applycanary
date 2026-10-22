@@ -16,7 +16,7 @@ import VerifyEmail from "./pages/VerifyEmail";
 import Landing from "./pages/Landing";
 import Opportunities from "./pages/Opportunities";
 import Internships from "./pages/Internships";
-import EntryLevel from "./pages/EntryLevel";
+import KenyaJobs from "./pages/KenyaJobs";
 import { useAuth } from "./context/AuthContext";
 import { FeedbackModal } from "./FeedbackModal";
 import {
@@ -38,9 +38,8 @@ import { fmtDate } from "./OpportunityCard";
 const NAV = [
   { to: "/jobs", label: "Home", icon: "dashboard", end: true, mobile: true },
   { to: "/review", label: "Discovery", icon: "search", mobile: true },
-  // work.ke's entry-level technology feed: the first-rung roles the broad
-  // boards bury under senior postings.
-  { to: "/entry-level", label: "Entry level", icon: "work", mobile: true },
+  // Live Kenyan vacancies from work.ke across all sectors and experience levels
+  { to: "/kenya-jobs", label: "Kenya Jobs", icon: "work", mobile: true },
   { to: "/internships", label: "Internships & Opportunities", short: "Internships", icon: "school", end: true },
   { to: "/opportunities", label: "Programs", icon: "event", end: true },
   { to: "/memory", label: "Memory", icon: "psychology", mobile: true },
@@ -50,7 +49,7 @@ const NAV = [
 const MOBILE_MORE = NAV.filter((item) => !("mobile" in item && item.mobile));
 const MOBILE_MORE_PATHS = MOBILE_MORE.map((item) => item.to);
 
-function Dashboard({ page }: { page?: "internships" | "programs" }) {
+function Dashboard({ page }: { page?: "internships" | "programs" | "kenya-jobs" }) {
   const { user, logout } = useAuth();
   const location = useLocation();
   const [moreOpen, setMoreOpen] = useState(false);
@@ -387,12 +386,15 @@ function Dashboard({ page }: { page?: "internships" | "programs" }) {
             <Internships embedded />
           ) : page === "programs" ? (
             <Opportunities embedded />
+          ) : page === "kenya-jobs" ? (
+            <KenyaJobs embedded />
           ) : (
             <Routes>
               <Route path="/jobs" element={<Jobs />} />
               <Route path="/job/:id" element={<JobDetail />} />
               <Route path="/job/:id/interview" element={<InterviewStudio />} />
-              <Route path="/entry-level" element={<EntryLevel />} />
+              <Route path="/kenya-jobs" element={<KenyaJobs embedded />} />
+              <Route path="/entry-level" element={<Navigate to="/kenya-jobs" replace />} />
               <Route path="/memory" element={<Memory />} />
               <Route path="/review" element={<Review />} />
               <Route path="/applications" element={<Applications />} />
@@ -427,6 +429,8 @@ export default function App() {
         prop because a descendant Routes would resolve against this path. */}
     <Route path="/opportunities" element={user ? <Dashboard page="programs" /> : <Opportunities />} />
     <Route path="/internships" element={user ? <Dashboard page="internships" /> : <Navigate to="/" replace />} />
+    <Route path="/kenya-jobs" element={user ? <Dashboard page="kenya-jobs" /> : <KenyaJobs embedded={false} />} />
+    <Route path="/entry-level" element={<Navigate to="/kenya-jobs" replace />} />
     {/* Public regardless of session: these are opened from an email, and the
         link must not be swallowed by a redirect to /login. Confirming an
         address is also something a signed-in user does. */}

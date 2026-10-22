@@ -182,6 +182,9 @@ class EntryLevelRoleOut(BaseModel):
     summary: str = ""
     apply_url: str
     source_url: str
+    employment_type: str = ""
+    county: str = ""
+    location_labels: list[str] = Field(default_factory=list)
 
 
 class EntryLevelFeedOut(BaseModel):
@@ -541,6 +544,7 @@ def public_internships() -> OpportunitiesOut:
     return OpportunitiesOut(**get_internships())
 
 
+@router.get("/public/kenya-jobs", response_model=EntryLevelFeedOut)
 @router.get("/public/entry-level", response_model=EntryLevelFeedOut)
 async def public_entry_level(refresh: bool = False) -> EntryLevelFeedOut:
     """Entry-level IT and tech roles curated by work.ke.
