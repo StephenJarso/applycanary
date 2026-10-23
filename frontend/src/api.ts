@@ -619,6 +619,7 @@ export const api = {
   submit: (id: number, force = false) =>
     request<ActionResult>(`/jobs/${id}/submit?force=${force}`, { method: "POST" }),
   skip: (id: number) => request<ActionResult>(`/jobs/${id}/skip`, { method: "POST" }),
+  save: (id: number) => request<ActionResult>(`/jobs/${id}/save`, { method: "POST" }),
   prep: (id: number) => request<ActionResult>(`/jobs/${id}/prep`, { method: "POST" }),
 
   poll: () => request<ActionResult>("/actions/poll", { method: "POST" }),

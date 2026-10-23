@@ -1493,6 +1493,28 @@ def skip(
     return ActionResult(ok=True, message="Skipped.")
 
 
+@router.post("/jobs/{job_id}/save", response_model=ActionResult)
+def save_job(
+    job_id: int,
+    session: Session = Depends(get_session),
+    user: User = Depends(current_user),
+) -> ActionResult:
+    """Toggle save/bookmark on a job."""
+    job = session.get(Job, job_id)
+    if job is None:
+        raise HTTPException(404, "job not found")
+    state = user_job(session, user.id, job_id)
+    if state.status == JobStatus.SAVED:
+        state.status = JobStatus.NEW
+        session.add(state)
+        session.commit()
+        return ActionResult(ok=True, message="Removed from saved jobs.")
+    state.status = JobStatus.SAVED
+    session.add(state)
+    session.commit()
+    return ActionResult(ok=True, message="Saved for later.")
+
+
 @router.post("/jobs/{job_id}/prep", response_model=ActionResult)
 async def make_prep(
     job_id: int,

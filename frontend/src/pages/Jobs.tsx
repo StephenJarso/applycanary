@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { api, type JobFilters } from "../api";
 import { useAuth } from "../context/AuthContext";
@@ -24,11 +24,12 @@ export default function Jobs() {
   });
   const [search, setSearch] = useState("");
   const navigate = useNavigate();
-  const { user } = useAuth();
-  // Greet by profile name when one is on file, falling back to the email
-  // handle — never a hardcoded placeholder.
-  const { data: profile } = useQuery({ queryKey: ["profile"], queryFn: api.profile });
-  const firstName =
+const { user } = useAuth();
+// Greet by profile name when one is on file, falling back to the email
+// handle — never a hardcoded placeholder.
+const { data: profile } = useQuery({ queryKey: ["profile"], queryFn: api.profile });
+const qc = useQueryClient();
+const firstName =
     profile?.full_name?.trim().split(/\s+/)[0]
     || user?.email?.split("@")[0]
     || "there";
@@ -38,6 +39,14 @@ export default function Jobs() {
   const { data, isPending, error } = useQuery({
     queryKey: ["jobs", filters, offset],
     queryFn: () => api.jobs({ ...filters, limit: PAGE_SIZE, offset }),
+  });
+
+  const saveJob = useMutation({
+    mutationFn: (id: number) => api.save(id),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["jobs"] });
+      void qc.invalidateQueries({ queryKey: ["job"] });
+    },
   });
 
   const set = <K extends keyof JobFilters>(key: K, value: JobFilters[K]) => {
@@ -510,6 +519,17 @@ export default function Jobs() {
                         }}
                       >
                         Review
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          saveJob.mutate(job.id);
+                        }}
+                        className={`btn-sm ${job.status === "saved" ? "btn-primary" : "btn-ghost"}`}
+                        title={job.status === "saved" ? "Remove from saved" : "Save for later"}
+                        disabled={saveJob.isPending}
+                      >
+                        {job.status === "saved" ? "★ Saved" : "☆ Save"}
                       </button>
                     </div>
                   </div>

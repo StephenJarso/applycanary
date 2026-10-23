@@ -54,6 +54,7 @@ export default function JobDetail() {
   const tailor = useMutation({ mutationFn: () => api.tailor(jobId), onSuccess: refresh });
   const submit = useMutation({ mutationFn: () => api.submit(jobId), onSuccess: refresh });
   const skip = useMutation({ mutationFn: () => api.skip(jobId), onSuccess: refresh });
+  const save = useMutation({ mutationFn: () => api.save(jobId), onSuccess: refresh });
   const prep = useMutation({ mutationFn: () => api.prep(jobId), onSuccess: refresh });
 
   if (isPending) return <Loading label="Loading job" />;
@@ -64,7 +65,7 @@ export default function JobDetail() {
     job.salary_min, job.salary_max, job.salary_currency, job.salary_is_estimate,
   );
   const version = job.resume_version;
-  const busy = tailor.isPending || submit.isPending || skip.isPending || prep.isPending;
+  const busy = tailor.isPending || submit.isPending || skip.isPending || save.isPending || prep.isPending;
   const blocked = version?.truthcheck_passed === false;
 
   return (
@@ -126,6 +127,14 @@ export default function JobDetail() {
           </button>
           <button onClick={() => skip.mutate()} disabled={busy} className="btn-danger btn-sm">
             Skip
+          </button>
+          <button
+            onClick={() => save.mutate()}
+            disabled={busy}
+            className={`btn-sm ${job.status === "saved" ? "btn-primary" : "btn-ghost"}`}
+            title={job.status === "saved" ? "Remove from saved" : "Save for later"}
+          >
+            {job.status === "saved" ? "★ Saved" : "☆ Save"}
           </button>
         </div>
       </div>

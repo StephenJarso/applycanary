@@ -31,6 +31,7 @@ class JobStatus(StrEnum):
     APPLIED = "applied"
     REJECTED = "rejected"      # filtered out by scoring
     SKIPPED = "skipped"        # user declined
+    SAVED = "saved"            # bookmarked for later
     EXPIRED = "expired"        # vanished from source
     FAILED = "failed"          # submission errored
 
