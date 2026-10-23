@@ -29,6 +29,7 @@ export default function Review() {
     onSuccess: refresh,
   });
   const skip = useMutation({ mutationFn: (id: number) => api.skip(id), onSuccess: refresh });
+  const save = useMutation({ mutationFn: (id: number) => api.save(id), onSuccess: refresh });
 
   const totalPages = useMemo(
     () => Math.max(1, Math.ceil((data?.total ?? 0) / PAGE_SIZE)),
@@ -95,7 +96,7 @@ export default function Review() {
                   </td>
                   <td className="col-company">{job.company}</td>
                   <td className="col-age cell-dim num">{relTime(job.posted_at ?? job.first_seen_at)}</td>
-                  <td className="col-actions">
+<td className="col-actions">
                     <div className="review-action-btns" style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                       <button
                         className="btn-primary btn-sm"
@@ -107,9 +108,17 @@ export default function Review() {
                         }}
                         disabled={submit.isPending}
                       >
-                        Approve &amp; send
+                        Approve & send
                       </button>
                       <Link to={`/job/${job.id}`} className="btn btn-sm">Review</Link>
+                      <button
+                        onClick={() => save.mutate(job.id)}
+                        className={`btn-sm ${job.status === "saved" ? "btn-primary" : "btn-ghost"}`}
+                        title={job.status === "saved" ? "Remove from saved" : "Save for later"}
+                        disabled={save.isPending}
+                      >
+                        {job.status === "saved" ? "★ Saved" : "☆ Save"}
+                      </button>
                       <button
                         className="btn-danger btn-sm"
                         onClick={() => skip.mutate(job.id)}
