@@ -818,6 +818,65 @@ export default function ProfilePage() {
         {saveEmailSending.isError && <ErrorBox error={saveEmailSending.error} />}
         {smtpMessage && <div className="banner banner-ok" role="status">{smtpMessage}</div>}
       </div>
+
+      <div className="card" style={{ marginTop: 16 }}>
+        <h3 className="card-title">
+          <span className="material-symbols-outlined" aria-hidden="true">send</span>
+          Auto-submit preferences
+        </h3>
+        <p className="cell-dim" style={{ marginTop: 0 }}>
+          When enabled, ApplyCanary will automatically submit approved applications
+          for jobs that score at or above your threshold. Each application is still
+          reviewed by you in Discovery before sending. Requires a connected mailbox
+          (see "Send applications from my inbox" above).
+        </p>
+        <label className="check" style={{ marginBottom: 14 }}>
+          <input
+            type="checkbox"
+            checked={form.enable_auto_submit ?? false}
+            onChange={(e) => set("enable_auto_submit", e.target.checked)}
+          />
+          Enable auto-submit for approved applications
+        </label>
+        <div className="grid2">
+          <div className="field">
+            <label htmlFor="auto-submit-min-score">Minimum score for auto-submit</label>
+            <input
+              id="auto-submit-min-score"
+              type="number"
+              min={0}
+              max={100}
+              step={1}
+              value={form.auto_submit_min_score ?? 70}
+              onChange={(e) =>
+                set("auto_submit_min_score", e.target.value ? Math.max(0, Math.min(100, Number(e.target.value))) : 70)
+              }
+            />
+            <p className="cell-dim">Jobs scoring below this will stay in your review queue.</p>
+          </div>
+          <div className="field">
+            <label htmlFor="daily-apply-cap">Daily application cap</label>
+            <input
+              id="daily-apply-cap"
+              type="number"
+              min={1}
+              max={50}
+              step={1}
+              value={form.daily_apply_cap ?? 5}
+              onChange={(e) =>
+                set("daily_apply_cap", e.target.value ? Math.max(1, Math.min(50, Number(e.target.value))) : 5)
+              }
+            />
+            <p className="cell-dim">Maximum applications sent per 24 hours (all sources combined).</p>
+          </div>
+        </div>
+        {form.enable_auto_submit && !data?.email_sending_configured && (
+          <div className="banner banner-warn" role="status" style={{ marginTop: 12 }}>
+            Auto-submit is enabled but no mailbox is connected. Applications will be
+            drafted but not sent until you configure email sending above.
+          </div>
+        )}
+      </div>
     </>
   );
 }

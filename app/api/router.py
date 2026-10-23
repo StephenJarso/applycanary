@@ -222,6 +222,10 @@ class ProfileOut(BaseModel):
     github_connected: bool = False
     # Email alerts: when a posting scores at/above this, email it immediately.
     alert_min_score: float = 90.0
+    # Auto-submit preferences
+    enable_auto_submit: bool = False
+    auto_submit_min_score: float = 70.0
+    daily_apply_cap: int = 5
     # Per-user LLM key
     llm_provider: str = ""
     llm_api_key_masked: str = ""  # masked, never the raw key
@@ -263,6 +267,10 @@ class ProfileIn(BaseModel):
     skills: list[str] = Field(default_factory=list)
     # Email alerts: send immediately when a posting scores at/above this (0 = off).
     alert_min_score: float | None = None
+    # Auto-submit preferences
+    enable_auto_submit: bool = False
+    auto_submit_min_score: float = 70.0
+    daily_apply_cap: int = 5
     # Per-user LLM key (optional — blank means use server default)
     llm_provider: str = ""
     llm_api_key: str = ""  # sent once, stored, never read back raw
@@ -1104,6 +1112,9 @@ def get_profile(
         github_repo_count=len(evidence.get("repos") or []),
         github_connected=bool(profile.github_token_encrypted),
         alert_min_score=profile.alert_min_score,
+        enable_auto_submit=profile.enable_auto_submit,
+        auto_submit_min_score=profile.auto_submit_min_score,
+        daily_apply_cap=profile.daily_apply_cap,
         llm_provider="" if user.is_admin else profile.llm_provider,
         llm_api_key_masked=masked,
         preferred_work_type=profile.preferred_work_type,

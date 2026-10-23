@@ -232,6 +232,10 @@ export interface Profile {
   github_repo_count: number;
   github_connected: boolean;
   alert_min_score: number;
+  /** Auto-submit preferences */
+  enable_auto_submit: boolean;
+  auto_submit_min_score: number;
+  daily_apply_cap: number;
   llm_provider: string;
   llm_api_key_masked: string;
   preferred_work_type: string;
