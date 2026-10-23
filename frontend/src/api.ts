@@ -72,6 +72,7 @@ export interface Job {
   seen_count: number;
   age_hours: number;
   score: Score | null;
+  apply_email: string;
 }
 
 export interface JobDetail extends Job {
@@ -93,6 +94,7 @@ export interface JobDetail extends Job {
     cover_letter: string;
     form_answers: Record<string, string>;
     outcome: string;
+    apply_email: string;
   } | null;
   resume_version: {
     id: number;
@@ -620,6 +622,11 @@ export const api = {
     request<ActionResult>(`/jobs/${id}/submit?force=${force}`, { method: "POST" }),
   skip: (id: number) => request<ActionResult>(`/jobs/${id}/skip`, { method: "POST" }),
   save: (id: number) => request<ActionResult>(`/jobs/${id}/save`, { method: "POST" }),
+  setApplyEmail: (id: number, email: string) =>
+    request<ActionResult>(`/jobs/${id}/apply-email`, {
+      method: "PUT",
+      body: JSON.stringify({ apply_email: email }),
+    }),
   prep: (id: number) => request<ActionResult>(`/jobs/${id}/prep`, { method: "POST" }),
 
   poll: () => request<ActionResult>("/actions/poll", { method: "POST" }),

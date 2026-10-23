@@ -55,6 +55,10 @@ export default function JobDetail() {
   const submit = useMutation({ mutationFn: () => api.submit(jobId), onSuccess: refresh });
   const skip = useMutation({ mutationFn: () => api.skip(jobId), onSuccess: refresh });
   const save = useMutation({ mutationFn: () => api.save(jobId), onSuccess: refresh });
+  const setApplyEmail = useMutation({
+    mutationFn: (email: string) => api.setApplyEmail(jobId, email),
+    onSuccess: refresh,
+  });
   const prep = useMutation({ mutationFn: () => api.prep(jobId), onSuccess: refresh });
 
   if (isPending) return <Loading label="Loading job" />;
@@ -65,7 +69,7 @@ export default function JobDetail() {
     job.salary_min, job.salary_max, job.salary_currency, job.salary_is_estimate,
   );
   const version = job.resume_version;
-  const busy = tailor.isPending || submit.isPending || skip.isPending || save.isPending || prep.isPending;
+  const busy = tailor.isPending || submit.isPending || skip.isPending || save.isPending || setApplyEmail.isPending || prep.isPending;
   const blocked = version?.truthcheck_passed === false;
 
   return (
@@ -138,6 +142,46 @@ export default function JobDetail() {
           </button>
         </div>
       </div>
+
+      {job.apply_email || job.apply_url?.includes("mailto:") || job.application?.apply_email ? null : (
+        <div className="card" style={{ marginTop: 12 }}>
+          <h3 className="card-title">
+            <span className="material-symbols-outlined" aria-hidden="true">email</span>
+            Application email
+          </h3>
+          <p className="cell-dim" style={{ marginTop: 0 }}>
+            This posting doesn't specify an email address to apply to. If you know the
+            correct email (e.g. hiring@company.com), enter it here to enable one-click
+            email applications from your connected mailbox.
+          </p>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+            <input
+              type="email"
+              placeholder="hiring@company.com"
+              value={job.application?.apply_email || ""}
+              onChange={(e) => setApplyEmail.mutate(e.target.value)}
+              disabled={busy}
+              style={{ flex: 1, minWidth: 250 }}
+            />
+            {job.application?.apply_email && (
+              <button
+                type="button"
+                className="btn-ghost btn-sm"
+                onClick={() => setApplyEmail.mutate("")}
+                disabled={busy}
+              >
+                Clear
+              </button>
+            )}
+          </div>
+          {setApplyEmail.isError && <ErrorBox error={setApplyEmail.error} />}
+          {setApplyEmail.isSuccess && (
+            <div className="banner banner-ok" role="status">
+              {job.application?.apply_email ? "Application email set." : "Application email cleared."}
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="card">
         <h3 className="card-title">

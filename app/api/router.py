@@ -918,6 +918,7 @@ def job_detail(
                 "cover_letter": app_row.cover_letter,
                 "form_answers": app_row.form_answers or {},
                 "outcome": app_row.outcome,
+                "apply_email": app_row.apply_email or "",
             }
             if app_row else None
         ),
@@ -1513,6 +1514,37 @@ def save_job(
     session.add(state)
     session.commit()
     return ActionResult(ok=True, message="Saved for later.")
+
+
+class ApplyEmailIn(BaseModel):
+    apply_email: str
+
+
+@router.put("/jobs/{job_id}/apply-email", response_model=ActionResult)
+def set_apply_email(
+    job_id: int,
+    payload: ApplyEmailIn,
+    session: Session = Depends(get_session),
+    user: User = Depends(current_user),
+) -> ActionResult:
+    """Set a custom application email for this job (used when posting has no mailto)."""
+    job = session.get(Job, job_id)
+    if job is None:
+        raise HTTPException(404, "job not found")
+    app = session.exec(
+        select(Application).where(
+            Application.job_id == job_id, Application.user_id == user.id
+        )
+    ).first()
+    if app is None:
+        app = Application(job_id=job_id, user_id=user.id)
+    email = payload.apply_email.strip()
+    if email and "@" not in email:
+        raise HTTPException(400, "Enter a valid email address")
+    app.apply_email = email
+    session.add(app)
+    session.commit()
+    return ActionResult(ok=True, message="Application email updated." if email else "Application email cleared.")
 
 
 @router.post("/jobs/{job_id}/prep", response_model=ActionResult)

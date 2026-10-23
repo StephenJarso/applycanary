@@ -80,8 +80,9 @@ class EmailSubmitter(BaseSubmitter):
         *,
         cover_letter: str = "",
         dry_run: bool = True,
+        application_email_override: str = "",
     ) -> SubmitResult:
-        to = application_email(job)
+        to = application_email_override or application_email(job)
         if not to:
             return SubmitResult(
                 ok=False,

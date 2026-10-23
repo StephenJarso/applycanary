@@ -409,6 +409,9 @@ class Application(SQLModel, table=True):
     cover_letter: str = Field(default="", sa_column=Column(Text))
     # Pre-filled answers to the form's questions, for one-click manual submit.
     form_answers: dict = Field(default_factory=dict, sa_column=Column(JSON))
+    # Optional override: user-specified email to send the application to.
+    # Used when the posting doesn't state an email but the user knows where to send it.
+    apply_email: str = ""
 
     queued_at: datetime = Field(default_factory=utcnow)
     submitted_at: datetime | None = Field(default=None, index=True)

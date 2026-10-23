@@ -139,14 +139,16 @@ async def submit(
     # Plenty of postings accept applications by email rather than through an
     # ATS. When no platform-specific submitter exists and the posting states an
     # address, send from the user's own mailbox instead of parking the job in
-    # the manual queue.
-    if isinstance(submitter, ManualSubmitter) and application_email(job):
+    # the manual queue. Also use EmailSubmitter if the user manually specified
+    # an application email for this job.
+    if isinstance(submitter, ManualSubmitter) and (application_email(job) or app.apply_email):
         submitter = EmailSubmitter()
     dry_run = gate.dry_run or not submitter.can_auto_submit
 
     app.attempts += 1
     result = await submitter.submit(
-        job, profile, version, cover_letter=app.cover_letter, dry_run=dry_run
+        job, profile, version, cover_letter=app.cover_letter, dry_run=dry_run,
+        application_email_override=app.apply_email,
     )
 
     app.method = result.method
