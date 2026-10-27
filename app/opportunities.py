@@ -597,6 +597,44 @@ PAID_PROGRAMS = [
 VOLUNTEER: list[dict] = [
     {
         "kind": "Volunteer",
+        "title": "WordCamp Nairobi 2026 — volunteer crew",
+        "org": "WordCamp Nairobi",
+        "when": "27–28 Nov 2026 · ALX Tech Hub, The Piano, Westlands",
+        "opens": None,
+        "closes": None,
+        # No application window yet, so the card counts down to the event.
+        "date": "2026-11-27",
+        "steps": [
+            "Confirmed but not open yet — the organisers are finalising team roles",
+            "Use the 'Get Notified' form on the call page, or watch nairobi.wordcamp.org",
+            "Crew shifts run across both days, 27–28 Nov, at the ALX Tech Hub",
+            "The speaker application is a separate form if you want a session slot",
+        ],
+        "city": "Nairobi",
+        "tags": [
+            "Volunteer",
+            "Registration",
+            "Speaker",
+            "WordPress",
+            "On-site",
+            "Nairobi",
+        ],
+        "stipend": "Unpaid + benefits: crew swag and full conference access",
+        "source": "Official",
+        "url": "https://nairobi.wordcamp.org/2026/organizers/call-for-volunteers/",
+        "desc": (
+            "Africa's longest-running WordPress conference returns for its "
+            "11th edition on 27 and 28 November 2026 at the ALX Tech Hub in "
+            "Westlands, with 250+ attendees and 20+ speakers. Volunteers run "
+            "event operations and get behind-the-scenes experience, crew swag "
+            "and full conference access. One thing to know before relying on "
+            "it: the organisers have published the call but not opened it — "
+            "the page says it will open shortly and offers to notify you — so "
+            "treat this as watch-and-wait rather than apply-today."
+        ),
+    },
+    {
+        "kind": "Volunteer",
         "title": "KotlinConf 2027 — volunteer crew",
         "org": "JetBrains",
         "when": "Event 21–23 Apr 2027 · apply by 21 Dec 2026",

@@ -613,9 +613,28 @@ def test_volunteer_feed_covers_crews_and_speaking_slots():
 
 def test_volunteer_dates_are_iso_so_the_card_can_count_down():
     for entry in VOLUNTEER:
-        for key in ("opens", "closes"):
+        for key in ("opens", "closes", "date"):
             if entry.get(key):
                 datetime.fromisoformat(entry[key])
+
+
+def test_a_crew_call_can_carry_the_event_it_belongs_to():
+    """The card must count down to something before a call even opens.
+
+    WordCamp Nairobi confirmed its crew but had not opened the call, so that
+    entry carries the event date and no window at all. Without the card's date
+    branch it would render as "rolling" and give the reader nothing to plan
+    around — which is the whole point of listing it a month out.
+    """
+    dated = [
+        entry
+        for entry in VOLUNTEER
+        if entry.get("date") and not entry.get("closes") and not entry.get("opens")
+    ]
+    assert dated, "nothing exercises the card's event-date branch"
+    for entry in dated:
+        datetime.fromisoformat(entry["date"])
+        assert entry["steps"], f"{entry['title']} never says how to get in"
 
 
 def test_event_feed_calls_are_retagged_as_volunteer_slots():
