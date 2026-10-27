@@ -180,6 +180,7 @@ def create_app() -> FastAPI:
             # bounced to the login wall (their data comes from /api/public/*).
             or path == "/opportunities"
             or path == "/internships"
+            or path == "/volunteers"
             or path.startswith("/api/public/")
             or path == "/favicon.ico"
         ):

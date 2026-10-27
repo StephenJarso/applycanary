@@ -516,9 +516,9 @@ export async function request<T>(
   return (await res.json()) as T;
 }
 
-/** One listing on the public events, programs or internships pages. */
+/** One listing on the public events, programs, internships or volunteer pages. */
 export interface Opportunity {
-  kind: "Event" | "Paid program" | "Internship";
+  kind: "Event" | "Paid program" | "Internship" | "Volunteer";
   title: string;
   org: string;
   /** Human-readable timing: "15 Oct 2026 · 08:00–11:00", "Coding May–Aug". */
@@ -584,6 +584,7 @@ export const api = {
   publicJobs: (filters: { q?: string; source?: string; remote_only?: boolean; sort?: "newest" | "oldest" } = {}) => request<PublicJobList>(`/public/jobs${qs(filters as JobFilters)}`),
   opportunities: () => request<Opportunities>("/public/opportunities"),
   internships: () => request<Opportunities>("/public/internships"),
+  volunteers: () => request<Opportunities>("/public/volunteers"),
   kenyaJobs: (refresh = false) =>
     request<EntryLevelFeed>(`/public/kenya-jobs${refresh ? "?refresh=true" : ""}`),
   entryLevel: (refresh = false) =>

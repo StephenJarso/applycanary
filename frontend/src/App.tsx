@@ -17,6 +17,7 @@ import Landing from "./pages/Landing";
 import Opportunities from "./pages/Opportunities";
 import Internships from "./pages/Internships";
 import KenyaJobs from "./pages/KenyaJobs";
+import Volunteers from "./pages/Volunteers";
 import { useAuth } from "./context/AuthContext";
 import { FeedbackModal } from "./FeedbackModal";
 import {
@@ -33,8 +34,8 @@ import { fmtDate } from "./OpportunityCard";
 // Side nav per the design pack (dashboard_1/job_discovery_1 code.html):
 // Home, Discovery, Interview, Memory, Profile — with Material Symbols matching
 // the mockups. Interview routes per-job (JobDetail → AI Interview), so the nav
-// item simply lands on Jobs. Internships and Programs stay public for visitors
-// but open inside this same shell once someone is signed in.
+// item simply lands on Jobs. Internships, Programs and Volunteer stay public
+// for visitors but open inside this same shell once someone is signed in.
 const NAV = [
   { to: "/jobs", label: "Home", icon: "dashboard", end: true, mobile: true },
   { to: "/review", label: "Discovery", icon: "search", mobile: true },
@@ -42,6 +43,8 @@ const NAV = [
   { to: "/kenya-jobs", label: "Kenya Jobs", icon: "work", mobile: true },
   { to: "/internships", label: "Internships & Opportunities", short: "Internships", icon: "school", end: true },
   { to: "/opportunities", label: "Programs", icon: "event", end: true },
+  // Crew, mentoring and speaking slots at tech events — rare, and never on a job board
+  { to: "/volunteers", label: "Volunteer", icon: "volunteer_activism", end: true },
   { to: "/memory", label: "Memory", icon: "psychology", mobile: true },
   { to: "/profile", label: "Profile", icon: "person" },
 ] as const;
@@ -49,6 +52,7 @@ const NAV = [
 const MOBILE_DRAWER_PAGES = [
   { to: "/internships", label: "Internships & Opportunities", icon: "school", end: true },
   { to: "/opportunities", label: "Programs", icon: "event", end: true },
+  { to: "/volunteers", label: "Volunteer", icon: "volunteer_activism", end: true },
   { to: "/applications", label: "Applications", icon: "work_history", end: true },
   { to: "/sources", label: "Sources Status", icon: "cable", end: true },
   { to: "/profile", label: "Profile & Resume", icon: "person", end: true },
@@ -60,7 +64,7 @@ const MOBILE_MORE_PATHS = [
   "/sources",
 ];
 
-function Dashboard({ page }: { page?: "internships" | "programs" | "kenya-jobs" }) {
+function Dashboard({ page }: { page?: "internships" | "programs" | "kenya-jobs" | "volunteers" }) {
   const { user, logout } = useAuth();
   const location = useLocation();
   const [moreOpen, setMoreOpen] = useState(false);
@@ -120,10 +124,19 @@ function Dashboard({ page }: { page?: "internships" | "programs" | "kenya-jobs" 
     staleTime: 12 * 60 * 60_000,
     refetchOnWindowFocus: false,
   });
+  const volunteers = useQuery({
+    queryKey: ["volunteers"],
+    queryFn: api.volunteers,
+    staleTime: 12 * 60 * 60_000,
+    refetchOnWindowFocus: false,
+  });
 
+  // Volunteer calls close and are gone; they belong in the deadline banner as
+  // much as a program application does.
   const allOpportunities = [
     ...(internships.data?.items ?? []),
     ...(opportunities.data?.items ?? []),
+    ...(volunteers.data?.items ?? []),
   ];
 
   const upcomingDeadlines = getUpcomingDeadlines(allOpportunities, 7);
@@ -388,7 +401,11 @@ function Dashboard({ page }: { page?: "internships" | "programs" | "kenya-jobs" 
                     </button>
                   )}
                   <NavLink
-                    to={nearest.kind === "Internship" ? "/internships" : "/opportunities"}
+                    to={
+                      nearest.kind === "Internship" ? "/internships"
+                      : nearest.kind === "Volunteer" ? "/volunteers"
+                      : "/opportunities"
+                    }
                     className="banner-action"
                   >
                     View details
@@ -445,6 +462,8 @@ function Dashboard({ page }: { page?: "internships" | "programs" | "kenya-jobs" 
             <Internships embedded />
           ) : page === "programs" ? (
             <Opportunities embedded />
+          ) : page === "volunteers" ? (
+            <Volunteers embedded />
           ) : page === "kenya-jobs" ? (
             <KenyaJobs embedded />
           ) : (
@@ -483,11 +502,13 @@ export default function App() {
     <Route path="/" element={user ? <Navigate to="/jobs" replace /> : <Landing />} />
     <Route path="/login" element={<Navigate to="/?mode=login" replace />} />
     <Route path="/register" element={<Navigate to="/?mode=register" replace />} />
-    {/* Programs stay public; internships are an account feature now. Both open
+    {/* Programs stay public; internships and volunteer calls are curated
+        account features now, gated by the auth middleware too. All three open
         inside the dashboard shell for signed-in users, with the explicit page
         prop because a descendant Routes would resolve against this path. */}
     <Route path="/opportunities" element={user ? <Dashboard page="programs" /> : <Opportunities />} />
     <Route path="/internships" element={user ? <Dashboard page="internships" /> : <Navigate to="/" replace />} />
+    <Route path="/volunteers" element={user ? <Dashboard page="volunteers" /> : <Navigate to="/" replace />} />
     <Route path="/kenya-jobs" element={user ? <Dashboard page="kenya-jobs" /> : <KenyaJobs embedded={false} />} />
     <Route path="/entry-level" element={<Navigate to="/kenya-jobs" replace />} />
     {/* Public regardless of session: these are opened from an email, and the

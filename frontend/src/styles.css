@@ -2997,6 +2997,7 @@ input[type="range"]::-moz-range-thumb {
 }
 .opp-kind-program { background: var(--ac-canary); color: var(--ac-on-canary); }
 .opp-kind-intern { background: var(--ac-primary); color: var(--ac-on-primary); }
+.opp-kind-volunteer { background: var(--ac-tertiary-container); color: var(--ac-on-tertiary-container); }
 .opp-source { color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .opp-watch-btn {
   background: none;

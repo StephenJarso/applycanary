@@ -9,9 +9,16 @@ export const fmtDate = (iso: string) =>
 /** Status shown in the box at the bottom of each card. */
 export function opportunityStatus(o: Opportunity): string {
   if (o.kind === "Event") return o.date && daysUntil(o.date) < 0 ? "Closed" : "Upcoming event";
-  if (!o.opens || !o.closes) return "Rolling";
-  if (daysUntil(o.closes) < 0) return "Closed";
-  return daysUntil(o.opens) <= 0 ? "Open now" : "Opening soon";
+  // A published deadline is enough to be open: a volunteer call advertises
+  // when it closes, not when it began, so a missing `opens` means "already
+  // open" rather than "no application window".
+  if (o.closes) {
+    if (daysUntil(o.closes) < 0) return "Closed";
+    return !o.opens || daysUntil(o.opens) <= 0 ? "Open now" : "Opening soon";
+  }
+  // Crew calls lifted from the events calendar carry the event's date.
+  if (o.date) return daysUntil(o.date) < 0 ? "Closed" : "Upcoming event";
+  return "Rolling";
 }
 
 /** Dated entries sort first, then rolling ones last. */
@@ -46,14 +53,16 @@ function Timeline({ item }: { item: Opportunity }) {
     );
   }
 
-  if (item.opens && item.closes) {
+  if (item.closes) {
     const left = daysUntil(item.closes);
+    const opens = item.opens ?? "";
+    const opening = opens ? daysUntil(opens) : 0;
     return (
       <>
         <p>
-          {daysUntil(item.opens) > 0 ? (
+          {opening > 0 ? (
             <>
-              ⏳ Opens <b>{fmtDate(item.opens)}</b> (in {daysUntil(item.opens)} days)
+              ⏳ Opens <b>{fmtDate(opens)}</b> (in {opening} days)
             </>
           ) : left <= 7 && left >= 0 ? (
             <>🚨 <b>Closing soon</b></>
@@ -62,6 +71,28 @@ function Timeline({ item }: { item: Opportunity }) {
           )}{" "}
           · Deadline <b>{fmtDate(item.closes)}</b>
           {left >= 0 && <> ({left === 0 ? "closes today!" : `${left} days left`})</>}
+        </p>
+        <Steps item={item} />
+      </>
+    );
+  }
+
+  // A crew call found in the events calendar is tied to the event it belongs
+  // to, so the event's own date is what the card counts down to.
+  if (item.date) {
+    const left = daysUntil(item.date);
+    return (
+      <>
+        <p>
+          📅 {left >= 0 ? (
+            <>
+              Happens <b>{fmtDate(item.date)}</b> · in {left} days
+            </>
+          ) : (
+            <>
+              Was on <b>{fmtDate(item.date)}</b>
+            </>
+          )}
         </p>
         <Steps item={item} />
       </>
@@ -109,7 +140,8 @@ export function OpportunityCard({
           className={
             "opp-kind" +
             (item.kind === "Paid program" ? " opp-kind-program"
-              : item.kind === "Internship" ? " opp-kind-intern" : "")
+              : item.kind === "Internship" ? " opp-kind-intern"
+              : item.kind === "Volunteer" ? " opp-kind-volunteer" : "")
           }
         >
           {item.kind}
