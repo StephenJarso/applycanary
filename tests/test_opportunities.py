@@ -24,11 +24,13 @@ from app.opportunities import (
     CURATED_EVENTS,
     INTERNSHIPS,
     PAID_PROGRAMS,
+    VOLUNTEER,
     CardEvent,
     Feed,
     _dedupe_events,
     _fetch_feed,
     _fetch_gdg,
+    _from_event_feed,
     _gdg_item,
     _to_item,
     _upcoming_curated_events,
@@ -512,3 +514,152 @@ def test_internships_endpoint_is_public_and_only_internships(client):
     assert {item["kind"] for item in body["items"]} == {"Internship"}
     assert {item["title"] for item in body["items"]} == {i["title"] for i in INTERNSHIPS}
     assert body["events_live"] is True
+
+
+# ------------------------------------------------------- volunteer & speaking
+
+
+def _volunteer_event() -> dict:
+    """A live calendar entry whose own description is a call for help."""
+    return {
+        "kind": "Event",
+        "title": "DevFest Kisumu 2026",
+        "org": "GDG Kisumu",
+        "date": "2026-11-21",
+        "when": "21 Nov 2026 · 08:00–17:30",
+        "city": "Kisumu",
+        "tags": ["GDG", "Community"],
+        "source": "GDG Community",
+        "url": "https://gdg.community.dev/events/details/devfest-kisumu/",
+        "stipend": "Free registration",
+        "opens": None,
+        "closes": None,
+        "steps": None,
+        "desc": "We need volunteers for the registration desk, and the call for speakers is still open.",
+    }
+
+
+def test_volunteer_calls_are_not_served_under_another_tab():
+    titles = [v["title"] for v in VOLUNTEER]
+    assert len(titles) == len(set(titles))
+    assert not (set(titles) & {p["title"] for p in PAID_PROGRAMS})
+    assert not (set(titles) & {i["title"] for i in INTERNSHIPS})
+    assert all(v["kind"] == "Volunteer" for v in VOLUNTEER)
+
+
+def test_volunteer_entries_carry_everything_the_card_renders():
+    for entry in VOLUNTEER:
+        assert entry["url"].startswith("https://")
+        assert entry["when"] and entry["city"] and entry["desc"] and entry["tags"]
+        assert entry["steps"], "a reader needs to know how to actually apply"
+
+
+def test_volunteer_entries_state_compensation_explicitly():
+    """Tech volunteering is unpaid; the card must say so, benefits and all."""
+    for entry in VOLUNTEER:
+        stipend = entry["stipend"]
+        assert stipend, f"{entry['title']} leaves compensation blank"
+        assert stipend.startswith(("Unpaid", "Paid")), stipend
+
+    unpaid = [v for v in VOLUNTEER if v["stipend"].startswith("Unpaid")]
+    assert unpaid
+    # A bare "Unpaid ..." is fine. Saying "+ benefits:" is a promise, so the
+    # benefit has to actually be named — the card prints this line verbatim.
+    for entry in unpaid:
+        stipend = entry["stipend"]
+        if "+ benefits:" in stipend:
+            assert stipend.partition("+ benefits:")[2].strip(), stipend
+
+
+def test_volunteer_feed_covers_crews_and_speaking_slots():
+    tags = {tag for entry in VOLUNTEER for tag in entry["tags"]}
+    assert "Volunteer" in tags
+    # The two things this tab exists for: a shift on the day, and a talk slot.
+    assert "Registration" in tags
+    assert "Speaker" in tags
+
+
+def test_volunteer_dates_are_iso_so_the_card_can_count_down():
+    for entry in VOLUNTEER:
+        for key in ("opens", "closes"):
+            if entry.get(key):
+                datetime.fromisoformat(entry[key])
+
+
+def test_event_feed_calls_are_retagged_as_volunteer_slots():
+    items = _from_event_feed([_volunteer_event()])
+    assert len(items) == 1
+    item = items[0]
+    assert item["kind"] == "Volunteer"
+    assert "From event feed" in item["tags"] and "Volunteer" in item["tags"]
+    assert "Speaker" in item["tags"]  # the same description carries the CFP
+    # The event's own date is kept, so the card still counts down to something.
+    assert item["date"] == "2026-11-21"
+    assert item["source"] == "GDG Community"
+
+
+def test_event_feed_ignores_an_event_that_merely_lists_speakers():
+    """"50+ speakers" is on every conference page and means nothing here."""
+    lineup = {
+        **_volunteer_event(),
+        "title": "Africa Tech Festival 2026",
+        "desc": "Join 50+ industry-leading speakers and 300 exhibitors in Cape Town.",
+    }
+    assert _from_event_feed([lineup]) == []
+
+
+def test_event_feed_ignores_an_event_with_no_call_in_it():
+    quiet = {**_volunteer_event(), "title": "Monthly meetup", "desc": "Talks and pizza."}
+    assert _from_event_feed([quiet]) == []
+
+
+def test_volunteers_endpoint_is_public_and_serves_only_volunteer_roles(client, monkeypatch):
+    async def fake_refresh(force: bool = False) -> Feed:  # noqa: ARG001
+        return Feed(items=[_volunteer_event()], fetched_at=1.0, ok=True)
+
+    monkeypatch.setattr("app.opportunities.refresh_events", fake_refresh)
+
+    res = client.get("/api/public/volunteers")
+    assert res.status_code == 200
+    body = res.json()
+
+    assert body["events_live"] is True
+    assert {item["kind"] for item in body["items"]} == {"Volunteer"}
+    titles = [item["title"] for item in body["items"]]
+    # The curated crew calls ride along...
+    assert {v["title"] for v in VOLUNTEER} <= set(titles)
+    # ...and so does the live event that asked for help.
+    assert "DevFest Kisumu 2026" in titles
+
+
+def test_volunteers_endpoint_does_not_double_a_curated_entry(client, monkeypatch):
+    """The same call read off a calendar must not appear twice."""
+    curated = VOLUNTEER[0]
+    live = {
+        **_volunteer_event(),
+        "title": curated["title"],
+        "desc": "Volunteers wanted for the crew.",
+    }
+
+    async def fake_refresh(force: bool = False) -> Feed:  # noqa: ARG001
+        return Feed(items=[live], fetched_at=1.0, ok=True)
+
+    monkeypatch.setattr("app.opportunities.refresh_events", fake_refresh)
+
+    titles = [item["title"] for item in client.get("/api/public/volunteers").json()["items"]]
+    assert titles.count(curated["title"]) == 1
+
+
+def test_volunteers_endpoint_keeps_curated_roles_when_the_calendar_is_down(client, monkeypatch):
+    async def fake_refresh(force: bool = False) -> Feed:  # noqa: ARG001
+        return Feed(items=[], attempted_at=1.0, ok=False)
+
+    monkeypatch.setattr("app.opportunities.refresh_events", fake_refresh)
+
+    res = client.get("/api/public/volunteers")
+    assert res.status_code == 200
+    body = res.json()
+
+    assert body["events_live"] is False
+    assert {item["title"] for item in body["items"]} == {v["title"] for v in VOLUNTEER}
+    assert {item["kind"] for item in body["items"]} == {"Volunteer"}
