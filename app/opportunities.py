@@ -1,4 +1,7 @@
-"""Events & paid programs behind ``GET /api/public/opportunities``.
+"""Events, programs, internships and volunteer slots for the public pages.
+
+Served through ``GET /api/public/opportunities`` (events and paid programs),
+``/api/public/internships`` and ``/api/public/volunteers``.
 
 The page is fed by two very different kinds of data:
 
@@ -17,6 +20,13 @@ The page is fed by two very different kinds of data:
   frontend rebuild. Compensation is stated explicitly ("Paid:", "Unpaid +
   benefits:") and tagged, and internships are split out under their own kind
   for the dedicated tab.
+
+* **Volunteer and speaking slots** are the rarest of all, and the least
+  structured: a conference advertises its registration crew or its call for
+  speakers in a line of prose on its own site, and nothing aggregates them.
+  They are curated here like the paid programs, and the live event calendars
+  are additionally scanned for volunteer and speaker calls the organisers
+  wrote into the event description itself.
 
 A failed fetch never fails the request. The last good event list keeps being
 served for ``STALE_TTL`` and ``events_live`` reports the difference, so the UI
@@ -401,6 +411,280 @@ INTERNSHIPS.append(
 PAID_PROGRAMS = [
     program for program in PAID_PROGRAMS if program["title"] not in _INTERNSHIP_TITLES
 ]
+
+
+# ------------------------------------------------- volunteer & speaking slots
+#
+# No job board carries these. A conference needs a registration desk and a
+# line-up, and the only notice is a paragraph on its own site, so they are
+# curated server-side for the same reason the paid programs are: adding one is
+# a backend change rather than a frontend rebuild.
+#
+# Compensation is stated the way the organisers state it. Volunteering in tech
+# is almost never paid, so the honest form is "Unpaid + benefits:" followed by
+# what you actually receive — a free ticket, board and lodging, a crew T-shirt.
+# Where the organisers published no perks, say only that it is unpaid.
+#
+# Dates marked as coming from the previous cycle are estimates: organisers
+# announce the next call on their own schedule, and the page tells the reader
+# to confirm on the official site.
+
+VOLUNTEER: list[dict] = [
+    {
+        "kind": "Volunteer",
+        "title": "KotlinConf 2027 — volunteer crew",
+        "org": "JetBrains",
+        "when": "Event 21–23 Apr 2027 · apply by 21 Dec 2026",
+        "opens": None,
+        "closes": "2026-12-21",
+        "steps": [
+            "Apply through the volunteer form by 21 Dec 2026",
+            "Short online interview during January 2027",
+            "Selection results announced 1 Feb 2027",
+            "Online orientation Mar–Apr, then an on-site briefing on 20–21 Apr",
+            "Work up to 10 hours across the conference days",
+        ],
+        "city": "Kraków",
+        "tags": ["Volunteer", "Registration", "Speaker support", "On-site", "Europe"],
+        "stipend": "Unpaid + benefits: complimentary ticket, lunch on event days, uniform",
+        "source": "Official",
+        "url": "https://kotlinconf.com/volunteers/",
+        "desc": (
+            "KotlinConf recruits its own crew for registration, speaker "
+            "support, navigation and the swag station — up to 10 hours in "
+            "total, in exchange for a complimentary ticket for the "
+            "conference days (22–23 Apr). Travel and accommodation are yours "
+            "to cover, and you must be at least 18."
+        ),
+    },
+    {
+        "kind": "Volunteer",
+        "title": "Droidcon & Fluttercon Kenya 2027 — speak or crew",
+        "org": "Droidcon Kenya",
+        "when": "Talk call ~Mar–Jul · event early Nov, Nairobi",
+        "opens": "2027-03-01",
+        "closes": "2027-07-31",
+        "steps": [
+            "Call for speakers opens ~Mar on Sessionize",
+            "Pick a lightning talk (20 min), session (40 min) or workshop (80 min)",
+            "CFP closes ~end of Jul — the 2026 call ran 1 Mar → 31 Jul",
+            "Speakers announced ~Sep; the conference runs in early Nov in Nairobi",
+            "Ask the organisers for the VISA support letter if you travel in",
+        ],
+        "city": "Nairobi",
+        "tags": ["Speaker", "Volunteer", "Conference", "Mobile", "On-site", "Nairobi"],
+        "stipend": "Unpaid + benefits: free speaker ticket (no travel support)",
+        "source": "Curated",
+        "url": "https://droidcon.co.ke/",
+        "desc": (
+            "Sub-Saharan Africa's largest mobile developer conference, run "
+            "alongside Fluttercon Kenya: two workshop days, 30+ sessions, "
+            "50+ speakers. The call for speakers is the door in, and the CFP "
+            "text says first-time speakers should not be put off — nobody "
+            "needs to be a Kotlin black belt to get a slot. The wider droidcon "
+            "family also takes volunteers for registration and speaker "
+            "support (roughly eight hours of shifts for a free conference "
+            "ticket; volunteer@droidcon.com)."
+        ),
+    },
+    {
+        "kind": "Volunteer",
+        "title": "PyCon Africa — volunteer crew",
+        "org": "PyCon Africa",
+        "when": "Annual conference · volunteer call opens with the CFP",
+        "opens": None,
+        "closes": None,
+        "steps": [
+            "Watch africa.pycon.org for the next edition's call",
+            "Sign up through the Call for Volunteers form",
+            "Take a shift: registration, a session room, sprints or socials",
+            "Speakers go through the separate call for proposals",
+        ],
+        "city": "Africa",
+        "tags": ["Volunteer", "Speaker", "Python", "Conference", "On-site"],
+        "stipend": "Unpaid volunteer crew",
+        "source": "Official",
+        "url": "https://africa.pycon.org/",
+        "desc": (
+            "Africa's continental Python conference, hosted by a different "
+            "city each year — the 2026 edition ran 7–11 October in Kampala, "
+            "Uganda, with a free beginners' day, sprints and a travel-grant "
+            "programme. The site keeps a standing Call for Volunteers next to "
+            "the call for proposals, which makes the crew the least "
+            "intimidating way in for someone who has never spoken."
+        ),
+    },
+    {
+        "kind": "Volunteer",
+        "title": "Learning Lions — on-site volunteer (2–6 months)",
+        "org": "Learning Lions",
+        "when": "2–6 months on-site · rolling intakes",
+        "opens": None,
+        "closes": None,
+        "steps": [
+            "Read the role list on the volunteer page",
+            "Apply through the online form (on-site or remote)",
+            "Agree a focus and dates with the programme team",
+            "Live and mentor at the ICT centre by Lake Turkana, near Lodwar",
+        ],
+        "city": "Lodwar",
+        "tags": ["Volunteer", "Mentoring", "On-site", "Coding", "Design", "Kenya"],
+        "stipend": "Unpaid + benefits: full board and lodging for full-time volunteers",
+        "source": "Official",
+        "url": "https://www.learninglions.org/volunteer/",
+        "desc": (
+            "Two to six months mentoring young adults in one of the most "
+            "remote parts of Kenya, at the ICT centre near Lodwar in Turkana. "
+            "They ask for web developers (React, TypeScript, Node, WordPress), "
+            "system and network administrators, database specialists, "
+            "designers, project management and sales support, animators, and "
+            "hands for campus construction and maintenance. Full-time "
+            "volunteers get full board and lodging on campus; part-time "
+            "volunteers pay €250 a month for room and board."
+        ),
+    },
+    {
+        "kind": "Volunteer",
+        "title": "Learning Lions — remote mentor",
+        "org": "Learning Lions",
+        "when": "Rolling · from anywhere, around your own work",
+        "opens": None,
+        "closes": None,
+        "steps": [
+            "Apply through the volunteer form and say you want to join remotely",
+            "Agree a mentoring focus with the programme team",
+            "Coach one Lion or a small group on real client work",
+        ],
+        "city": "Online",
+        "tags": ["Volunteer", "Mentoring", "Remote", "Coding", "Design"],
+        "stipend": "Unpaid remote volunteering",
+        "source": "Official",
+        "url": "https://www.learninglions.org/volunteer/",
+        "desc": (
+            "The programme runs a long-standing remote circle alongside the "
+            "campus one — one of its graphic-design volunteers has split their "
+            "time between the Turkana campus and Cologne since 2018. Freelance "
+            "developers and designers are explicitly welcomed, and mentoring "
+            "happens against the Lions' real client projects rather than "
+            "exercises."
+        ),
+    },
+    {
+        "kind": "Volunteer",
+        "title": "Inclusive Africa Conference 2027 — volunteer crew",
+        "org": "inABLE",
+        "when": "Event ~early Jun, Nairobi · call closes ~late May",
+        "opens": "2027-04-01",
+        "closes": "2027-05-23",
+        "steps": [
+            "Watch inclusiveafrica.org for the 2027 call for volunteers",
+            "Apply before the deadline — the 2026 call closed on 23 May",
+            "On-site briefing at the JW Marriott, Nairobi",
+        ],
+        "city": "Nairobi",
+        "tags": ["Volunteer", "Registration", "Accessibility", "On-site", "Nairobi"],
+        "stipend": "Unpaid volunteer crew",
+        "source": "Curated",
+        "url": "https://inclusiveafrica.org/",
+        "desc": (
+            "Africa's leading digital-accessibility platform, run by inABLE, "
+            "which trains blind and visually impaired students across the "
+            "continent. The 7th edition ran 2–4 June 2026 at the JW Marriott "
+            "in Nairobi, with 300+ delegates on site and thousands more "
+            "online, and it is staffed by volunteers on the registration desk "
+            "and around the sessions."
+        ),
+    },
+    {
+        "kind": "Volunteer",
+        "title": "Latitude59xKenya 2026 — volunteer crew",
+        "org": "Latitude59",
+        "when": "Event 3–4 Dec 2026 · Nairobi",
+        "opens": None,
+        "closes": None,
+        "steps": [
+            "Apply through the Latitude59 volunteer form",
+            "Take shifts across the two event days in Nairobi",
+            "Free entry to the event as a volunteer",
+        ],
+        "city": "Nairobi",
+        "tags": ["Volunteer", "Registration", "Startups", "On-site", "Nairobi"],
+        "stipend": "Unpaid + benefits: free entry to the event",
+        "source": "Official",
+        "url": "https://latitude59.ee/kenya/",
+        "desc": (
+            "The Estonian startup conference's 4th Nairobi edition, 3–4 "
+            "December 2026. Latitude59 has run a dedicated volunteer "
+            "programme since 2023, and the call for the Kenya edition is open "
+            "to local volunteers — entry is free for the crew."
+        ),
+    },
+    {
+        "kind": "Volunteer",
+        "title": "DevFest — volunteer crew & speakers",
+        "org": "Google Developer Groups",
+        "when": "DevFest season Oct–Dec · chapters across Kenya",
+        "opens": None,
+        "closes": None,
+        "steps": [
+            "Open a chapter page on gdg.community.dev and join the group",
+            "Message the organisers to help run the day",
+            "Submit a talk through the chapter's call for speakers",
+        ],
+        "city": "Kenya",
+        "tags": ["Volunteer", "Speaker", "Community", "On-site", "Kenya"],
+        "stipend": "Unpaid volunteer crew",
+        "source": "Official",
+        "url": "https://gdg.community.dev/",
+        "desc": (
+            "DevFest is the chapter-run event of the Google Developer Groups "
+            "year, and it is staffed by its own community: registration desk, "
+            "session rooms, A/V, socials. Kenyan chapters in Nairobi, Kisumu, "
+            "Eldoret and Kisii each hold one, and the people who volunteer are "
+            "usually the ones offered the first-time-speaker slots."
+        ),
+    },
+    {
+        "kind": "Volunteer",
+        "title": "OSCA Fest — volunteer crew & speakers",
+        "org": "Open Source Community Africa",
+        "when": "Annual festival · call for speakers ~Nov",
+        "opens": None,
+        "closes": None,
+        "steps": [
+            "Follow OSCA for the next festival date and CFP",
+            "Submit a talk through the festival's Sessionize call",
+            "Volunteer for the crew through the community's channels",
+        ],
+        "city": "Lagos",
+        "tags": ["Volunteer", "Speaker", "Open source", "Community", "On-site"],
+        "stipend": "Unpaid volunteer crew",
+        "source": "Official",
+        "url": "https://festival.oscafrica.org/",
+        "desc": (
+            "Open Source Festival is OSCA's flagship event — talks, workshops "
+            "and hands-on sessions on open-source tooling. The 2025 edition ran "
+            "14–16 August in Lagos, and the community also circulates "
+            "speaking slots at partner conferences such as the Eclipse "
+            "Foundation's Open Community Experience."
+        ),
+    },
+]
+
+# A conference's call for help usually lives in its own event description, so
+# the live calendars are scanned for it. The patterns are deliberately narrow:
+# "speaker" on its own matches the line-up of every conference in Africa, so
+# only an actual call-to-arms counts.
+_VOLUNTEER_CALL_RE = re.compile(
+    r"volunteer|call for speakers?|call for (papers|proposals)|"
+    r"speaker (applications?|submissions?|slots)|apply to speak|submit a talk|\bcfp\b",
+    re.I,
+)
+_SPEAKER_CALL_RE = re.compile(
+    r"call for speakers?|call for (papers|proposals)|"
+    r"speaker (applications?|submissions?|slots)|apply to speak|submit a talk|\bcfp\b",
+    re.I,
+)
 
 
 # ------------------------------------------------------------- curated events
@@ -992,4 +1276,61 @@ def get_internships() -> dict:
         "items": sorted(INTERNSHIPS, key=_sort_key),
         "events_live": True,
         "events_updated_at": None,
+    }
+
+
+def _volunteer_roles(item: dict) -> list[str]:
+    """Tags for an event whose description reads as a call for help."""
+    text = f"{item.get('title', '')} {item.get('desc', '')}"
+    roles = ["From event feed", "Volunteer"]
+    if _SPEAKER_CALL_RE.search(text):
+        roles.insert(0, "Speaker")
+    return roles
+
+
+def _from_event_feed(events: list[dict]) -> list[dict]:
+    """Upcoming events that are really an ask for volunteers or speakers.
+
+    Re-tagged rather than copied, so a card reads the same as a curated entry
+    and the reader can still see which calendar it came from. The event's own
+    date is kept as ``date``: a crew call inherits the event it belongs to.
+    """
+    calls: list[dict] = []
+    for item in events:
+        text = f"{item.get('title', '')} {item.get('desc', '')}"
+        if not _VOLUNTEER_CALL_RE.search(text):
+            continue
+        calls.append(
+            {
+                **item,
+                "kind": "Volunteer",
+                "tags": [*_volunteer_roles(item), *item.get("tags", [])],
+            }
+        )
+    return calls
+
+
+async def get_volunteers() -> dict:
+    """The payload for ``GET /api/public/volunteers``.
+
+    Curated crew and speaking slots, plus whatever the live calendars are
+    advertising. The live half reuses the event feed's cache, so this costs no
+    extra traffic; when that feed is down the curated entries still serve and
+    ``events_live`` says the calendar half is missing.
+    """
+    try:
+        feed = await asyncio.wait_for(refresh_events(), timeout=COLD_WAIT)
+    except TimeoutError:
+        feed = _feed
+
+    curated_titles = {str(item.get("title") or "").strip().lower() for item in VOLUNTEER}
+    live = [
+        item
+        for item in _from_event_feed(feed.items)
+        if str(item.get("title") or "").strip().lower() not in curated_titles
+    ]
+    return {
+        "items": sorted([*VOLUNTEER, *live], key=_sort_key),
+        "events_live": feed.ok,
+        "events_updated_at": feed.fetched_at_wall,
     }

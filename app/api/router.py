@@ -128,12 +128,12 @@ class OpportunityOut(BaseModel):
     """One listing on the public Events & paid programs page.
 
     Mirrors the dicts `app/opportunities.py` builds: live events from the TGK
-    calendar plus the curated paid programs and internships. `kind` decides
-    whether the card counts down to an event date or to an application
-    deadline.
+    calendar plus the curated paid programs, internships and volunteer/
+    speaking slots. `kind` decides whether the card counts down to an event
+    date or to an application deadline.
     """
 
-    kind: Literal["Event", "Paid program", "Internship"]
+    kind: Literal["Event", "Paid program", "Internship", "Volunteer"]
     title: str
     org: str
     when: str
@@ -706,6 +706,21 @@ def public_internships() -> OpportunitiesOut:
     from app.opportunities import get_internships
 
     return OpportunitiesOut(**get_internships())
+
+
+@router.get("/public/volunteers", response_model=OpportunitiesOut)
+async def public_volunteers() -> OpportunitiesOut:
+    """Curated volunteer and speaking slots, public like the events page.
+
+    Two halves: conference crew and call-for-speakers slots curated in
+    ``app.opportunities``, plus upcoming events whose own description reads as
+    a call for volunteers or speakers. The live half shares the event feed's
+    cache, so a calendar outage degrades to the curated entries with
+    ``events_live=False`` rather than emptying the page.
+    """
+    from app.opportunities import get_volunteers
+
+    return OpportunitiesOut(**await get_volunteers())
 
 
 @router.get("/public/kenya-jobs", response_model=EntryLevelFeedOut)
