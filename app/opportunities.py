@@ -404,7 +404,172 @@ INTERNSHIPS.append(
         "source": "Official",
         "url": "https://recruit.hennge.com/en/gip/",
         "desc": "On-site, English-speaking software engineering internship in Tokyo. Full-Stack pathway uses Python, Go or TypeScript (React/Vue), front-end on TypeScript, with AWS and DevOps training. Slots are first-come, first-served, and outstanding interns may be offered full-time roles.",
-    },
+    }
+)
+
+# Global and Kenyan internships that no job board indexes, or indexes only per
+# vacancy. Compensation and eligibility are quoted from each programme's own
+# page: those are the two facts that decide whether an afternoon of applying is
+# worth it, and both are the kind that scholarship blogs republish wrong.
+INTERNSHIPS.extend(
+    [
+        {
+            "kind": "Internship",
+            "title": "UNHCR Internship Programme",
+            "org": "UNHCR – UN Refugee Agency",
+            "when": "2–6 months · extendable to 8 full-time",
+            "opens": None,
+            "closes": None,
+            "steps": [
+                "Create a profile on the UNHCR recruitment portal",
+                "Look for internship vacancies at a duty station you can work from",
+                "Each vacancy sets its own deadline — there is no single annual intake",
+                "Some positions can be done remotely, subject to approval",
+            ],
+            "city": "Various",
+            "tags": ["Paid", "Internship", "United Nations", "NGO", "Remote", "Global"],
+            "stipend": (
+                "Paid: monthly allowance (part-time at 50%), food and local "
+                "transport support, return travel for eligible interns"
+            ),
+            "source": "Official",
+            "url": "https://www.unhcr.org/us/get-involved/work-us/careers-unhcr/internships",
+            "desc": (
+                "UNHCR recruits interns year-round rather than in one intake: an "
+                "internship can begin at any time, normally runs two to six "
+                "months, and can be extended up to eight months full-time. "
+                "Part-time internships run longer, and their allowance is "
+                "calculated at 50% of the full-time rate for the duty station. "
+                "Because deadlines are set per vacancy, this is one to watch "
+                "rather than wait on — and the same portal carries the "
+                "UN Volunteering and consultant roles that never make it to "
+                "aggregators."
+            ),
+        },
+        {
+            "kind": "Internship",
+            "title": "UNICEF Internship Programme",
+            "org": "UNICEF",
+            "when": "6–26 weeks · full-time or part-time",
+            "opens": None,
+            "closes": None,
+            "steps": [
+                "Browse the UNICEF vacancies page — internships run all year",
+                "Check the requirements: 18+, enrolled or graduated within two years",
+                "Apply to the specific vacancy with a profile tailored to it",
+                "Only shortlisted candidates are contacted",
+            ],
+            "city": "Various",
+            "tags": ["Paid", "Internship", "United Nations", "NGO", "Global"],
+            "stipend": (
+                "Paid: monthly stipend, plus a one-time travel and visa "
+                "contribution when funding allows"
+            ),
+            "source": "Official",
+            "url": "https://www.unicef.org/careers/internships",
+            "desc": (
+                "UNICEF pays interns a monthly stipend and adds a one-time lump "
+                "sum towards travel and visa costs when funding is available, "
+                "which puts it among the more accessible UN schemes. Placements "
+                "last six to twenty-six weeks and may be full- or part-time, "
+                "and they are offered throughout the year rather than in one "
+                "window. Open to anyone at least 18 who is enrolled in an "
+                "undergraduate, graduate or PhD programme, or graduated within "
+                "the past two years, and who has no immediate relative working "
+                "for UNICEF."
+            ),
+        },
+        {
+            "kind": "Internship",
+            "title": "WFP Internship Programme",
+            "org": "World Food Programme",
+            "when": "2–8 months · country offices, regional bureaux or HQ",
+            "opens": None,
+            "closes": None,
+            "steps": [
+                "Check the timing rule: enrolled with classes attended in the last 12 months, or graduated within the last 6",
+                "Two years of undergraduate study must be completed",
+                "Apply to a specific internship in the WFP openings list",
+                "Placements run at country, regional or headquarters level",
+            ],
+            "city": "Various",
+            "tags": ["Paid", "Internship", "United Nations", "NGO", "Global"],
+            "stipend": (
+                "Paid: up to USD 1,000/month, medical and accident insurance, "
+                "return trip for eligible interns"
+            ),
+            "source": "Official",
+            "url": "https://www.wfp.org/careers/contract-types",
+            "desc": (
+                "WFP internships run two to eight months and come with a stipend "
+                "capped at USD 1,000 a month plus medical and accident "
+                "insurance. The clause Kenyan applicants should read first is "
+                "the roundtrip appointment and repatriation trip, which covers "
+                "nationals of developing economies studying in their own "
+                "country. Eligibility is strict about timing: you must be "
+                "enrolled and have attended classes in the past 12 months, or "
+                "have graduated within the last six months."
+            ),
+        },
+        {
+            "kind": "Internship",
+            "title": "Safaricom Internship Program",
+            "org": "Safaricom PLC",
+            "when": "3–6 months · annual intake",
+            "opens": None,
+            "closes": None,
+            "steps": [
+                "Search the Safaricom careers portal for the current intake",
+                "Create a profile and finish the application in one session",
+                "Sit the online assessment (psychological, technical, competency)",
+                "Screening → assessment → selection → confirmation by email",
+            ],
+            "city": "Nairobi",
+            "tags": ["Internship", "Kenya", "Telecom", "On-site"],
+            "stipend": "Stipend not published by Safaricom",
+            "source": "Official",
+            "url": "https://www.safaricom.co.ke/career/internship-program",
+            "desc": (
+                "Kenya's largest telco runs its internship across every business "
+                "function, three to six months at a time. You qualify from the "
+                "third year of a degree, while awaiting graduation, or within "
+                "12 months of graduating. Selection is a four-stage funnel — "
+                "screening, online assessment, shortlist, confirmation — and "
+                "interns are added to the internal talent pool with priority "
+                "for new roles, so this is a genuine route in rather than a "
+                "certificate."
+            ),
+        },
+        {
+            "kind": "Internship",
+            "title": "Google Software Engineering Internship 2027",
+            "org": "Google",
+            "when": "13 weeks minimum, Summer 2027 · apply by ~2 Dec",
+            "opens": None,
+            "closes": "2026-12-02",
+            "steps": [
+                "Open Google's internships page and search the 2027 openings",
+                "Pick a location and team you could actually work in",
+                "Apply before the December deadline — this one closes on a date, not on a rolling basis",
+                "Interviews follow; internships start May, June or July 2027",
+            ],
+            "city": "Various",
+            "tags": ["Paid", "Internship", "Software", "AI", "Global"],
+            "stipend": "Paid: Google internship compensation, stated on each posting",
+            "source": "Official",
+            "url": "https://www.google.com/about/careers/applications/internships",
+            "desc": (
+                "The 2027 software engineering internships are open and the "
+                "funnel shuts early: Google's student channel announced a "
+                "2 December application deadline, and interns must be available "
+                "full-time for at least 13 weeks over Summer 2027, starting in "
+                "May, June or July. Roles are listed by location, so check that "
+                "an opening accepts applicants where you are before spending "
+                "the afternoon on it. The process is interview-led rather than "
+                "degree-led."
+            ),
+        },
+    ]
 )
 
 # Programs are what remains; the moved entries are now served by INTERNSHIPS.

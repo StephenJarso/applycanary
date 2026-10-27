@@ -505,6 +505,38 @@ def test_internships_are_split_from_programs_and_state_compensation():
     assert all("Paid" in i["tags"] for i in paid)
 
 
+def test_internship_feed_covers_the_global_schemes_with_compensation():
+    """The UN and big-employer schemes advertised off-platform are all here.
+
+    These are the ones users find on LinkedIn and then ask why the app does not
+    have them, so a silent drop-out is the failure this pins.
+    """
+    by_title = {entry["title"]: entry for entry in INTERNSHIPS}
+    expected = (
+        "UNHCR Internship Programme",
+        "UNICEF Internship Programme",
+        "WFP Internship Programme",
+        "Safaricom Internship Program",
+        "Google Software Engineering Internship 2027",
+    )
+    for title in expected:
+        assert title in by_title, f"{title} fell out of the internships feed"
+
+    for entry in by_title.values():
+        assert entry["stipend"], f"{entry['title']} leaves compensation unstated"
+        assert entry["steps"], f"{entry['title']} never says how to apply"
+        assert entry["url"].startswith("https://")
+
+    # The UN schemes are the paid ones, and the card keys its badge off both
+    # the string and the tag.
+    un = [by_title[title] for title in expected[:3]]
+    assert all(entry["stipend"].startswith("Paid:") for entry in un)
+    assert all("Paid" in entry["tags"] for entry in un)
+
+    # A dated entry must carry a real ISO deadline: the card counts down to it.
+    datetime.fromisoformat(by_title["Google Software Engineering Internship 2027"]["closes"])
+
+
 def test_internships_endpoint_is_public_and_only_internships(client):
     res = client.get("/api/public/internships")
     assert res.status_code == 200
