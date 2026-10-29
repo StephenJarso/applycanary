@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { api, type EntryLevelRole } from "../api";
+import { api, API_BASE, type EntryLevelRole } from "../api";
 import { ErrorBox, Loading, relTime } from "../components";
 import { daysUntil, fmtDate } from "../OpportunityCard";
 
@@ -729,7 +729,13 @@ export default function KenyaJobs({ embedded = true }: { embedded?: boolean }) {
           <div className="opp-grid">
             {pageItems.map((role) => {
               const closing = formatClosing(role);
-              const applyTarget = role.apply_url || role.source_url;
+              // The live feed publishes work.ke slugs, not the employer's advert,
+              // so those open through the API, which redirects to the posting.
+              // Roles that already carry an external advert link straight to it.
+              const applyTarget =
+                role.apply_url && role.apply_url !== role.source_url
+                  ? role.apply_url
+                  : `${API_BASE}/api/public/kenya-jobs/${encodeURIComponent(role.slug)}/apply`;
 
               return (
                 <article

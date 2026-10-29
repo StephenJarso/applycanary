@@ -12,12 +12,13 @@ client has something real to mirror.
 from __future__ import annotations
 
 import logging
+import re
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Literal
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, RedirectResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import and_, or_
 from sqlmodel import Session, func, select
@@ -744,6 +745,28 @@ async def public_entry_level(refresh: bool = False) -> EntryLevelFeedOut:
             detail="work.ke could not be reached; try again in a few minutes.",
         ) from exc
     return EntryLevelFeedOut(**feed)
+
+
+# work.ke slugs are lowercase words joined by hyphens and a short hash. Anything
+# else is not a role this API will look up.
+_ENTRY_LEVEL_SLUG_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9-]{0,199}$")
+
+
+@router.get("/public/kenya-jobs/{slug}/apply")
+@router.get("/public/entry-level/{slug}/apply")
+async def public_entry_level_apply(slug: str) -> RedirectResponse:
+    """Send a Kenya Jobs card to the employer's own advert.
+
+    The live feed is built from work.ke's job index, which publishes slugs but
+    not the employer link, so the advert is read from the role page the first
+    time someone opens it (and cached). If work.ke publishes no external advert,
+    or the page is unreachable, the work.ke listing is the fallback.
+    """
+    from app.entry_level import resolve_apply_url
+
+    if not _ENTRY_LEVEL_SLUG_RE.fullmatch(slug):
+        raise HTTPException(status_code=404, detail="Unknown role")
+    return RedirectResponse(url=await resolve_apply_url(slug), status_code=307)
 
 
 @router.get("/jobs", response_model=JobListOut)

@@ -214,6 +214,55 @@ async def test_source_turns_roles_into_raw_jobs() -> None:
     assert all(job.description for job in jobs)
 
 
+async def test_resolve_apply_url_reads_the_advert_once() -> None:
+    entry_level.reset_apply_cache()
+    requested: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requested.append(str(request.url))
+        return httpx.Response(200, text=ENTRY_DETAIL_HTML)
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        first = await entry_level.resolve_apply_url("junior-it-officer-example-abc123", client)
+        second = await entry_level.resolve_apply_url("junior-it-officer-example-abc123", client)
+
+    assert first == second == "https://employer.example/apply/42"
+    # The role page is read once; the second click is served from the cache.
+    assert requested == ["https://work.ke/jobs/junior-it-officer-example-abc123"]
+
+
+async def test_resolve_apply_url_falls_back_to_the_listing() -> None:
+    entry_level.reset_apply_cache()
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(404, text="not found")
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        url = await entry_level.resolve_apply_url("missing-role-abc123", client)
+
+    assert url == "https://work.ke/jobs/missing-role-abc123"
+
+
+def test_kenya_jobs_apply_redirects_to_the_employer(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def fake_resolve(slug: str) -> str:
+        assert slug == "junior-it-officer-example-abc123"
+        return "https://employer.example/apply/42"
+
+    monkeypatch.setattr(entry_level, "resolve_apply_url", fake_resolve)
+
+    client = TestClient(create_app(), follow_redirects=False)
+    response = client.get("/api/public/kenya-jobs/junior-it-officer-example-abc123/apply")
+
+    assert response.status_code == 307
+    assert response.headers["location"] == "https://employer.example/apply/42"
+
+
+def test_kenya_jobs_apply_rejects_unknown_slugs() -> None:
+    client = TestClient(create_app(), follow_redirects=False)
+    response = client.get("/api/public/kenya-jobs/not...a-role/apply")
+    assert response.status_code == 404
+
+
 def test_public_entry_level_endpoint_serves_the_feed(monkeypatch: pytest.MonkeyPatch) -> None:
     entry_level.reset_cache()
 

@@ -26,6 +26,7 @@ import re
 import time
 from datetime import UTC, datetime, timedelta, timezone
 from typing import Any
+from urllib.parse import quote
 
 import httpx
 
@@ -38,6 +39,10 @@ LISTING_PATHS = (
     "/jobs/junior-tech",
 )
 CACHE_TTL_SECONDS = 30 * 60.0
+# The live job index carries work.ke slugs, not the employers' advert links, so
+# each role page is read once on demand (see ``resolve_apply_url``) and the
+# answer kept for half a day.
+APPLY_CACHE_TTL_SECONDS = 12 * 60 * 60.0
 USER_AGENT = "applycanary/0.1 (personal job search agent; +https://github.com)"
 MAX_DETAIL_FETCHES = 6
 
@@ -68,6 +73,7 @@ _MONTHS = {
 _cache: dict[str, Any] | None = None
 _cached_at = 0.0
 _lock = asyncio.Lock()
+_apply_urls: dict[str, tuple[float, str]] = {}
 
 
 # ---------------------------------------------------------------- parsing
@@ -272,6 +278,53 @@ async def _get(client: httpx.AsyncClient, url: str) -> str:
     return response.text
 
 
+def role_url(slug: str) -> str:
+    """work.ke's own page for a role — also the fallback when no advert is found."""
+    return f"{BASE_URL}/jobs/{quote(slug.strip().strip('/'), safe='')}"
+
+
+async def resolve_apply_url(
+    slug: str, client: httpx.AsyncClient | None = None
+) -> str:
+    """Employer's own advert for one listing, read from its work.ke page.
+
+    The live job index only publishes work.ke slugs, so the external advert can
+    only be recovered from the role page. That costs one request per role, which
+    is why it happens when someone opens the role rather than for the whole
+    catalog; results are cached. When the page has no external advert (or is
+    unreachable) the work.ke listing itself is returned.
+    """
+    listing = role_url(slug)
+    cached = _apply_urls.get(slug.strip().strip("/"))
+    if cached and cached[0] > time.monotonic():
+        return cached[1]
+
+    owns_client = client is None
+    if owns_client:
+        client = httpx.AsyncClient(
+            timeout=20.0,
+            follow_redirects=True,
+            headers={"User-Agent": USER_AGENT},
+        )
+    try:
+        page = await _get(client, listing)
+        apply_url = parse_detail(page)["apply_url"]
+    except Exception as exc:  # noqa: BLE001 - the listing still opens
+        log.warning("work.ke: could not resolve advert for %s: %s", listing, exc)
+        return listing
+    finally:
+        if owns_client and client is not None:
+            await client.aclose()
+
+    if not apply_url:
+        return listing
+    _apply_urls[slug.strip().strip("/")] = (
+        time.monotonic() + APPLY_CACHE_TTL_SECONDS,
+        apply_url,
+    )
+    return apply_url
+
+
 async def fetch_entry_level(client: httpx.AsyncClient | None = None) -> dict[str, Any]:
     """Fetch the current entry-level technology roles from work.ke.
 
@@ -453,3 +506,8 @@ def reset_cache() -> None:
     global _cache, _cached_at  # noqa: PLW0603
     _cache = None
     _cached_at = 0.0
+
+
+def reset_apply_cache() -> None:
+    """Test helper: forget the resolved employer advert links."""
+    _apply_urls.clear()
