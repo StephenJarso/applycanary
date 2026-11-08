@@ -817,3 +817,48 @@ async def send_alert(
     body_with_cta = body + _cta_button(job.apply_url or "#", "Open posting")
     html = _wrap(body_with_cta, preheader=subject)
     return await send(subject, html, text, to=_recipient(profile, user))
+
+
+# ---------------------------------------------------------------------------
+#  Follow-up reminder — the date the user set on the Pipeline tab has arrived
+# ---------------------------------------------------------------------------
+
+
+async def send_follow_up_reminder(
+    job: Job,
+    *,
+    profile=None,  # noqa: ANN001
+    user=None,  # noqa: ANN001
+    days_waiting: int | None = None,
+) -> bool:
+    """One nudge for an application the user meant to chase today.
+
+    Deliberately short: the role, how long it has been out, and the one action
+    worth taking. The user chose the date themselves, so this is a reminder of
+    their own decision rather than advice about what to do next.
+    """
+    waited = f"{days_waiting} days" if days_waiting is not None else "a while"
+    subject = f"Follow up: {job.title} at {job.company}"
+    text = (
+        f"{subject}\n\n"
+        f"You sent this application {waited} ago and have not heard back.\n"
+        "A short note to the recruiter is the cheapest way to move it.\n"
+        "If they answer, record it in Pipeline so the chasing stops.\n\n"
+        f"Posting: {job.apply_url}\n"
+    )
+    body = (
+        "<table role='presentation' width='100%' cellspacing='0' cellpadding='0'>"
+        "<tr><td style='padding-bottom:4px'>"
+        f"<h2 style='margin:0;font-size:20px;color:{_BRAND_TEXT}'>"
+        f"{escape(job.title)}</h2>"
+        f"<p style='margin:4px 0 0;font-size:15px;color:{_BRAND_DIM}'>"
+        f"{escape(job.company)}</p></td></tr>"
+        "<tr><td style='padding:12px 0;font-size:14px;line-height:1.6;"
+        "color:#374151'>"
+        f"Sent {escape(waited)} ago with no reply yet. A short follow-up note is "
+        "the cheapest way to move it — and if they answer, record it in Pipeline "
+        "so the chasing stops.</td></tr>"
+        + _cta_button(job.apply_url or "#", "Open posting")
+    )
+    html = _wrap(body, preheader=subject)
+    return await send(subject, html, text, to=_recipient(profile, user))

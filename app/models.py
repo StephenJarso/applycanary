@@ -420,6 +420,9 @@ class Application(SQLModel, table=True):
     attempts: int = 0
 
     follow_up_due: datetime | None = None
+    # When the due date has been announced. Without it a daily job would repeat
+    # the same nudge every morning until the user cleared the date by hand.
+    follow_up_notified_at: datetime | None = None
     response_received: bool = False
     outcome: str = ""               # interview | rejected | ghosted | offer
 

@@ -486,6 +486,108 @@ async def _send_deadline_pushes() -> None:
     log.info("deadline_push: sent %d push notifications", sent)
 
 
+async def _send_follow_up_reminders() -> None:
+    """Nudge users about applications whose follow-up date has arrived.
+
+    Push first, then email when the user has an address of their own. A row is
+    marked notified once either channel takes the message, so a broken channel
+    does not mean the reminder is repeated every morning; when neither channel
+    is available the row stays unmarked and the next run tries again.
+    """
+    from sqlmodel import Session as SyncSession
+
+    from app.db import engine
+    from app.models import Application
+    from app.notify import email as notify
+
+    now = utcnow()
+    pushed = 0
+    emailed = 0
+    stale_ids: list[int] = []
+
+    with SyncSession(engine) as session:
+        due = session.exec(
+            select(Application)
+            .where(Application.submitted_at.is_not(None))
+            .where(Application.follow_up_due.is_not(None))
+            .where(Application.follow_up_due <= now)
+            .where(Application.follow_up_notified_at.is_(None))
+            .where(Application.response_received == False)  # noqa: E712 - SQL
+            .where(Application.outcome == "")
+        ).all()
+
+        for app_row in due:
+            job = session.get(Job, app_row.job_id)
+            if job is None:
+                continue
+            days = (
+                (now - app_row.submitted_at).days
+                if app_row.submitted_at is not None
+                else None
+            )
+            notified = False
+
+            subs = session.exec(
+                select(PushSubscription).where(
+                    PushSubscription.user_id == app_row.user_id
+                )
+            ).all()
+            for sub in subs:
+                result = send_push(
+                    endpoint=sub.endpoint,
+                    p256dh=sub.p256dh,
+                    auth=sub.auth,
+                    title="ApplyCanary — Follow up today",
+                    body=(
+                        f"{job.title} at {job.company}"
+                        + (f" — sent {days} days ago" if days is not None else "")
+                        + ", no reply yet."
+                    ),
+                    url="/pipeline",
+                )
+                if result == "ok":
+                    notified = True
+                    pushed += 1
+                elif result == "stale":
+                    stale_ids.append(sub.id)
+
+            # The operator's fallback inbox must not receive other users'
+            # applications, the same rule the digest follows.
+            profile = session.exec(
+                select(Profile).where(Profile.user_id == app_row.user_id)
+            ).first()
+            has_own_email = bool(
+                profile
+                and (
+                    (profile.email or "").strip()
+                    or (profile.digest_to or "").strip()
+                )
+            )
+            if has_own_email and await notify.send_follow_up_reminder(
+                job,
+                profile=profile,
+                user=session.get(User, app_row.user_id),
+                days_waiting=days,
+            ):
+                notified = True
+                emailed += 1
+
+            if notified:
+                app_row.follow_up_notified_at = utcnow()
+                session.add(app_row)
+
+        for sid in stale_ids:
+            stale = session.get(PushSubscription, sid)
+            if stale:
+                session.delete(stale)
+
+        session.commit()
+
+    log.info(
+        "follow_ups: %d push, %d email reminder(s)", pushed, emailed
+    )
+
+
 # ---------------------------------------------------------------- wiring
 
 
@@ -526,6 +628,9 @@ def build_scheduler() -> AsyncIOScheduler:
         # Role discovery is slow and budgeted (Adzuna free tier), so 6-hourly.
         ("discover_roles", CronTrigger(hour="*/6", minute=37), job_discover_roles),
         ("digest", CronTrigger(hour=8, minute=3), job_digest),
+        # Twenty minutes after the digest: one message about anything whose
+        # follow-up date has arrived, before the day's work starts.
+        ("follow_ups", CronTrigger(hour=8, minute=23), _send_follow_up_reminders),
         ("expire_stale", CronTrigger(hour=4, minute=23), job_expire_stale),
         ("embed_new", IntervalTrigger(minutes=15, jitter=120), job_embed_new),
         # The public Opportunities page reads a cached TGK event list; keep it

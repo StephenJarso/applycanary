@@ -1262,6 +1262,7 @@ def update_pipeline(
         app_row.response_received = body.response_received
         if body.response_received:
             app_row.follow_up_due = None
+            app_row.follow_up_notified_at = None
 
     if body.follow_up_in_days is not None:
         app_row.follow_up_due = (
@@ -1269,6 +1270,9 @@ def update_pipeline(
             if body.follow_up_in_days <= 0
             else utcnow() + timedelta(days=body.follow_up_in_days)
         )
+        # A new date deserves a new reminder, including one the user clears and
+        # then sets again.
+        app_row.follow_up_notified_at = None
 
     session.add(app_row)
     session.commit()
