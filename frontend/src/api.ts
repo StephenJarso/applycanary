@@ -153,6 +153,31 @@ export interface ReviewList {
   total: number;
 }
 
+export interface PipelineItem {
+  job_id: number;
+  title: string;
+  company: string;
+  source: string;
+  apply_url: string;
+  method: string;
+  status: string;
+  /** follow-up due | applied | responded | interview | offer | rejected | ghosted */
+  stage: string;
+  submitted_at: string | null;
+  follow_up_due: string | null;
+  response_received: boolean;
+  outcome: string;
+  days_waiting: number | null;
+  follow_up_overdue: boolean;
+  score: number | null;
+}
+
+export interface Pipeline {
+  items: PipelineItem[];
+  /** Stage -> count. Every stage key is present, zero when empty. */
+  counts: Record<string, number>;
+}
+
 export interface PublicJob {
   id: number;
   company: string;
@@ -592,6 +617,11 @@ export const api = {
   job: (id: number) => request<JobDetail>(`/jobs/${id}`),
   review: (params: { limit?: number; offset?: number } = {}) => request<ReviewList>(`/review${qs(params)}`),
   applications: () => request<Job[]>("/applications"),
+  pipeline: () => request<Pipeline>("/pipeline"),
+  setPipelineStage: (
+    jobId: number,
+    body: { outcome?: string; response_received?: boolean; follow_up_in_days?: number },
+  ) => request<PipelineItem>("PATCH", `/pipeline/${jobId}`, body),
   sources: () => request<SourceHealth[]>("/sources"),
   profile: () => request<Profile>("/profile"),
   atsReport: () => request<AtsReport>("/profile/ats"),

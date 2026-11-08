@@ -18,6 +18,7 @@ import Opportunities from "./pages/Opportunities";
 import Internships from "./pages/Internships";
 import KenyaJobs from "./pages/KenyaJobs";
 import Volunteers from "./pages/Volunteers";
+import Pipeline from "./pages/Pipeline";
 import { useAuth } from "./context/AuthContext";
 import { FeedbackModal } from "./FeedbackModal";
 import {
@@ -45,6 +46,8 @@ const NAV = [
   { to: "/opportunities", label: "Programs", icon: "event", end: true },
   // Crew, mentoring and speaking slots at tech events — rare, and never on a job board
   { to: "/volunteers", label: "Volunteer", icon: "volunteer_activism", end: true },
+  // What came back after applying: outcomes, replies and follow-ups due.
+  { to: "/pipeline", label: "Pipeline", icon: "view_kanban", end: true },
   { to: "/memory", label: "Memory", icon: "psychology", mobile: true },
   { to: "/profile", label: "Profile", icon: "person" },
 ] as const;
@@ -53,6 +56,7 @@ const MOBILE_DRAWER_PAGES = [
   { to: "/internships", label: "Internships & Opportunities", icon: "school", end: true },
   { to: "/opportunities", label: "Programs", icon: "event", end: true },
   { to: "/volunteers", label: "Volunteer", icon: "volunteer_activism", end: true },
+  { to: "/pipeline", label: "Pipeline", icon: "view_kanban", end: true },
   { to: "/applications", label: "Applications", icon: "work_history", end: true },
   { to: "/sources", label: "Sources Status", icon: "cable", end: true },
   { to: "/profile", label: "Profile & Resume", icon: "person", end: true },
@@ -475,6 +479,7 @@ function Dashboard({ page }: { page?: "internships" | "programs" | "kenya-jobs" 
               <Route path="/entry-level" element={<Navigate to="/kenya-jobs" replace />} />
               <Route path="/memory" element={<Memory />} />
               <Route path="/review" element={<Review />} />
+              <Route path="/pipeline" element={<Pipeline />} />
               <Route path="/applications" element={<Applications />} />
               <Route path="/sources" element={<Sources />} />
               <Route path="/profile" element={<ProfilePage />} />

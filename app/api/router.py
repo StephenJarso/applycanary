@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import logging
 import re
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Literal
 
@@ -123,6 +123,52 @@ class ReviewJobOut(JobOut):
 class ReviewListOut(BaseModel):
     jobs: list[ReviewJobOut]
     total: int
+
+
+class PipelineItemOut(BaseModel):
+    """One sent application with the stage the tracker shows.
+
+    The stage is derived rather than stored (see ``_pipeline_stage``), so a row
+    reads correctly whether the change was an explicit outcome, a reply, or a
+    follow-up date quietly passing.
+    """
+
+    job_id: int
+    title: str
+    company: str
+    source: str
+    apply_url: str
+    method: str
+    status: str
+    # follow-up due | applied | responded | interview | offer | rejected | ghosted
+    stage: str
+    submitted_at: datetime | None = None
+    follow_up_due: datetime | None = None
+    response_received: bool = False
+    outcome: str = ""
+    days_waiting: int | None = None
+    follow_up_overdue: bool = False
+    score: float | None = None
+
+
+class PipelineOut(BaseModel):
+    items: list[PipelineItemOut]
+    # Stage -> count. Fixed keys so the header chips do not disappear when a
+    # stage is empty.
+    counts: dict[str, int]
+
+
+class PipelineUpdate(BaseModel):
+    """One click's worth of stage change.
+
+    Only the fields present are applied. ``follow_up_in_days`` is a duration
+    rather than a date so the server clock decides the reminder and a client
+    timezone cannot shift it.
+    """
+
+    outcome: Literal["", "interview", "offer", "rejected", "ghosted"] | None = None
+    response_received: bool | None = None
+    follow_up_in_days: int | None = Field(default=None, ge=0, le=120)
 
 
 class OpportunityOut(BaseModel):
@@ -385,6 +431,91 @@ def _job_out(
         seen_count=job.seen_count,
         age_hours=round(job.age.total_seconds() / 3600, 1),
         score=_score_out(score),
+    )
+
+
+_PIPELINE_OUTCOMES = ("interview", "offer", "rejected", "ghosted")
+# Follow-ups first: they are the only entries with a deadline attached. Within a
+# stage the oldest application is the one to deal with, which the endpoint's
+# sort handles.
+_PIPELINE_ORDER = {
+    "follow-up due": 0,
+    "applied": 1,
+    "responded": 2,
+    "interview": 3,
+    "offer": 4,
+    "rejected": 5,
+    "ghosted": 6,
+}
+
+
+def _pipeline_stage(
+    outcome: str,
+    response_received: bool,
+    follow_up_due: datetime | None,
+    submitted_at: datetime | None,
+) -> str:
+    """Which column an application belongs in.
+
+    An explicit outcome outranks everything: after the user records "offer", a
+    follow-up date left over from last week must not drag the row back into the
+    chase list. A reply outranks an overdue follow-up for the same reason.
+    """
+    if outcome in _PIPELINE_OUTCOMES:
+        return outcome
+    if submitted_at is None:
+        return "prepared"
+    if response_received:
+        return "responded"
+    if follow_up_due is not None and follow_up_due <= utcnow():
+        return "follow-up due"
+    return "applied"
+
+
+def _pipeline_item(
+    session: Session, user: User, app_row: Application
+) -> PipelineItemOut:
+    """Serialize one application for the tracker.
+
+    Every lookup is scoped by ``user.id`` as well as ``job_id``: the posting is
+    shared, the score and workflow state are not.
+    """
+    job = session.get(Job, app_row.job_id)
+    score = session.exec(
+        select(JobScore).where(
+            JobScore.job_id == app_row.job_id, JobScore.user_id == user.id
+        )
+    ).first()
+    state = session.exec(
+        select(UserJob).where(
+            UserJob.job_id == app_row.job_id, UserJob.user_id == user.id
+        )
+    ).first()
+    submitted = app_row.submitted_at
+    stage = _pipeline_stage(
+        app_row.outcome or "",
+        app_row.response_received,
+        app_row.follow_up_due,
+        submitted,
+    )
+    return PipelineItemOut(
+        job_id=app_row.job_id,
+        title=job.title if job else "",
+        company=job.company if job else "",
+        source=job.source if job else "",
+        apply_url=job.apply_url if job else "",
+        method=str(app_row.method),
+        status=str(state.status) if state else str(JobStatus.APPLIED),
+        stage=stage,
+        submitted_at=submitted,
+        follow_up_due=app_row.follow_up_due,
+        response_received=app_row.response_received,
+        outcome=app_row.outcome or "",
+        days_waiting=int((utcnow() - submitted).days) if submitted else None,
+        follow_up_overdue=bool(
+            app_row.follow_up_due is not None and app_row.follow_up_due <= utcnow()
+        ),
+        score=score.total if score else None,
     )
 
 
@@ -1068,6 +1199,81 @@ def applications(
         .order_by(Application.submitted_at.desc())
     ).all()
     return [_job_out(job, score, uj) for job, score, uj in rows]
+
+
+@router.get("/pipeline", response_model=PipelineOut)
+def pipeline(
+    session: Session = Depends(get_session),
+    user: User = Depends(current_user),
+) -> PipelineOut:
+    """Sent applications and what came back, for the tracker tab.
+
+    Only rows this user has submitted: an application still waiting in the
+    review queue belongs there, where it can be sent, not in the chase list.
+    """
+    rows = session.exec(
+        select(Application)
+        .where(
+            Application.user_id == user.id,
+            Application.submitted_at.is_not(None),
+        )
+        .order_by(Application.submitted_at.desc())
+    ).all()
+
+    items = [_pipeline_item(session, user, row) for row in rows]
+    items.sort(key=lambda i: (_PIPELINE_ORDER.get(i.stage, 99), -(i.days_waiting or 0)))
+    counts = {
+        stage: sum(1 for item in items if item.stage == stage)
+        for stage in _PIPELINE_ORDER
+    }
+    return PipelineOut(items=items, counts=counts)
+
+
+@router.patch("/pipeline/{job_id}", response_model=PipelineItemOut)
+def update_pipeline(
+    job_id: int,
+    body: PipelineUpdate,
+    session: Session = Depends(get_session),
+    user: User = Depends(current_user),
+) -> PipelineItemOut:
+    """Record an outcome, a reply, or schedule/clear a follow-up.
+
+    Scoped by ``user_id`` as well as ``job_id``: an application belongs to the
+    account that sent it, so another user's row must read as absent here.
+    """
+    app_row = session.exec(
+        select(Application).where(
+            Application.job_id == job_id,
+            Application.user_id == user.id,
+        )
+    ).first()
+    if app_row is None or app_row.submitted_at is None:
+        raise HTTPException(404, "no submitted application for this job")
+
+    if body.outcome is not None:
+        app_row.outcome = body.outcome
+        if body.outcome in _PIPELINE_OUTCOMES:
+            # Ghosted is the absence of a reply, not one. The other outcomes
+            # all mean the employer answered, so the chase is over.
+            app_row.response_received = body.outcome != "ghosted"
+            app_row.follow_up_due = None
+
+    if body.response_received is not None:
+        app_row.response_received = body.response_received
+        if body.response_received:
+            app_row.follow_up_due = None
+
+    if body.follow_up_in_days is not None:
+        app_row.follow_up_due = (
+            None
+            if body.follow_up_in_days <= 0
+            else utcnow() + timedelta(days=body.follow_up_in_days)
+        )
+
+    session.add(app_row)
+    session.commit()
+    session.refresh(app_row)
+    return _pipeline_item(session, user, app_row)
 
 
 @router.get("/sources", response_model=list[SourceHealthOut])
