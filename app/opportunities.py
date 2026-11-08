@@ -365,6 +365,40 @@ PAID_PROGRAMS: list[dict] = [
         "url": "https://github.com/education/students/campus-expert",
         "desc": "Student leaders get free training, resources and funding to run tech communities at their institution.",
     },
+    {
+        "kind": "Paid program",
+        "title": "MEST AI Startup Program",
+        "org": "MEST Africa",
+        "when": "7 months training + 4 months incubation · residential, Accra",
+        "opens": "2027-05-01",
+        "closes": "2027-07-20",
+        "steps": [
+            "Applications open around May on meltwater.org — the 2027 class closed on 20 Jul 2026",
+            "Apply online; shortlisted applicants interview in Ghana, Nigeria, Senegal or Kenya",
+            "7 months of full-time training: software engineering, AI, product and business",
+            "Selected teams continue into 4 months of incubation and can pitch for pre-seed funding",
+        ],
+        "city": "Accra",
+        "tags": ["Paid", "Fully funded", "Accommodation", "Flights", "AI", "Software", "Africa"],
+        "stipend": (
+            "Paid: fully sponsored — tuition, accommodation, meals, healthcare "
+            "and the flight to Ghana"
+        ),
+        "source": "Official",
+        "url": "https://meltwater.org/mest-ai-startup-program",
+        "desc": (
+            "MEST has trained African software founders in Accra since 2008, "
+            "and the AI Start-up Program is its current form: seven months of "
+            "full-time, in-person training in software engineering and AI, "
+            "then up to four months of incubation for the teams that earn it. "
+            "Nobody pays a fee — tuition, accommodation, meals and healthcare "
+            "are covered, and admitted participants get their flight to Ghana "
+            "paid. The 2027 intake drew from West and East Africa with "
+            "interviews held in Nairobi, so Kenya is in scope; the catch is "
+            "that it is residential and full-time, and cannot be combined "
+            "with a job or a degree."
+        ),
+    },
 ]
 
 # Curated entries can be internships as well as pay-to-learn programs. Keeping
@@ -567,6 +601,254 @@ INTERNSHIPS.extend(
                 "an opening accepts applicants where you are before spending "
                 "the afternoon on it. The process is interview-led rather than "
                 "degree-led."
+            ),
+        },
+    ]
+)
+
+# Funded placements. HENNGE is the template — an internship worth taking
+# because it pays for the flight and the room — so these are the programmes
+# that answer the same question: what does it cost me to say yes? Each one
+# states the funding first, then what travel or housing comes with it. Huawei
+# and UNON are the local routes; Grafana is the Go-shaped one that does not
+# care where you sit.
+INTERNSHIPS.extend(
+    [
+        {
+            "kind": "Internship",
+            "title": "Huawei Seeds for the Future (Kenya)",
+            "org": "Huawei Kenya & ICT Authority",
+            "when": "~3 weeks · annual call, usually Mar–May",
+            "opens": "2027-03-01",
+            "closes": None,
+            "steps": [
+                "Watch Huawei Kenya's site and socials, and ask your ICT department — universities are nominated",
+                "Register through the yearly Huawei Kenya form when it opens (the 2025 call closed on 7 May)",
+                "Take a week of online HCIA certification training",
+                "A week of training in Nairobi, then a funded training trip abroad with the cohort",
+            ],
+            "city": "Kenya",
+            "tags": ["Paid", "Travel covered", "Accommodation", "Kenya", "Students", "Cloud"],
+            "stipend": (
+                "Paid: fully funded — training, travel and accommodation covered, "
+                "no fee to attend"
+            ),
+            "source": "Official",
+            "url": "https://www.huawei.com/ke/corporate-citizenship/seeds-for-the-future",
+            "desc": (
+                "Huawei's flagship ICT student programme, run with the ICT "
+                "Authority in Kenya since 2014. Recent editions are a "
+                "three-week arc: a week of virtual HCIA training, a week on "
+                "site in Nairobi, then a week of training and a digital tour "
+                "abroad — the flights and the accommodation are the "
+                "programme's cost, not the student's. Places are few (around "
+                "ten in the physical editions), so the nomination route "
+                "through your university matters as much as the public form."
+            ),
+        },
+        {
+            "kind": "Internship",
+            "title": "UNEP & UN-Habitat internships (Nairobi)",
+            "org": "United Nations Office at Nairobi",
+            "when": "2–6 months · vacancies posted year-round",
+            "opens": None,
+            "closes": None,
+            "steps": [
+                "Create an Inspira account on the UN Careers portal",
+                "Search internships with duty station Nairobi and filter the IT / data job family",
+                "Apply to each vacancy separately — every posting carries its own deadline",
+                "The same programme covers UNEP, UN-Habitat, UNON and the UN Dispute Tribunal",
+            ],
+            "city": "Nairobi",
+            "tags": ["Internship", "United Nations", "Kenya", "On-site", "Data", "IT"],
+            "stipend": (
+                "Stipend not published — the standard UN internship leaves "
+                "travel, visa, accommodation and living costs to the intern"
+            ),
+            "source": "Official",
+            "url": "https://www.unon.org/en/content/internship-programme",
+            "desc": (
+                "The UN Office at Nairobi runs one internship programme for "
+                "UNEP, UN-Habitat and UNON itself, which makes Nairobi the "
+                "densest concentration of UN internships in Africa. Postings "
+                "run from two to six months and are advertised year-round "
+                "rather than in one intake, and the Nairobi list regularly "
+                "carries information-technology, data and software roles "
+                "alongside the policy ones. Read the funding line before you "
+                "apply: no stipend is published, so this is a name and a "
+                "reference for your CV, not an income."
+            ),
+        },
+        {
+            "kind": "Internship",
+            "title": "Grafana Labs engineering internship (remote)",
+            "org": "Grafana Labs",
+            "when": "12 weeks · summer intake, fully remote",
+            "opens": None,
+            "closes": None,
+            "steps": [
+                "Watch Grafana Labs' Greenhouse board from autumn — the summer posting goes up there",
+                "Pick the track that matches you; the backend and ML tracks are Go-first",
+                "Technical screen, then squad interviews — the loop runs in about three weeks",
+                "Check the posting lists a country you can legally work from before applying",
+            ],
+            "city": "Online",
+            "tags": ["Paid", "Go", "Backend", "Remote", "Students"],
+            "stipend": "Paid: paid internship, rate stated on the posting",
+            "source": "Official",
+            "url": "https://job-boards.greenhouse.io/grafanalabs",
+            "desc": (
+                "Grafana Labs — the company behind Grafana, Loki, Mimir and "
+                "Tempo — runs a twelve-week, 100% remote summer engineering "
+                "internship. Its backend is Go and interns land on a real "
+                "squad rather than a sandbox, which makes this the shortest "
+                "route from 'I write Go' to 'I shipped Go'. As of late 2026 no "
+                "Summer 2027 posting was live yet, so the board is the thing "
+                "to watch rather than a page to apply on today; remote-first "
+                "also does not mean every country hires, so confirm the "
+                "posting's location list first."
+            ),
+        },
+        {
+            "kind": "Internship",
+            "title": "TechWomen — funded mentorship in the US",
+            "org": "U.S. Department of State",
+            "when": "~5 weeks in the US · cycle usually opens in January",
+            "opens": None,
+            "closes": None,
+            "steps": [
+                "Read the eligibility list on exchanges.state.gov for your country",
+                "Apply when the yearly cycle opens — it has historically run Jan–Feb",
+                "Shortlisted applicants are interviewed by the local U.S. embassy",
+                "Selected mentees travel to the US for mentorship, then give back through a home-country project",
+            ],
+            "city": "United States",
+            "tags": ["Travel covered", "Accommodation", "Mentorship", "Women in tech", "Global"],
+            "stipend": (
+                "Unpaid + benefits: round-trip airfare, housing, meals and local "
+                "transport covered"
+            ),
+            "source": "Official",
+            "url": "https://exchanges.state.gov/non-us/program/techwomen",
+            "desc": (
+                "A five-week professional mentorship in the United States for "
+                "women in STEM from Africa, the Middle East and Asia: a "
+                "mentor at a host company, a project, and a professional "
+                "network that is otherwise hard to reach from Nairobi. There "
+                "is no salary, but airfare, housing, meals and local transport "
+                "are covered, which is what makes it affordable. Applicants "
+                "need at least two years of professional STEM experience and "
+                "strong English; Kenya is on the eligible-country list."
+            ),
+        },
+    ]
+)
+
+# Funded placements abroad where the flight and the room are the programme's
+# problem, not the applicant's — the HENNGE shape in three more flavours. All
+# three touch Go, and each states plainly what it costs to say yes.
+INTERNSHIPS.extend(
+    [
+        {
+            "kind": "Internship",
+            "title": "Mercari Software Engineer Internship (Tokyo)",
+            "org": "Mercari Group",
+            "when": "2–3 months · several intakes a year in Tokyo",
+            "opens": None,
+            "closes": None,
+            "steps": [
+                "Open careers.mercari.com and pick the engineering internship for your graduating class",
+                "Apply with the Go/backend, frontend or mobile experience the posting lists",
+                "Interview remotely — overseas candidates get visa and accommodation help",
+                "Check the batch dates: Mercari runs more than one intake a year",
+            ],
+            "city": "Tokyo",
+            "tags": ["Paid", "Go", "Backend", "Airfare", "Accommodation", "Japan"],
+            "stipend": (
+                "Paid: round-trip airfare, accommodation and visa support covered "
+                "for overseas interns; intern pay stated on the posting"
+            ),
+            "source": "Official",
+            "url": "https://careers.mercari.com/en/new-graduates/",
+            "desc": (
+                "Mercari and Merpay run in Tokyo on Go, PHP and Java, and the "
+                "engineering internship puts you on the real codebase rather "
+                "than a training sandbox — past interns have rewritten "
+                "Merpay's settlement service and moved its authentication to "
+                "OAuth 2.0. The posting is explicit about the expensive part: "
+                "overseas interns get airline tickets arranged and "
+                "accommodation sorted, plus visa support, over two to three "
+                "months at 20+ hours a week. It targets students who can join "
+                "as new graduates in October 2027 or April 2028, so read the "
+                "class year before applying."
+            ),
+        },
+        {
+            "kind": "Internship",
+            "title": "Japan Internship Program (METI)",
+            "org": "Government of Japan",
+            "when": "~2–3 months in Japan · annual call",
+            "opens": None,
+            "closes": None,
+            "steps": [
+                "Check internshipprogram.go.jp for the next call and the eligibility list",
+                "Confirm your nationality is on the OECD DAC list — Kenya is",
+                "Apply to a host company through the programme, not to the company directly",
+                "The in-person course covers airfare, furnished accommodation, insurance and the visa",
+            ],
+            "city": "Japan",
+            "tags": ["Paid", "Travel covered", "Accommodation", "Japan", "Software", "Global"],
+            "stipend": (
+                "Paid: round-trip economy airfare, furnished accommodation and "
+                "utilities, insurance and visa support"
+            ),
+            "source": "Official",
+            "url": "https://internshipprogram.go.jp/english/intern/",
+            "desc": (
+                "The Japanese government's own internship programme places "
+                "foreign professionals with host companies inside Japan and "
+                "pays the parts that stop most people: round-trip economy "
+                "airfare, accommodation including furniture, bedding and "
+                "utilities, travel between the airport, the host company and "
+                "the training venue, insurance and the visa. Applicants must "
+                "be nationals of an OECD DAC list country living outside "
+                "Japan — which covers Kenya — with a degree or equivalent "
+                "experience. Host companies span software, IT and "
+                "manufacturing, so read the company list rather than assuming "
+                "a Go team."
+            ),
+        },
+        {
+            "kind": "Internship",
+            "title": "Cloudflare Software Engineer Intern (2027)",
+            "org": "Cloudflare",
+            "when": "12–14 weeks · Winter/Spring or Summer 2027",
+            "opens": None,
+            "closes": None,
+            "steps": [
+                "Open the 2027 postings on Cloudflare's Greenhouse board",
+                "Pick the office whose work authorization you actually hold — Austin, London or Lisbon",
+                "Apply to one term: Winter/Spring (Jan–May) or Summer (May–Sep) 2027",
+                "Hiring is rolling until the roles fill, so apply the week the posting opens",
+            ],
+            "city": "Various",
+            "tags": ["Paid", "Go", "Rust", "Systems", "Housing stipend", "On-site"],
+            "stipend": (
+                "Paid: USD 45–53/hour plus housing and relocation stipends for "
+                "US interns; the Lisbon posting lists EUR 2,450/month"
+            ),
+            "source": "Official",
+            "url": "https://job-boards.greenhouse.io/cloudflare",
+            "desc": (
+                "Cloudflare's edge is written in Go and Rust, and interns ship "
+                "code that runs in front of hundreds of millions of people: "
+                "12+ weeks in office in Austin, London or Lisbon. US interns "
+                "are paid USD 45–53 an hour plus housing and relocation "
+                "stipends, which is what makes the summer affordable. The "
+                "catch worth reading twice: the postings require existing "
+                "authorization to work in that country and do not sponsor "
+                "visas, so a Kenyan applicant needs to already be studying or "
+                "resident there."
             ),
         },
     ]
@@ -870,6 +1152,106 @@ VOLUNTEER: list[dict] = [
             "14–16 August in Lagos, and the community also circulates "
             "speaking slots at partner conferences such as the Eclipse "
             "Foundation's Open Community Experience."
+        ),
+    },
+    {
+        "kind": "Volunteer",
+        "title": "UN Volunteers — national & international assignments",
+        "org": "United Nations Volunteers",
+        "when": "3–24 months · assignments posted year-round",
+        "opens": None,
+        "closes": None,
+        "steps": [
+            "Register a profile on UNV's Unified Volunteering Platform",
+            "Filter by duty station (Kenya, or abroad) and by the IT / information management area",
+            "Apply to individual assignments — each has its own deadline and host agency",
+            "Shortlisted candidates go through the host agency's interview",
+        ],
+        "city": "Various",
+        "tags": ["Volunteer", "Paid", "Allowance", "Accommodation", "Travel", "Global", "Kenya"],
+        "stipend": (
+            "Paid: monthly living allowance, plus travel, insurance and a "
+            "settling-in grant towards accommodation"
+        ),
+        "source": "Official",
+        "url": "https://www.unv.org/become-volunteer",
+        "desc": (
+            "The only volunteer route that is genuinely funded end to end: a "
+            "monthly living allowance, travel entitlements, insurance and — "
+            "where the duty station is not within commuting distance — a "
+            "settling-in grant and travel reimbursement towards getting there "
+            "and living there. National assignments serve inside Kenya with "
+            "agencies based in Nairobi; international ones place you with a "
+            "host agency abroad. UNV publishes assignments on its own "
+            "platform rather than a job board, and 'information and "
+            "communications technology' is a standing area, so this is the "
+            "way to turn volunteer work into a funded first posting."
+        ),
+    },
+    {
+        "kind": "Volunteer",
+        "title": "VSO — professional volunteer placements",
+        "org": "Voluntary Service Overseas",
+        "when": "6–24 months · rolling recruitment",
+        "opens": None,
+        "closes": None,
+        "steps": [
+            "Check the current placement list on vsointernational.org",
+            "Confirm you meet the bar: a degree or equivalent and about three years' experience",
+            "Apply online, then interview with the country programme",
+            "Complete the pre-departure training and visa process before you fly",
+        ],
+        "city": "Kenya",
+        "tags": ["Volunteer", "Paid", "Allowance", "Accommodation", "Travel", "Kenya", "Global"],
+        "stipend": (
+            "Paid: living allowance in local currency, plus accommodation, "
+            "travel, insurance and visa costs covered"
+        ),
+        "source": "Official",
+        "url": "https://www.vsointernational.org/volunteering",
+        "desc": (
+            "VSO has worked in Kenya since 1959 and still places "
+            "experienced professionals for six to twenty-four months. For a "
+            "placement abroad it covers the living allowance, accommodation, "
+            "travel, medical and personal-liability insurance, immunisations "
+            "and the visa — the volunteer funds their own medical check and "
+            "personal kit. Most placements are in health, education and "
+            "livelihoods, with digital and data roles appearing from time to "
+            "time, so treat the current list as the filter: this is a route "
+            "for someone with a few years behind them, not a first job."
+        ),
+    },
+    {
+        "kind": "Volunteer",
+        "title": "GopherCon South Africa 2027 — call for speakers",
+        "org": "Go South Africa",
+        "when": "Event 17–18 Feb 2027 · Johannesburg · CFP open now",
+        "opens": None,
+        "closes": None,
+        "date": "2027-02-17",
+        "steps": [
+            "Read the call for speakers on gopherconf.co.za",
+            "Propose a talk under the 2027 theme, \"Go Beyond — Building the Future with Go\"",
+            "Never spoken before? Propose a hands-on or beginner session rather than a keynote",
+            "Ask the organisers what travel support exists before you budget for the trip",
+        ],
+        "city": "Johannesburg",
+        "tags": ["Speaker", "Go", "Conference", "On-site", "South Africa"],
+        "stipend": (
+            "Unpaid + benefits: speaking slot and speaker ticket; travel "
+            "support not published, so ask the organisers"
+        ),
+        "source": "Official",
+        "url": "https://gopherconf.co.za/",
+        "desc": (
+            "South Africa's Go conference returns for a second year on 17–18 "
+            "February 2027 in Johannesburg, and the call for speakers is open "
+            "now. This is the cheapest way onto a Go stage in Africa: a talk "
+            "slot, an audience of Go developers and the recruiters who hire "
+            "them, and a line on your CV that no certificate matches. No "
+            "travel or accommodation funding is published — ask before you "
+            "commit, and treat the trip as yours to fund unless they say "
+            "otherwise."
         ),
     },
 ]
