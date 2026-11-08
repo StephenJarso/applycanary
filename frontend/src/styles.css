@@ -3468,3 +3468,7 @@ input[type="range"]::-moz-range-thumb {
 @media (max-width: 860px) {
   .side-by-side { grid-template-columns: 1fr; }
 }
+
+/* Opportunity tracking: state chip plus the one action worth taking. */
+.opp-track { display: inline-flex; align-items: center; gap: 4px; margin-left: 4px; }
+.opp-track .opp-watch-btn { font-size: 11.5px; }

@@ -2392,22 +2392,18 @@ def get_watched(
     user: User = Depends(current_user),
     session: Session = Depends(get_session),
 ) -> list[dict]:
-    """Return all watched opportunities for the current user."""
+    """Return all watched opportunities for the current user.
+
+    Only rows whose alert is still on: an application the user tracked and then
+    silenced stays in the tracker, not in this list.
+    """
     rows = session.exec(
-        select(WatchedOpportunity).where(WatchedOpportunity.user_id == user.id)
+        select(WatchedOpportunity).where(
+            WatchedOpportunity.user_id == user.id,
+            WatchedOpportunity.watched == True,  # noqa: E712 - SQL, not Python
+        )
     ).all()
-    return [
-        {
-            "id": r.id,
-            "opp_url": r.opp_url,
-            "opp_title": r.opp_title,
-            "opp_org": r.opp_org,
-            "opp_kind": r.opp_kind,
-            "deadline": r.deadline,
-            "created_at": r.created_at.isoformat(),
-        }
-        for r in rows
-    ]
+    return [_opportunity_row(r) for r in rows]
 
 
 @router.post("/opportunities/watch")
@@ -2423,7 +2419,7 @@ def watch_opp(
             WatchedOpportunity.opp_url == body.url,
         )
     ).first()
-    if not existing:
+    if existing is None:
         session.add(
             WatchedOpportunity(
                 user_id=user.id,
@@ -2434,7 +2430,16 @@ def watch_opp(
                 deadline=body.deadline,
             )
         )
-        session.commit()
+    else:
+        # Re-watching must not wipe the tracking the row already carries, and
+        # the card is the freshest source for the metadata.
+        existing.watched = True
+        existing.opp_title = body.title or existing.opp_title
+        existing.opp_org = body.org or existing.opp_org
+        existing.opp_kind = body.kind or existing.opp_kind
+        existing.deadline = body.deadline or existing.deadline
+        session.add(existing)
+    session.commit()
     return {"ok": True, "watched": True}
 
 
@@ -2451,10 +2456,137 @@ def unwatch_opp(
             WatchedOpportunity.opp_url == body.url,
         )
     ).first()
-    if row:
-        session.delete(row)
+    if row is not None:
+        if row.applied_at is not None or row.outcome:
+            # Turn off the alert but keep the application history: the user is
+            # saying "stop reminding me", not "forget that I applied".
+            row.watched = False
+            session.add(row)
+        else:
+            session.delete(row)
         session.commit()
     return {"ok": True, "watched": False}
+
+
+def _opportunity_stage(row: WatchedOpportunity) -> str:
+    """Which stage an opportunity application has reached.
+
+    Mirrors the job tracker: an explicit verdict outranks a reply, and a row
+    the user only watches (never applied to) is not part of the pipeline at all.
+    """
+    if row.outcome in _PIPELINE_OUTCOMES:
+        return row.outcome
+    if row.applied_at is None:
+        return "watching"
+    if row.response_received:
+        return "responded"
+    return "applied"
+
+
+def _opportunity_row(row: WatchedOpportunity) -> dict:
+    return {
+        "id": row.id,
+        "opp_url": row.opp_url,
+        "opp_title": row.opp_title,
+        "opp_org": row.opp_org,
+        "opp_kind": row.opp_kind,
+        "deadline": row.deadline,
+        "watched": row.watched,
+        "applied_at": row.applied_at,
+        "response_received": row.response_received,
+        "outcome": row.outcome or "",
+        "stage": _opportunity_stage(row),
+        "created_at": row.created_at.isoformat(),
+    }
+
+
+class OpportunityStatusIn(BaseModel):
+    """One click on an opportunity card or in the Pipeline tracker."""
+
+    url: str = Field(min_length=8, max_length=1000)
+    title: str = ""
+    org: str = ""
+    kind: str = ""
+    deadline: str | None = None
+    status: Literal["", "applied", "heard_back", "interview", "offer", "rejected", "ghosted"]
+
+
+@router.get("/opportunities/tracked")
+def list_tracked_opportunities(
+    user: User = Depends(current_user),
+    session: Session = Depends(get_session),
+) -> list[dict]:
+    """Opportunities the user has applied to, with the stage they reached.
+
+    Watching alone is not an application: an alert-only row would otherwise
+    appear in the tracker as if it had been sent.
+    """
+    rows = session.exec(
+        select(WatchedOpportunity).where(
+            WatchedOpportunity.user_id == user.id,
+            or_(
+                WatchedOpportunity.applied_at.is_not(None),
+                WatchedOpportunity.outcome != "",
+            ),
+        )
+    ).all()
+    items = [_opportunity_row(r) for r in rows]
+    items.sort(key=lambda i: (_PIPELINE_ORDER.get(i["stage"], 99), i["opp_title"]))
+    return items
+
+
+@router.patch("/opportunities/tracked")
+def track_opportunity(
+    body: OpportunityStatusIn,
+    user: User = Depends(current_user),
+    session: Session = Depends(get_session),
+) -> dict:
+    """Mark an opportunity applied, replied to, or closed with a verdict."""
+    row = session.exec(
+        select(WatchedOpportunity).where(
+            WatchedOpportunity.user_id == user.id,
+            WatchedOpportunity.opp_url == body.url,
+        )
+    ).first()
+    if row is None:
+        row = WatchedOpportunity(
+            user_id=user.id,
+            opp_url=body.url,
+            opp_title=body.title,
+            opp_org=body.org,
+            opp_kind=body.kind,
+            deadline=body.deadline,
+            # Tracking is not the same as asking for a deadline push.
+            watched=False,
+        )
+    else:
+        row.opp_title = body.title or row.opp_title
+        row.opp_org = body.org or row.opp_org
+        row.opp_kind = body.kind or row.opp_kind
+        row.deadline = body.deadline or row.deadline
+
+    if body.status:
+        # Anything past watching means they applied; the date anchors sorting
+        # and the "how long has it been out" column.
+        if row.applied_at is None:
+            row.applied_at = utcnow()
+
+    if body.status == "applied":
+        row.outcome = ""
+        row.response_received = False
+    elif body.status == "heard_back":
+        row.response_received = True
+    elif body.status in _PIPELINE_OUTCOMES:
+        row.outcome = body.status
+        row.response_received = body.status != "ghosted"
+    elif body.status == "":
+        # Reopen: withdraw the verdict but keep the fact that they applied.
+        row.outcome = ""
+
+    session.add(row)
+    session.commit()
+    session.refresh(row)
+    return _opportunity_row(row)
 
 
 # ---------------------------------------------------------------- admin management

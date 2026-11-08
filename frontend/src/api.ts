@@ -926,6 +926,43 @@ export const unwatchOpp = (url: string) =>
 export const getWatched = () =>
   request<WatchedOpp[]>("GET", "/api/opportunities/watched");
 
+export interface TrackedOpp {
+  id: number;
+  opp_url: string;
+  opp_title: string;
+  opp_org: string;
+  opp_kind: string;
+  deadline: string | null;
+  watched: boolean;
+  applied_at: string | null;
+  response_received: boolean;
+  outcome: string;
+  /** watching | applied | responded | interview | offer | rejected | ghosted */
+  stage: string;
+  created_at: string;
+}
+
+export type OpportunityStatus =
+  | ""
+  | "applied"
+  | "heard_back"
+  | "interview"
+  | "offer"
+  | "rejected"
+  | "ghosted";
+
+export const getTrackedOpps = () =>
+  request<TrackedOpp[]>("GET", "/api/opportunities/tracked");
+
+export const setOpportunityStatus = (body: {
+  url: string;
+  title?: string;
+  org?: string;
+  kind?: string;
+  deadline?: string | null;
+  status: OpportunityStatus;
+}) => request<TrackedOpp>("PATCH", "/api/opportunities/tracked", body);
+
 export const vapidKey = () =>
   request<{ publicKey: string }>("GET", "/api/push/vapid-public-key");
 

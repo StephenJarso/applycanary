@@ -617,7 +617,12 @@ class Feedback(SQLModel, table=True):
 
 
 class WatchedOpportunity(SQLModel, table=True):
-    """Records that a logged-in user wants deadline push alerts for this opportunity."""
+    """Per-user state for one opportunity: deadline alert and application tracking.
+
+    A row exists when the user asks for a deadline push *or* marks the
+    opportunity applied, so `watched` keeps the bell separate from the tracker:
+    clearing the alert must not erase the application history.
+    """
 
     __tablename__ = "watched_opportunity"
     __table_args__ = (
@@ -632,6 +637,12 @@ class WatchedOpportunity(SQLModel, table=True):
     opp_kind: str = ""  # Internship | Event | Paid program
     deadline: str | None = None  # ISO date e.g. '2025-01-15'
     notified_at: datetime | None = None
+    # True while the deadline push is wanted. A tracked-only row carries False,
+    # so the bell and the Pipeline entry never overwrite one another.
+    watched: bool = True
+    applied_at: datetime | None = None
+    response_received: bool = False
+    outcome: str = ""  # interview | offer | rejected | ghosted
     created_at: datetime = Field(default_factory=utcnow)
 
 

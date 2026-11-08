@@ -1,4 +1,15 @@
 import type { Opportunity } from "./api";
+import { useOpportunityTracking } from "./useOpportunityTracking";
+
+/** Short labels for the tracking control on a card. */
+const TRACK_LABELS: Record<string, string> = {
+  applied: "Applied",
+  responded: "Replied",
+  interview: "Interview",
+  offer: "Offer",
+  rejected: "Rejected",
+  ghosted: "Ghosted",
+};
 
 export const daysUntil = (iso: string) =>
   Math.ceil((new Date(iso).getTime() - Date.now()) / 86_400_000);
@@ -127,6 +138,9 @@ export function OpportunityCard({
   onToggleWatch,
 }: OpportunityCardProps) {
   const deadline = item.closes ?? (item.kind === "Event" ? item.date : null) ?? null;
+  // Tracking is per application, so volunteer and speaking slots count too.
+  const tracking = useOpportunityTracking();
+  const stage = tracking.stageFor(item.url);
 
   return (
     <a
@@ -161,6 +175,46 @@ export function OpportunityCard({
           >
             {isWatched ? "🔔" : "🔕"}
           </button>
+        )}
+        {tracking.signedIn && (
+          <span className="opp-track">
+            {stage && (
+              <span className="opp-watch-btn opp-watch-active" title={`Tracked: ${stage}`}>
+                {TRACK_LABELS[stage] ?? stage}
+              </span>
+            )}
+            {stage === "applied" ? (
+              <button
+                type="button"
+                className="opp-watch-btn"
+                title="They replied"
+                aria-label="Mark as replied"
+                disabled={tracking.busy}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  tracking.mark(item, "heard_back");
+                }}
+              >
+                Heard back
+              </button>
+            ) : !stage ? (
+              <button
+                type="button"
+                className="opp-watch-btn"
+                title="Mark this application as sent"
+                aria-label="Mark as applied"
+                disabled={tracking.busy}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  tracking.mark(item, "applied");
+                }}
+              >
+                ✓ Applied
+              </button>
+            ) : null}
+          </span>
         )}
       </div>
 
