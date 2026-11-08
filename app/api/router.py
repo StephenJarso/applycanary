@@ -698,15 +698,17 @@ async def public_opportunities() -> OpportunitiesOut:
 
 
 @router.get("/public/internships", response_model=OpportunitiesOut)
-def public_internships() -> OpportunitiesOut:
-    """Curated internship placements, public like the events page.
+async def public_internships() -> OpportunitiesOut:
+    """Curated placements plus the live Kenyan internship collection.
 
     Kept separate from ``/public/opportunities`` so the page can offer a
     dedicated Internships tab without every event request carrying the cards.
+    The live work.ke half is cached in ``app.opportunities`` and degrades to
+    the curated list with ``events_live=False`` rather than failing.
     """
     from app.opportunities import get_internships
 
-    return OpportunitiesOut(**get_internships())
+    return OpportunitiesOut(**await get_internships())
 
 
 @router.get("/public/volunteers", response_model=OpportunitiesOut)

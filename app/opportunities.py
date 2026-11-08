@@ -1850,16 +1850,200 @@ async def get_opportunities() -> dict:
     }
 
 
-def get_internships() -> dict:
+# ------------------------------------------------- live work.ke internships
+#
+# The curated INTERNSHIPS list can only carry programmes somebody has written
+# up. Kenyan employers post internships to work.ke instead, and work.ke exposes
+# its whole catalog as one public JSON index that marks each role's seniority —
+# so the live collection is a filter over that index rather than a second
+# scraper, and it needs no key. The live half is cached, capped, and keeps its
+# last good answer through an outage; the curated half never depends on it.
+
+WORKKE_INDEX_URL = "https://work.ke/job-index.json"
+WORKKE_TTL = 30 * 60.0        # a tab, not a job board: half an hour is plenty
+WORKKE_STALE_TTL = 24 * 3600.0  # an internship older than a day is a dead link
+MAX_LIVE_INTERNSHIPS = 40     # the tab stays readable; the index stays cheap
+
+
+@dataclass(slots=True)
+class InternshipFeed:
+    """The live internship half, with enough state to report a failed refresh."""
+
+    items: list[dict] = field(default_factory=list)
+    fetched_at: float | None = None
+    ok: bool = False
+
+
+_live_feed = InternshipFeed()
+_live_lock = asyncio.Lock()
+
+
+def _is_internship(role: dict) -> bool:
+    """True when work.ke marks the row as an internship.
+
+    The index carries seniority ("Internship", "Entry level", …) and an
+    employment type; employers fill in one or both, so either counts.
+    """
+    seniority = str(role.get("seniority") or "").lower()
+    employment = str(role.get("employmentType") or "").lower()
+    return "intern" in seniority or "intern" in employment
+
+
+def _workke_item(role: dict) -> dict | None:
+    """One live internship as the card renders it.
+
+    The index publishes no description — only the fields work.ke's own tile
+    shows — so the card points at the listing instead of inventing a summary.
+    Compensation is reported as unpublished unless the listing disclosed a
+    salary, which the index does tell us.
+    """
+    title = str(role.get("title") or "").strip()
+    employer = str(role.get("employer") or "").strip()
+    slug = str(role.get("slug") or "").strip()
+    if not title or not employer or not slug:
+        return None
+
+    location = str(role.get("location") or "").strip()
+    work_mode = str(role.get("workMode") or "").strip()
+    remote = work_mode.lower() == "remote" or "remote" in location.lower()
+
+    raw_closing = str(role.get("closingAt") or "").replace("Z", "+00:00")
+    closes = None
+    when = "Rolling — no closing date published"
+    try:
+        deadline = datetime.fromisoformat(raw_closing) if raw_closing else None
+    except ValueError:
+        deadline = None
+    if deadline is not None:
+        closes = deadline.date().isoformat()
+        when = f"Closes {deadline.strftime('%d %b %Y').lstrip('0')}"
+
+    salary_disclosed = bool(role.get("salaryDisclosed"))
+    tags = ["Internship", "Kenya", "From work.ke"]
+    category = str(role.get("category") or "").strip()
+    if category:
+        tags.append(category)
+    if remote:
+        tags.append("Remote")
+    if salary_disclosed:
+        tags.append("Paid")
+
+    return {
+        "kind": "Internship",
+        "title": title,
+        "org": employer,
+        "when": when,
+        "opens": None,
+        "closes": closes,
+        "steps": [
+            "Open the work.ke listing from this card",
+            "Follow 'View advert' to the employer's own application page",
+            "Apply before the closing date printed on the advert",
+        ],
+        "city": "Online" if remote else (location or "Kenya"),
+        "tags": tags,
+        "stipend": (
+            "Salary disclosed on the listing"
+            if salary_disclosed
+            else "Stipend not published by the employer"
+        ),
+        "source": "work.ke",
+        "url": f"https://work.ke/jobs/{slug}",
+        "desc": (
+            f"{title} at {employer} in {location or 'Kenya'}, listed live in "
+            "work.ke's Kenyan job index. work.ke links every listing to the "
+            "employer's own advert, which carries the full description, the "
+            "requirements and the application form."
+        ),
+    }
+
+
+async def _fetch_workke_internships() -> list[dict]:
+    """The current internship rows from work.ke's JSON index."""
+    async with httpx.AsyncClient(
+        timeout=REQUEST_TIMEOUT,
+        headers={"User-Agent": USER_AGENT, "Accept": "application/json"},
+        follow_redirects=True,
+    ) as client:
+        response = await client.get(WORKKE_INDEX_URL)
+        response.raise_for_status()
+        payload = response.json()
+    if not isinstance(payload, list):
+        raise RuntimeError("work.ke index was not a list")
+
+    items = [
+        item
+        for item in (
+            _workke_item(role)
+            for role in payload
+            if isinstance(role, dict) and _is_internship(role)
+        )
+        if item is not None
+    ]
+    items.sort(key=_sort_key)
+    return items[:MAX_LIVE_INTERNSHIPS]
+
+
+async def refresh_workke_internships(force: bool = False) -> InternshipFeed:
+    """Refresh the live work.ke internship list; never raises.
+
+    Mirrors ``refresh_events``: the attempt is stamped before the network call
+    so a burst of page loads cannot become a burst of traffic on work.ke, and a
+    failure keeps the last good list for up to ``WORKKE_STALE_TTL`` rather than
+    emptying the tab.
+    """
+    global _live_feed
+    async with _live_lock:
+        now = time.monotonic()
+        if (
+            not force
+            and _live_feed.fetched_at is not None
+            and now - _live_feed.fetched_at < WORKKE_TTL
+        ):
+            return _live_feed
+        try:
+            items = await _fetch_workke_internships()
+        except Exception as exc:  # noqa: BLE001 - curated internships still serve
+            log.warning("work.ke internships refresh failed: %s", exc)
+            stale_ok = (
+                _live_feed.fetched_at is not None
+                and now - _live_feed.fetched_at < WORKKE_STALE_TTL
+            )
+            _live_feed = InternshipFeed(
+                items=_live_feed.items if stale_ok else [],
+                fetched_at=_live_feed.fetched_at if stale_ok else None,
+                ok=False,
+            )
+            return _live_feed
+        _live_feed = InternshipFeed(items=items, fetched_at=time.monotonic(), ok=True)
+        log.info("work.ke internships: %d live placements", len(items))
+        return _live_feed
+
+
+async def get_internships() -> dict:
     """The payload for ``GET /api/public/internships``.
 
-    Internships are curated, so this is synchronous and cannot fail the way the
-    live event feed can. The response reuses the opportunities shape so the
-    frontend can share one card component.
+    Two halves, like the volunteers tab: the curated placements in
+    ``INTERNSHIPS`` and the live Kenyan internship collection from work.ke.
+    The curated half cannot fail; the live half is capped by ``COLD_WAIT`` so a
+    slow index answers with the curated list and ``events_live=False``.
     """
+    try:
+        feed = await asyncio.wait_for(refresh_workke_internships(), timeout=COLD_WAIT)
+    except TimeoutError:  # the scheduled/manual refresh still lands in _live_feed
+        feed = _live_feed
+
+    curated_titles = {str(item.get("title") or "").strip().lower() for item in INTERNSHIPS}
+    live = [
+        item
+        for item in feed.items
+        if str(item.get("title") or "").strip().lower() not in curated_titles
+    ]
+    items = [*INTERNSHIPS, *live]
+    items.sort(key=_sort_key)
     return {
-        "items": sorted(INTERNSHIPS, key=_sort_key),
-        "events_live": True,
+        "items": items,
+        "events_live": feed.ok,
         "events_updated_at": None,
     }
 

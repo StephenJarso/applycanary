@@ -27,13 +27,16 @@ from app.opportunities import (
     VOLUNTEER,
     CardEvent,
     Feed,
+    InternshipFeed,
     _dedupe_events,
     _fetch_feed,
     _fetch_gdg,
     _from_event_feed,
     _gdg_item,
+    _is_internship,
     _to_item,
     _upcoming_curated_events,
+    _workke_item,
     parse_card_date,
     parse_event_cards,
     parse_event_detail,
@@ -537,7 +540,12 @@ def test_internship_feed_covers_the_global_schemes_with_compensation():
     datetime.fromisoformat(by_title["Google Software Engineering Internship 2027"]["closes"])
 
 
-def test_internships_endpoint_is_public_and_only_internships(client):
+def test_internships_endpoint_is_public_and_only_internships(client, monkeypatch):
+    async def no_live(force: bool = False) -> InternshipFeed:  # noqa: ARG001
+        return InternshipFeed(items=[], ok=True)
+
+    monkeypatch.setattr("app.opportunities.refresh_workke_internships", no_live)
+
     res = client.get("/api/public/internships")
     assert res.status_code == 200
     body = res.json()
@@ -546,6 +554,129 @@ def test_internships_endpoint_is_public_and_only_internships(client):
     assert {item["kind"] for item in body["items"]} == {"Internship"}
     assert {item["title"] for item in body["items"]} == {i["title"] for i in INTERNSHIPS}
     assert body["events_live"] is True
+
+
+# ------------------------------------------------- live work.ke internships
+
+
+def _live_internship(**overrides) -> dict:
+    """One card as `_workke_item` builds it, standing in for the live half."""
+    return {
+        "kind": "Internship",
+        "title": "Backend Intern (Go) — M-KOPA",
+        "org": "M-KOPA",
+        "when": "Closes 30 Nov 2026",
+        "opens": None,
+        "closes": "2026-11-30",
+        "steps": ["Open the work.ke listing from this card"],
+        "city": "Nairobi",
+        "tags": ["Internship", "Kenya", "From work.ke", "Go"],
+        "stipend": "Stipend not published by the employer",
+        "source": "work.ke",
+        "url": "https://work.ke/jobs/backend-intern-go",
+        "desc": "Listed live in work.ke's Kenyan job index.",
+        **overrides,
+    }
+
+
+def test_workke_index_rows_are_filtered_by_internship_markers():
+    assert _is_internship({"seniority": "Internship"})
+    assert _is_internship({"seniority": "", "employmentType": "Internship"})
+    assert not _is_internship({"seniority": "Mid level", "employmentType": "Full-time"})
+    assert not _is_internship({})
+
+
+def test_workke_row_becomes_a_card_with_a_countable_deadline():
+    item = _workke_item(
+        {
+            "slug": "software-engineering-intern-acme",
+            "title": "Software Engineering Intern",
+            "employer": "Acme Kenya",
+            "location": "Nairobi",
+            "category": "Software Development",
+            "seniority": "Internship",
+            "workMode": "On-site",
+            "closingAt": "2026-11-29T20:59:00Z",
+            "salaryDisclosed": True,
+        }
+    )
+    assert item is not None
+    assert item["kind"] == "Internship"
+    assert item["org"] == "Acme Kenya"
+    assert item["closes"] == "2026-11-29"
+    assert item["when"] == "Closes 29 Nov 2026"
+    assert item["url"] == "https://work.ke/jobs/software-engineering-intern-acme"
+    assert item["source"] == "work.ke"
+    assert "Paid" in item["tags"]  # the index said the salary is disclosed
+    assert item["steps"]
+
+
+def test_workke_row_without_a_deadline_says_so_instead_of_guessing():
+    item = _workke_item(
+        {"slug": "x", "title": "Intern", "employer": "Acme", "closingAt": None}
+    )
+    assert item is not None
+    assert item["closes"] is None
+    assert item["when"].startswith("Rolling")
+    assert "Paid" not in item["tags"]
+    assert item["stipend"] == "Stipend not published by the employer"
+
+
+def test_workke_remote_role_is_bucketed_under_online():
+    item = _workke_item(
+        {"slug": "x", "title": "Intern", "employer": "Acme", "location": "Remote"}
+    )
+    assert item is not None
+    assert item["city"] == "Online"
+    assert "Remote" in item["tags"]
+
+
+def test_workke_row_missing_title_employer_or_slug_is_skipped():
+    assert _workke_item({"title": "Intern", "employer": "Acme"}) is None
+    assert _workke_item({"slug": "x", "employer": "Acme"}) is None
+    assert _workke_item({"slug": "x", "title": "Intern"}) is None
+
+
+def test_internships_endpoint_merges_the_live_kenyan_collection(client, monkeypatch):
+    async def fake_live(force: bool = False) -> InternshipFeed:  # noqa: ARG001
+        return InternshipFeed(items=[_live_internship()], fetched_at=1.0, ok=True)
+
+    monkeypatch.setattr("app.opportunities.refresh_workke_internships", fake_live)
+
+    body = client.get("/api/public/internships").json()
+    titles = [item["title"] for item in body["items"]]
+
+    assert body["events_live"] is True
+    assert "Backend Intern (Go) — M-KOPA" in titles
+    assert {i["title"] for i in INTERNSHIPS} <= set(titles)
+    assert {item["kind"] for item in body["items"]} == {"Internship"}
+    # A dated live role sorts ahead of the rolling curated placements.
+    assert titles.index("Backend Intern (Go) — M-KOPA") < titles.index(
+        "HENNGE Global Internship Program (GIP)"
+    )
+
+
+def test_internships_endpoint_keeps_curated_roles_when_workke_is_down(client, monkeypatch):
+    async def broken_live(force: bool = False) -> InternshipFeed:  # noqa: ARG001
+        return InternshipFeed(items=[], ok=False)
+
+    monkeypatch.setattr("app.opportunities.refresh_workke_internships", broken_live)
+
+    body = client.get("/api/public/internships").json()
+    assert body["events_live"] is False
+    assert {item["title"] for item in body["items"]} == {i["title"] for i in INTERNSHIPS}
+
+
+def test_a_live_internship_matching_a_curated_title_is_served_once(client, monkeypatch):
+    curated = INTERNSHIPS[0]
+
+    async def fake_live(force: bool = False) -> InternshipFeed:  # noqa: ARG001
+        return InternshipFeed(items=[_live_internship(title=curated["title"])], ok=True)
+
+    monkeypatch.setattr("app.opportunities.refresh_workke_internships", fake_live)
+
+    titles = [i["title"] for i in client.get("/api/public/internships").json()["items"]]
+    assert titles.count(curated["title"]) == 1
 
 
 # ------------------------------------------------------- volunteer & speaking

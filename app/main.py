@@ -88,9 +88,11 @@ async def lifespan(app: FastAPI):  # noqa: ANN201, ARG001
     warm = None
 
     async def warm_opportunities() -> None:
-        from app.opportunities import refresh_events
+        from app.opportunities import refresh_events, refresh_workke_internships
 
-        await refresh_events()
+        # The internships tab reads the live work.ke collection on first view;
+        # warming it here keeps that first visitor off the cold path.
+        await asyncio.gather(refresh_events(), refresh_workke_internships())
 
     warm = asyncio.create_task(warm_opportunities())
 

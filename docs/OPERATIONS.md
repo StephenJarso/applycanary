@@ -95,6 +95,13 @@ identical across a cycle and should be a cache hit after the first call.
 calendars: programs and internships (`PAID_PROGRAMS`, `INTERNSHIPS`) and dated
 African conferences (`CURATED_EVENTS`).
 
+The Internships tab also carries a live half: `refresh_workke_internships`
+filters work.ke's public `job-index.json` down to rows whose seniority or
+employment type is an internship, caches it for 30 minutes, and serves the last
+good list for up to a day if work.ke is unreachable (`events_live=false` on
+`/api/public/internships` tells the page to say so). It is capped at 40 cards,
+so a busy index cannot turn the tab into a job board.
+
 **Read every date from the official event or program page** before adding it —
 a wrong date sends someone to an empty venue. If a program has not published
 its next window yet, leave `opens`/`closes` as `None` (the entry sorts last)

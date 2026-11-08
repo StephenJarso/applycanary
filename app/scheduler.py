@@ -407,13 +407,21 @@ async def job_refresh_opportunities() -> None:
     traffic. The endpoint still refreshes lazily after the daily TTL expires,
     which covers instances that stayed up across the scheduled run.
     """
-    from app.opportunities import refresh_events
+    from app.opportunities import refresh_events, refresh_workke_internships
 
     feed = await refresh_events()
     log.info(
         "opportunities: %d events (live=%s)",
         len(feed.items),
         feed.ok,
+    )
+    # The live internship half changes more often than the event calendars, so
+    # it gets its own short TTL; refreshing it here keeps the tab warm overnight.
+    internships = await refresh_workke_internships()
+    log.info(
+        "opportunities: %d live internships (live=%s)",
+        len(internships.items),
+        internships.ok,
     )
 
 

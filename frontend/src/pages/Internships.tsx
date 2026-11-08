@@ -262,6 +262,14 @@ export default function Internships({ embedded = false }: { embedded?: boolean }
 
           {data && !isPending && (
             <>
+              {data.events_live === false && (
+                <p className="opp-count">
+                  The live Kenyan internship feed (work.ke) could not be
+                  reached, so newly posted placements may be missing. The
+                  curated placements below are unaffected.
+                </p>
+              )}
+
               <p className="opp-count">
                 {results.length} results · {paid} paid · {unpaid} unpaid with benefits
                 {programs > 0 && ` · ${programs} paid programs`}
