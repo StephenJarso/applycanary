@@ -10,10 +10,13 @@ from __future__ import annotations
 from datetime import timedelta
 
 import pytest
-from sqlmodel import Session
+from fastapi.testclient import TestClient
+from sqlmodel import Session, select
 
+from app.auth import SESSION_COOKIE_NAME, create_session_token
 from app.db import engine, init_db
-from app.models import SourceRun, utcnow
+from app.main import create_app
+from app.models import SourceRun, User, utcnow
 from app.pipeline.health import StaleSource, alert_body, stale_sources
 from app.scheduler import job_source_health
 
@@ -95,6 +98,42 @@ class TestStaleSources:
 
         with Session(engine) as session:
             assert "health-healthy" not in _flagged(session, {"health-healthy"})
+
+
+class TestSourcesEndpoint:
+    def test_the_status_page_carries_the_same_verdict(self, db):
+        _add("health-endpoint", ok=True, found=2, hours_ago=50)
+        _add("health-endpoint", ok=False, found=0, hours_ago=1)
+
+        with Session(engine) as session:
+            user = User(
+                email="health-viewer@example.test",
+                password_hash="x",
+                email_verified=True,
+                is_active=True,
+            )
+            session.add(user)
+            session.commit()
+            session.refresh(user)
+
+        try:
+            client = TestClient(create_app(), follow_redirects=False)
+            client.cookies.set(SESSION_COOKIE_NAME, create_session_token(user))
+            response = client.get("/api/sources")
+            assert response.status_code == 200
+            row = next(
+                item for item in response.json() if item["source"] == "health-endpoint"
+            )
+            assert row["stale"] is True
+            assert "failing" in row["stale_reason"]
+        finally:
+            with Session(engine) as session:
+                stored = session.exec(
+                    select(User).where(User.email == "health-viewer@example.test")
+                ).first()
+                if stored is not None:
+                    session.delete(stored)
+                    session.commit()
 
 
 class TestAlert:

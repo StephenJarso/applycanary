@@ -312,6 +312,9 @@ export interface SourceHealth {
   last_run_at: string | null;
   last_duration_ms: number;
   last_error: string;
+  /** Nothing produced for a day; the same verdict as the emailed alert. */
+  stale: boolean;
+  stale_reason: string;
 }
 
 export type ProgrammeKind = "Paid program" | "Internship" | "Volunteer";

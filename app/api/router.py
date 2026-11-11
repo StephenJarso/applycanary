@@ -351,6 +351,9 @@ class SourceHealthOut(BaseModel):
     last_run_at: datetime | None = None
     last_duration_ms: int = 0
     last_error: str = ""
+    # The same verdict the daily email uses, so the page and the alert agree.
+    stale: bool = False
+    stale_reason: str = ""
 
 
 class StatusOut(BaseModel):
@@ -1366,6 +1369,14 @@ def sources(session: Session = Depends(get_session)) -> list[SourceHealthOut]:
         entry.new_jobs += run.new_jobs
         if not run.ok:
             entry.failures += 1
+
+    from app.pipeline.health import stale_sources
+
+    for item in stale_sources(session):
+        entry = by_source.get(item.source)
+        if entry is not None:
+            entry.stale = True
+            entry.stale_reason = item.reason
 
     return sorted(by_source.values(), key=lambda e: e.source)
 

@@ -55,9 +55,23 @@ export default function Sources() {
                 <tr key={s.source}>
                   <td className="col-dot"><span className={`dot ${s.ok ? "dot-ok" : "dot-bad"}`} /></td>
                   <td className="col-source">
-                    <div className="cell-title">{s.source}</div>
+                    <div className="cell-title">
+                      {s.source}{" "}
+                      {s.stale && (
+                        <span
+                          className="chip chip-warn"
+                          title={s.stale_reason}
+                          style={{ fontSize: 10.5, marginLeft: 6 }}
+                        >
+                          silent 1d
+                        </span>
+                      )}
+                    </div>
                     {s.last_error && (
                       <div style={{ color: "var(--bad)", fontSize: 11.5 }}>{s.last_error}</div>
+                    )}
+                    {s.stale && !s.last_error && (
+                      <div className="cell-dim" style={{ fontSize: 11.5 }}>{s.stale_reason}</div>
                     )}
                   </td>
                   <td className="col-runs cell-dim num" data-label="Runs">{s.runs}</td>
