@@ -320,6 +320,26 @@ async def job_refresh_github() -> None:
                 )
 
 
+async def job_source_health() -> None:
+    """Email when a connector has failed or returned nothing for a full day.
+
+    Runs before the digest: a source that has been dead for a day explains why
+    the digest is thin, and the operator can act on it the same morning.
+    """
+    from app.notify import email as notify
+    from app.pipeline.health import alert_body, stale_sources
+
+    with session_scope() as session:
+        stale = stale_sources(session)
+    if not stale:
+        log.info("source_health: every source produced in the last day")
+        return
+
+    subject, html, text = alert_body(stale)
+    sent = await notify.send(subject, html, text)
+    log.info("source_health: %d stale source(s), alert sent=%s", len(stale), sent)
+
+
 async def job_digest() -> None:
     from app.notify import email as notify
 
@@ -627,6 +647,7 @@ def build_scheduler() -> AsyncIOScheduler:
         ("refresh_github", CronTrigger(hour=3, minute=17), job_refresh_github),
         # Role discovery is slow and budgeted (Adzuna free tier), so 6-hourly.
         ("discover_roles", CronTrigger(hour="*/6", minute=37), job_discover_roles),
+        ("source_health", CronTrigger(hour=7, minute=53), job_source_health),
         ("digest", CronTrigger(hour=8, minute=3), job_digest),
         # Twenty minutes after the digest: one message about anything whose
         # follow-up date has arrived, before the day's work starts.
