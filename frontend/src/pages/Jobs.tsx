@@ -47,6 +47,26 @@ const firstName =
 
   const live = useLiveRows(data?.jobs, `${offset}|${JSON.stringify(filters)}`);
 
+  // "Is the feed still refreshing?" is answered by the connectors themselves,
+  // not by this page having loaded, so the timestamp comes from their last run.
+  const { data: sourceHealth } = useQuery({
+    queryKey: ["sources"],
+    queryFn: api.sources,
+    staleTime: 60_000,
+    refetchInterval: 120_000,
+  });
+  const lastPoll = useMemo(() => {
+    let latest: string | null = null;
+    for (const row of sourceHealth ?? []) {
+      if (!row.last_run_at) continue;
+      if (!latest || Date.parse(row.last_run_at) > Date.parse(latest)) {
+        latest = row.last_run_at;
+      }
+    }
+    return latest;
+  }, [sourceHealth]);
+  const failingSources = (sourceHealth ?? []).filter((row) => !row.ok).length;
+
   const saveJob = useMutation({
     mutationFn: (id: number) => api.save(id),
     onSuccess: () => {
@@ -116,6 +136,17 @@ const firstName =
             <strong>Agent active</strong>
             <div style={{ fontSize: 12, color: "var(--text-dim)" }}>
               {data?.jobs.length ?? 0} matches shown{bestScore ? ` · best ${Math.round(bestScore)}%` : ""}
+            </div>
+            <div style={{ fontSize: 12, color: "var(--text-faint)", marginTop: 2 }}>
+              {lastPoll ? `Sources checked ${relTime(lastPoll)} ago` : "Sources not checked yet"}
+              {failingSources > 0 && (
+                <>
+                  {" · "}
+                  <Link to="/sources" style={{ color: "inherit", textDecoration: "underline" }}>
+                    {failingSources} failing
+                  </Link>
+                </>
+              )}
             </div>
           </div>
         </div>
