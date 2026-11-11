@@ -6,6 +6,7 @@ import { useAuth } from "../context/AuthContext";
 import {
   Chips, Empty, ErrorBox, TableSkeleton, formatSalary, relTime,
 } from "../components";
+import { useLiveRows } from "../useLiveRows";
 
 const SORTS = [
   { key: "score", label: "Score" },
@@ -39,7 +40,12 @@ const firstName =
   const { data, isPending, error } = useQuery({
     queryKey: ["jobs", filters, offset],
     queryFn: () => api.jobs({ ...filters, limit: PAGE_SIZE, offset }),
+    // The agent polls every five minutes; a tab left open should catch up on
+    // the same rhythm without the reader reloading.
+    refetchInterval: 60_000,
   });
+
+  const live = useLiveRows(data?.jobs, `${offset}|${JSON.stringify(filters)}`);
 
   const saveJob = useMutation({
     mutationFn: (id: number) => api.save(id),
@@ -114,6 +120,23 @@ const firstName =
           </div>
         </div>
       </div>
+
+      {live.newCount > 0 && (
+        <div
+          className="banner banner-ok"
+          role="status"
+          style={{ display: "flex", alignItems: "center", gap: 10 }}
+        >
+          <span className="material-symbols-outlined" style={{ fontSize: 18 }}>fiber_new</span>
+          <span style={{ flex: 1 }}>
+            {live.newCount} new posting{live.newCount === 1 ? "" : "s"} arrived while
+            this page was open.
+          </span>
+          <button type="button" className="btn-ghost" onClick={live.dismiss}>
+            Dismiss
+          </button>
+        </div>
+      )}
 
       {/* Relevance filters only exist once the profile carries the facts they
           compare against. Say which ones are off instead of silently serving a

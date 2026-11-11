@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { api } from "../api";
 import { Chips, Empty, ErrorBox, ScoreBadge, TableSkeleton, relTime } from "../components";
+import { useLiveRows } from "../useLiveRows";
 
 const PAGE_SIZE = 50;
 
@@ -15,7 +16,10 @@ export default function Review() {
   const { data, isPending, error } = useQuery({
     queryKey: ["review", offset],
     queryFn: () => api.review({ limit: PAGE_SIZE, offset }),
+    refetchInterval: 60_000,
   });
+
+  const live = useLiveRows(data?.jobs, offset);
 
   const refresh = () => {
     void qc.invalidateQueries({ queryKey: ["review"] });
@@ -53,6 +57,23 @@ export default function Review() {
       {submit.isSuccess && (
         <div className={`banner banner-${submit.data.ok ? "ok" : "warn"}`} role="status">
           {submit.data.message}
+        </div>
+      )}
+
+      {live.newCount > 0 && (
+        <div
+          className="banner banner-ok"
+          role="status"
+          style={{ display: "flex", alignItems: "center", gap: 10 }}
+        >
+          <span className="material-symbols-outlined" style={{ fontSize: 18 }}>fiber_new</span>
+          <span style={{ flex: 1 }}>
+            {live.newCount} new application{live.newCount === 1 ? "" : "s"} finished
+            preparing while this page was open.
+          </span>
+          <button type="button" className="btn-ghost" onClick={live.dismiss}>
+            Dismiss
+          </button>
         </div>
       )}
 
