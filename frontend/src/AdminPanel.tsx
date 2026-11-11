@@ -1,6 +1,12 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { api, type AdminUserItem, type EmailDeliveryReport, type FeedbackItem } from "./api";
+import {
+  api,
+  type AdminUserItem,
+  type BoardPreview,
+  type EmailDeliveryReport,
+  type FeedbackItem,
+} from "./api";
 import { ErrorBox, Loading } from "./components";
 import { useAuth } from "./context/AuthContext";
 
@@ -17,7 +23,11 @@ function relTime(iso: string | null): string {
 export function AdminPanel() {
   const qc = useQueryClient();
   const { user: currentUser } = useAuth();
-  const [activeTab, setActiveTab] = useState<"services" | "users" | "feedback" | "sources">("services");
+  const [activeTab, setActiveTab] = useState<"services" | "users" | "feedback" | "sources" | "content">("services");
+  const [boardUrl, setBoardUrl] = useState("");
+  const [boardPreview, setBoardPreview] = useState<BoardPreview | null>(null);
+  const [programmeJson, setProgrammeJson] = useState("");
+  const [contentMsg, setContentMsg] = useState("");
   const [feedbackStatus, setFeedbackStatus] = useState<string>("all");
   const [testedProviders, setTestedProviders] = useState<Record<string, { ok: boolean; msg: string }>>({});
   const [editingNotes, setEditingNotes] = useState<Record<number, string>>({});
@@ -156,6 +166,72 @@ export function AdminPanel() {
     },
   });
 
+  const boardsQuery = useQuery({
+    queryKey: ["admin", "boards"],
+    queryFn: api.boards,
+    enabled: activeTab === "content",
+  });
+  const programmesQuery = useQuery({
+    queryKey: ["admin", "programmes"],
+    queryFn: api.programmes,
+    enabled: activeTab === "content",
+  });
+
+  const previewBoard = useMutation({
+    mutationFn: api.previewBoard,
+    onSuccess: (result) => {
+      setBoardPreview(result);
+      setContentMsg("");
+    },
+    onError: (err) => {
+      setBoardPreview(null);
+      setContentMsg(err instanceof Error ? err.message : "Could not read that board.");
+    },
+  });
+  const addBoard = useMutation({
+    mutationFn: () => api.addBoard(boardUrl.trim()),
+    onSuccess: (row) => {
+      setBoardUrl("");
+      setBoardPreview(null);
+      setContentMsg(`Added ${row.label}. It polls on the curated cadence.`);
+      void qc.invalidateQueries({ queryKey: ["admin", "boards"] });
+      void qc.invalidateQueries({ queryKey: ["sources"] });
+    },
+    onError: (err) =>
+      setContentMsg(err instanceof Error ? err.message : "Could not add that board."),
+  });
+  const removeBoard = useMutation({
+    mutationFn: api.deleteBoard,
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["admin", "boards"] });
+      void qc.invalidateQueries({ queryKey: ["sources"] });
+    },
+  });
+
+  const importProgrammes = useMutation({
+    mutationFn: async () => {
+      const parsed: unknown = JSON.parse(programmeJson);
+      return api.importProgrammes(Array.isArray(parsed) ? parsed : [parsed]);
+    },
+    onSuccess: (result) => {
+      setContentMsg(result.message);
+      setProgrammeJson("");
+      void qc.invalidateQueries({ queryKey: ["admin", "programmes"] });
+      void qc.invalidateQueries({ queryKey: ["opportunities"] });
+    },
+    onError: (err) =>
+      setContentMsg(
+        `Import failed: ${err instanceof Error ? err.message : String(err)}`,
+      ),
+  });
+  const removeProgramme = useMutation({
+    mutationFn: api.deleteProgramme,
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["admin", "programmes"] });
+      void qc.invalidateQueries({ queryKey: ["opportunities"] });
+    },
+  });
+
   const embedAll = useMutation({
     mutationFn: () => api.embedAll(100),
     onSuccess: () => {
@@ -218,6 +294,14 @@ export function AdminPanel() {
                 {data.database.feedback_new} new
               </span>
             ) : null}
+          </button>
+          <button
+            type="button"
+            className={activeTab === "content" ? "btn-primary" : "btn-ghost"}
+            onClick={() => setActiveTab("content")}
+            style={{ fontSize: 13, padding: "6px 12px" }}
+          >
+            Boards &amp; Programmes
           </button>
         </div>
       </div>
@@ -968,6 +1052,185 @@ export function AdminPanel() {
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {/* Tab 5: Boards & programmes */}
+      {activeTab === "content" && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+          {contentMsg && (
+            <div className="banner banner-ok" role="status">
+              {contentMsg}
+            </div>
+          )}
+
+          <div className="card" style={{ margin: 0, padding: 14 }}>
+            <h4 style={{ margin: 0 }}>Add a job board</h4>
+            <p className="cell-dim" style={{ fontSize: 13, margin: "4px 0 10px" }}>
+              Paste a Greenhouse, Lever, Ashby, Workable or SmartRecruiters
+              board, or any careers page. Preview fetches it once and saves
+              nothing, so a wrong URL fails before it polls.
+            </p>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <input
+                type="url"
+                placeholder="https://boards.greenhouse.io/acme"
+                value={boardUrl}
+                onChange={(e) => setBoardUrl(e.target.value)}
+                style={{ flex: "1 1 320px", fontSize: 13, padding: "6px 10px" }}
+              />
+              <button
+                type="button"
+                className="btn-ghost"
+                disabled={!boardUrl.trim() || previewBoard.isPending}
+                onClick={() => previewBoard.mutate(boardUrl.trim())}
+              >
+                {previewBoard.isPending ? "Reading…" : "Preview"}
+              </button>
+              <button
+                type="button"
+                className="btn-primary"
+                disabled={!boardUrl.trim() || addBoard.isPending}
+                onClick={() => addBoard.mutate()}
+              >
+                {addBoard.isPending ? "Adding…" : "Add board"}
+              </button>
+            </div>
+
+            {boardPreview && (
+              <div
+                className="card"
+                style={{ margin: "10px 0 0", padding: 12, background: "var(--bg-raised, #f8fafc)" }}
+              >
+                <strong style={{ fontSize: 13 }}>
+                  {boardPreview.kind}
+                  {boardPreview.token ? ` · ${boardPreview.token}` : ""} ·{" "}
+                  {boardPreview.found} posting{boardPreview.found === 1 ? "" : "s"}
+                </strong>
+                <ul style={{ margin: "6px 0 0", paddingLeft: 18, fontSize: 13 }}>
+                  {boardPreview.samples.map((sample) => (
+                    <li key={sample.url}>
+                      {sample.title}
+                      {sample.company ? ` — ${sample.company}` : ""}
+                    </li>
+                  ))}
+                </ul>
+                {boardPreview.found === 0 && (
+                  <p className="cell-dim" style={{ fontSize: 12, margin: "6px 0 0" }}>
+                    Nothing parsed. The board may be empty, or the page may need
+                    its sitemap configured in companies.yaml.
+                  </p>
+                )}
+              </div>
+            )}
+
+            <div className="table-wrap" style={{ marginTop: 12 }}>
+              <table>
+                <thead>
+                  <tr><th>Board</th><th>Kind</th><th /></tr>
+                </thead>
+                <tbody>
+                  {(boardsQuery.data ?? []).map((board) => (
+                    <tr key={board.id}>
+                      <td>
+                        <a href={board.url} target="_blank" rel="noreferrer">
+                          {board.label || board.url}
+                        </a>
+                      </td>
+                      <td className="cell-dim">
+                        {board.kind}
+                        {board.token ? ` · ${board.token}` : ""}
+                      </td>
+                      <td>
+                        <button
+                          type="button"
+                          className="btn-ghost"
+                          style={{ fontSize: 11, padding: "2px 8px" }}
+                          onClick={() => removeBoard.mutate(board.id)}
+                        >
+                          Remove
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                  {!boardsQuery.data?.length && (
+                    <tr>
+                      <td colSpan={3} className="cell-dim">
+                        No boards added by URL yet.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div className="card" style={{ margin: 0, padding: 14 }}>
+            <h4 style={{ margin: 0 }}>Programmes &amp; internships</h4>
+            <p className="cell-dim" style={{ fontSize: 13, margin: "4px 0 10px" }}>
+              Paste one card or a JSON array. A matching kind and title updates
+              in place, so this is also the edit form. Deleting a card removes
+              it from the public pages immediately.
+            </p>
+            <textarea
+              rows={6}
+              placeholder={'[{"kind":"Internship","title":"…","org":"…","when":"…","url":"https://…"}]'}
+              value={programmeJson}
+              onChange={(e) => setProgrammeJson(e.target.value)}
+              style={{ width: "100%", fontSize: 12, fontFamily: "monospace", padding: 10 }}
+            />
+            <button
+              type="button"
+              className="btn-primary"
+              style={{ marginTop: 8 }}
+              disabled={!programmeJson.trim() || importProgrammes.isPending}
+              onClick={() => importProgrammes.mutate()}
+            >
+              {importProgrammes.isPending ? "Importing…" : "Import"}
+            </button>
+
+            <div className="table-wrap" style={{ marginTop: 12 }}>
+              <table>
+                <thead>
+                  <tr><th>Kind</th><th>Title</th><th>Org</th><th /></tr>
+                </thead>
+                <tbody>
+                  {(programmesQuery.data ?? []).map((card) => (
+                    <tr key={card.id}>
+                      <td className="cell-dim">{card.kind}</td>
+                      <td>
+                        {card.url ? (
+                          <a href={card.url} target="_blank" rel="noreferrer">
+                            {card.title}
+                          </a>
+                        ) : (
+                          card.title
+                        )}
+                      </td>
+                      <td className="cell-dim">{card.org}</td>
+                      <td>
+                        <button
+                          type="button"
+                          className="btn-ghost"
+                          style={{ fontSize: 11, padding: "2px 8px" }}
+                          onClick={() => removeProgramme.mutate(card.id)}
+                        >
+                          Delete
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                  {!programmesQuery.data?.length && (
+                    <tr>
+                      <td colSpan={4} className="cell-dim">
+                        No programme cards yet.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
       )}
     </div>

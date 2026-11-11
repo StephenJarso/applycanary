@@ -314,6 +314,46 @@ export interface SourceHealth {
   last_error: string;
 }
 
+export type ProgrammeKind = "Paid program" | "Internship" | "Volunteer";
+
+/** One curated opportunity card, editable from the admin panel. */
+export interface ProgrammeCard {
+  id: number;
+  kind: ProgrammeKind;
+  title: string;
+  org: string;
+  when: string;
+  opens: string | null;
+  closes: string | null;
+  date: string | null;
+  steps: string[] | null;
+  city: string;
+  tags: string[];
+  stipend: string | null;
+  source: string;
+  url: string;
+  desc: string;
+}
+
+/** A board added by URL; it polls like a companies.yaml entry. */
+export interface CustomBoard {
+  id: number;
+  url: string;
+  /** ATS name, or "careers" for a plain careers page. */
+  kind: string;
+  token: string;
+  label: string;
+  enabled: boolean;
+}
+
+export interface BoardPreview {
+  kind: string;
+  token: string;
+  label: string;
+  found: number;
+  samples: { title: string; company: string; location: string; url: string }[];
+}
+
 export interface Status {
   ok: boolean;
   counts: Record<string, number>;
@@ -746,6 +786,27 @@ export const api = {
     }),
 
   // Admin telemetry & service control (admin only)
+  programmes: () => request<ProgrammeCard[]>("/admin/programmes"),
+  importProgrammes: (items: unknown[]) =>
+    request<ActionResult>("/admin/programmes/import", {
+      method: "POST",
+      body: JSON.stringify({ items }),
+    }),
+  deleteProgramme: (id: number) =>
+    request<ActionResult>(`/admin/programmes/${id}`, { method: "DELETE" }),
+  boards: () => request<CustomBoard[]>("/admin/boards"),
+  previewBoard: (url: string) =>
+    request<BoardPreview>("/admin/boards/preview", {
+      method: "POST",
+      body: JSON.stringify({ url }),
+    }),
+  addBoard: (url: string, label = "") =>
+    request<CustomBoard>("/admin/boards", {
+      method: "POST",
+      body: JSON.stringify({ url, label }),
+    }),
+  deleteBoard: (id: number) =>
+    request<ActionResult>(`/admin/boards/${id}`, { method: "DELETE" }),
   adminFeedback: (status = "all", limit = 50, offset = 0) =>
     request<FeedbackList>(`/admin/feedback?status=${status}&limit=${limit}&offset=${offset}`),
   updateFeedback: (id: number, payload: { status?: string; admin_notes?: string }) =>
