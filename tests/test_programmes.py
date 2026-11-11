@@ -12,6 +12,7 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import Session, select
 
+import app.opportunities as opp
 from app.auth import SESSION_COOKIE_NAME, create_session_token
 from app.db import engine, init_db
 from app.main import create_app
@@ -197,6 +198,74 @@ def test_editing_to_a_blank_title_is_rejected(admin_client):
     assert response.status_code == 422
 
 
+class TestSeedMerge:
+    """The seed runs on every boot, so new cards must land without clobbering."""
+
+    def test_new_builtins_reach_an_already_seeded_database(self, db, monkeypatch):
+        monkeypatch.setitem(
+            opp._BUILTIN_CARDS,
+            "Internship",
+            [{"kind": "Internship", "title": TITLE, "org": "Pytest"}],
+        )
+        with Session(engine) as session:
+            assert seed_programmes(session) >= 1
+            assert seed_programmes(session) == 0
+
+        assert TITLE in [card["title"] for card in curated_cards("Internship")]
+
+    def test_an_edit_survives_the_seed(self, db, monkeypatch):
+        monkeypatch.setitem(
+            opp._BUILTIN_CARDS,
+            "Internship",
+            [{"kind": "Internship", "title": TITLE, "org": "Original"}],
+        )
+        with Session(engine) as session:
+            seed_programmes(session)
+            row = session.exec(
+                select(ProgrammeEntry).where(ProgrammeEntry.title == TITLE)
+            ).one()
+            row.org = "Edited"
+            session.add(row)
+            session.commit()
+
+        with Session(engine) as session:
+            assert seed_programmes(session) == 0
+            row = session.exec(
+                select(ProgrammeEntry).where(ProgrammeEntry.title == TITLE)
+            ).one()
+            assert row.org == "Edited"
+
+    def test_a_deleted_builtin_does_not_resurrect(self, db, monkeypatch, admin_client):
+        monkeypatch.setitem(
+            opp._BUILTIN_CARDS,
+            "Internship",
+            [{"kind": "Internship", "title": TITLE}],
+        )
+        with Session(engine) as session:
+            seed_programmes(session)
+            entry_id = session.exec(
+                select(ProgrammeEntry).where(ProgrammeEntry.title == TITLE)
+            ).one().id
+
+        assert admin_client.delete(f"/api/admin/programmes/{entry_id}").status_code == 200
+        with Session(engine) as session:
+            assert seed_programmes(session) == 0
+
+        assert TITLE not in [card["title"] for card in curated_cards("Internship")]
+
+    def test_the_expanded_catalogue_is_seeded(self, db):
+        with Session(engine) as session:
+            seed_programmes(session)
+
+        volunteers = {card["title"] for card in curated_cards("Volunteer")}
+        internships = {card["title"] for card in curated_cards("Internship")}
+        programmes = {card["title"] for card in curated_cards("Paid program")}
+
+        assert "UN Online Volunteering" in volunteers
+        assert "Safaricom Graduate Management Trainee" in internships
+        assert "CNCF Mentoring" in programmes
+
+
 class TestDeadlineState:
     def test_a_past_deadline_is_expired(self):
         state = deadline_state(
@@ -216,7 +285,7 @@ class TestDeadlineState:
             "days_left": None,
         }
 
-    def test_a_card_carries_its_own_state(self):
+    def test_a_card_carries_its_own_state(self, db):
         with Session(engine) as session:
             session.add(_row(closes="2020-01-01"))
             session.commit()

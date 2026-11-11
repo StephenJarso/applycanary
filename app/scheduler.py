@@ -421,11 +421,12 @@ async def job_expire_stale() -> None:
 
 
 async def job_refresh_opportunities() -> None:
-    """Refresh the public events cache once a day (plus once at startup).
+    """Refresh the public opportunities cache twice a day (plus at startup).
 
-    Listings change rarely, so anything more frequent just adds third-party
-    traffic. The endpoint still refreshes lazily after the daily TTL expires,
-    which covers instances that stayed up across the scheduled run.
+    Listings change slowly, so anything more frequent just adds third-party
+    traffic; twice covers a cohort announced after the morning refresh. The
+    endpoint still refreshes lazily after the TTL expires, which covers
+    instances that stayed up across the scheduled run.
     """
     from app.opportunities import refresh_events, refresh_workke_internships
 
@@ -656,9 +657,10 @@ def build_scheduler() -> AsyncIOScheduler:
         ("embed_new", IntervalTrigger(minutes=15, jitter=120), job_embed_new),
         # The public Opportunities page reads a cached TGK event list; keep it
         # warm so page loads never wait on a third-party fetch.
-        # Events/programs barely change; startup warms the cache and this daily
-        # job is the only scheduled refresh, avoiding needless third-party hits.
-        ("refresh_opportunities", CronTrigger(hour=3, minute=7), job_refresh_opportunities),
+        # Events/programs change slowly; startup warms the cache and these two
+        # daily refreshes keep newly announced cohorts from waiting a full day
+        # after the morning they appear.
+        ("refresh_opportunities", CronTrigger(hour="3,15", minute=7), job_refresh_opportunities),
     ]
 
     # DateTrigger, not IntervalTrigger: run once ~20s after startup. `replace`

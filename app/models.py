@@ -690,6 +690,9 @@ class ProgrammeEntry(SQLModel, table=True):
     source: str = ""
     url: str = ""
     desc: str = Field(default="", sa_column=Column(Text))
+    # Deleting a built-in card retires it instead of removing the row: the seed
+    # runs every boot, and a missing row would come straight back.
+    retired: bool = False
     created_at: datetime = Field(default_factory=utcnow)
     updated_at: datetime = Field(default_factory=utcnow)
 

@@ -45,7 +45,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, date, datetime, timedelta, timezone
 
 import httpx
-from sqlmodel import Session, func, select
+from sqlmodel import Session, select
 
 from app.db import session_scope
 from app.models import ProgrammeEntry
@@ -1360,6 +1360,361 @@ CURATED_EVENTS: list[dict] = [
 # first boot and every public page reads the table afterwards, so publishing a
 # new internship or volunteer slot is a database change, not a deploy.
 
+# Later additions to the built-in set. They carry no guessed deadlines: where
+# a programme announces its own dates, `closes` stays None and the card says to
+# check the official page, rather than putting an invented date on the page.
+
+PAID_PROGRAMS += [
+    {
+        "kind": "Paid program",
+        "title": "CNCF Mentoring",
+        "org": "Cloud Native Computing Foundation",
+        "when": "Several cohorts through the year",
+        "opens": None,
+        "closes": None,
+        "steps": [
+            "Browse the open projects in the mentoring repo",
+            "Apply during a cohort window",
+            "Mentored contribution runs for around three months",
+        ],
+        "city": "Online",
+        "tags": ["Open source", "Cloud", "Mentored"],
+        "stipend": "Stipend — amount is stated per project",
+        "source": "Official",
+        "url": "https://github.com/cncf/mentoring",
+        "desc": (
+            "Mentored, stipended contributions to CNCF projects such as Kubernetes, "
+            "Prometheus and Envoy. Cohorts open more than once a year; each listing "
+            "states its own stipend and duration."
+        ),
+    },
+    {
+        "kind": "Paid program",
+        "title": "Season of KDE",
+        "org": "KDE",
+        "when": "Annual cohort, early in the year",
+        "opens": None,
+        "closes": None,
+        "steps": [
+            "Pick a project from the published ideas list",
+            "Apply when the next season opens",
+            "Work with a mentor through the programme",
+        ],
+        "city": "Online",
+        "tags": ["Open source", "Desktop", "Design"],
+        "stipend": "Stipend — see the programme page",
+        "source": "Official",
+        "url": "https://season.kde.org/",
+        "desc": (
+            "A mentored open-source programme for KDE, open to code and non-code "
+            "contributions such as design, documentation and translation. Dates are "
+            "announced each cycle on the Season of KDE site."
+        ),
+    },
+    {
+        "kind": "Paid program",
+        "title": "Tony Elumelu Foundation Entrepreneurship Programme",
+        "org": "Tony Elumelu Foundation",
+        "when": "Annual application window, usually early in the year",
+        "opens": None,
+        "closes": None,
+        "steps": [
+            "Apply on TEFConnect during the open window",
+            "Selected founders join the training and mentoring track",
+            "Seed capital is disbursed to successful participants",
+        ],
+        "city": "Online",
+        "tags": ["Entrepreneurship", "Funding", "Africa"],
+        "stipend": "USD 5,000 non-refundable seed capital",
+        "source": "Official",
+        "url": "https://www.tefconnect.net/",
+        "desc": (
+            "A pan-African entrepreneurship programme combining training, mentoring "
+            "and seed capital. Open to founders across Africa; the application window "
+            "is announced on TEFConnect each year."
+        ),
+    },
+]
+
+INTERNSHIPS += [
+    {
+        "kind": "Internship",
+        "title": "Safaricom Graduate Management Trainee",
+        "org": "Safaricom PLC",
+        "when": "Annual intake — watch the careers page",
+        "opens": None,
+        "closes": None,
+        "steps": [
+            "Create a profile on the Safaricom careers portal",
+            "Apply when the graduate intake opens",
+            "Assessment centres and interviews follow",
+        ],
+        "city": "Nairobi",
+        "tags": ["Graduate", "Telecom", "Kenya"],
+        "stipend": "Paid graduate role — see listing",
+        "source": "Official",
+        "url": "https://www.safaricom.co.ke/careers",
+        "desc": (
+            "Safaricom's graduate track rotates trainees across engineering, data, "
+            "commercial and operations teams. Intake dates are published on the "
+            "careers portal rather than a fixed calendar."
+        ),
+    },
+    {
+        "kind": "Internship",
+        "title": "KCB Group Graduate Trainee Programme",
+        "org": "KCB Group",
+        "when": "Annual intake — check the careers page",
+        "opens": None,
+        "closes": None,
+        "steps": [
+            "Apply through the KCB careers portal",
+            "Complete the online assessments",
+            "Shortlisted candidates attend assessment days",
+        ],
+        "city": "Nairobi",
+        "tags": ["Graduate", "Banking", "Kenya"],
+        "stipend": "Paid graduate role — see listing",
+        "source": "Official",
+        "url": "https://kcbgroup.com/careers/",
+        "desc": (
+            "A structured graduate programme across KCB's technology, risk and "
+            "business functions. Openings are posted to the group careers page when "
+            "the intake opens."
+        ),
+    },
+    {
+        "kind": "Internship",
+        "title": "Equity Group Graduate Trainee Programme",
+        "org": "Equity Group Holdings",
+        "when": "Annual intake — check the careers page",
+        "opens": None,
+        "closes": None,
+        "steps": [
+            "Apply on the Equity Group careers portal",
+            "Sit the graduate assessments",
+            "Interviews and placements follow",
+        ],
+        "city": "Nairobi",
+        "tags": ["Graduate", "Banking", "Kenya"],
+        "stipend": "Paid graduate role — see listing",
+        "source": "Official",
+        "url": "https://equitygroupholdings.com/ke/careers",
+        "desc": (
+            "Graduate placements across Equity's banking and technology teams in "
+            "Kenya and the wider group. The careers page carries the current intake."
+        ),
+    },
+    {
+        "kind": "Internship",
+        "title": "Absa Kenya Graduate Programme",
+        "org": "Absa Group",
+        "when": "Annual intake — check the careers page",
+        "opens": None,
+        "closes": None,
+        "steps": [
+            "Search Absa careers for graduate roles in Kenya",
+            "Apply to the open programme listing",
+            "Assessments and interviews follow",
+        ],
+        "city": "Nairobi",
+        "tags": ["Graduate", "Banking", "Kenya"],
+        "stipend": "Paid graduate role — see listing",
+        "source": "Official",
+        "url": "https://www.absa.africa/careers/",
+        "desc": (
+            "Absa's graduate programme covers engineering, data, finance and "
+            "operations. Listings are posted per country on the group careers site."
+        ),
+    },
+    {
+        "kind": "Internship",
+        "title": "PwC Kenya Graduate Careers",
+        "org": "PwC Kenya",
+        "when": "Graduate intake — check the careers page",
+        "opens": None,
+        "closes": None,
+        "steps": [
+            "Browse graduate roles on the PwC Kenya careers page",
+            "Apply to a specific business area",
+            "Online assessment and interviews follow",
+        ],
+        "city": "Nairobi",
+        "tags": ["Graduate", "Consulting", "Kenya"],
+        "stipend": "Paid graduate role — see listing",
+        "source": "Official",
+        "url": "https://www.pwc.co.ke/careers.html",
+        "desc": (
+            "Graduate and internship roles across PwC Kenya's assurance, tax, "
+            "advisory and technology practices. Postings appear on the careers page "
+            "through the year."
+        ),
+    },
+    {
+        "kind": "Internship",
+        "title": "Microsoft Africa Development Centre internships",
+        "org": "Microsoft",
+        "when": "Internships posted through the year",
+        "opens": None,
+        "closes": None,
+        "steps": [
+            "Search Microsoft careers for Nairobi roles",
+            "Apply to an internship or student listing",
+            "Interviews follow online",
+        ],
+        "city": "Nairobi",
+        "tags": ["Engineering", "Data", "Nairobi"],
+        "stipend": "Paid internship — see listing",
+        "source": "Official",
+        "url": "https://careers.microsoft.com/v2/global/en/home.html",
+        "desc": (
+            "Engineering and data internships with Microsoft's Africa Development "
+            "Centre in Nairobi and Lagos. Roles are listed on the global careers "
+            "site as they open."
+        ),
+    },
+]
+
+VOLUNTEER += [
+    {
+        "kind": "Volunteer",
+        "title": "UN Online Volunteering",
+        "org": "United Nations Volunteers",
+        "when": "Rolling — assignments posted continuously",
+        "opens": None,
+        "closes": None,
+        "steps": [
+            "Create a profile on the UNV platform",
+            "Filter assignments by skill and remote",
+            "Apply to individual postings",
+        ],
+        "city": "Online",
+        "tags": ["Remote", "Online", "Development"],
+        "stipend": "Unpaid — volunteer role",
+        "source": "Official",
+        "url": "https://www.onlinevolunteering.org/",
+        "desc": (
+            "Remote assignments for UN agencies and NGOs, from translation and "
+            "research to web development and data work. Task length and time "
+            "commitment vary by posting."
+        ),
+    },
+    {
+        "kind": "Volunteer",
+        "title": "TED Translators",
+        "org": "TED",
+        "when": "Rolling — apply any time",
+        "opens": None,
+        "closes": None,
+        "steps": [
+            "Apply on the TED Translators site",
+            "Complete a short test in your language pair",
+            "Subtitle talks once approved",
+        ],
+        "city": "Online",
+        "tags": ["Translation", "Remote", "Media"],
+        "stipend": "Unpaid — volunteer role",
+        "source": "Official",
+        "url": "https://www.ted.com/participate/translate",
+        "desc": (
+            "Volunteer subtitling and translation of TED talks into and out of "
+            "languages including Swahili. Work is self-paced and reviewed by other "
+            "volunteers."
+        ),
+    },
+    {
+        "kind": "Volunteer",
+        "title": "CLEAR Global volunteer translators",
+        "org": "CLEAR Global",
+        "when": "Rolling — volunteer pool",
+        "opens": None,
+        "closes": None,
+        "steps": [
+            "Register through the CLEAR Global volunteer page",
+            "State your language pairs and availability",
+            "Respond to requests as projects come up",
+        ],
+        "city": "Online",
+        "tags": ["Translation", "Humanitarian", "Remote"],
+        "stipend": "Unpaid — volunteer role",
+        "source": "Official",
+        "url": "https://www.clearglobal.org/volunteer/",
+        "desc": (
+            "Translation and language support for humanitarian response, including "
+            "Swahili and other East African languages. Assignments are sent to the "
+            "volunteer pool as projects arise."
+        ),
+    },
+    {
+        "kind": "Volunteer",
+        "title": "OpenStreetMap Kenya mapping community",
+        "org": "OpenStreetMap",
+        "when": "Rolling — contribute any time",
+        "opens": None,
+        "closes": None,
+        "steps": [
+            "Create an OpenStreetMap account",
+            "Read the Kenya mapping wiki and local conventions",
+            "Start with map tasks in your area",
+        ],
+        "city": "Nairobi",
+        "tags": ["Mapping", "Open data", "Kenya"],
+        "stipend": "Unpaid — volunteer role",
+        "source": "Community",
+        "url": "https://wiki.openstreetmap.org/wiki/Kenya",
+        "desc": (
+            "Open mapping of Kenyan roads, amenities and services. Contribution is "
+            "continuous and self-directed, with local mapping tasks and community "
+            "meet-ups listed on the wiki."
+        ),
+    },
+    {
+        "kind": "Volunteer",
+        "title": "Mozilla Common Voice",
+        "org": "Mozilla",
+        "when": "Rolling — contribute any time",
+        "opens": None,
+        "closes": None,
+        "steps": [
+            "Open Common Voice and pick a language",
+            "Record prompts or validate other recordings",
+            "Optionally help with localisation",
+        ],
+        "city": "Online",
+        "tags": ["Voice data", "Open source", "Remote"],
+        "stipend": "Unpaid — volunteer role",
+        "source": "Official",
+        "url": "https://commonvoice.mozilla.org/",
+        "desc": (
+            "Contribute voice recordings and validation for open speech datasets, "
+            "including Swahili. Useful for anyone wanting open-source data and ML "
+            "experience on their record."
+        ),
+    },
+    {
+        "kind": "Volunteer",
+        "title": "Ushahidi open-source contributors",
+        "org": "Ushahidi",
+        "when": "Rolling — issues labelled for newcomers",
+        "opens": None,
+        "closes": None,
+        "steps": [
+            "Read the contributor guide in the repository",
+            "Pick an issue labelled for first-time contributors",
+            "Open a pull request and work with reviewers",
+        ],
+        "city": "Online",
+        "tags": ["Open source", "Software", "Kenya"],
+        "stipend": "Unpaid — volunteer role",
+        "source": "Community",
+        "url": "https://github.com/ushahidi",
+        "desc": (
+            "Contribute to the open-source crisis-mapping platform built in Nairobi. "
+            "Work is asynchronous on GitHub, with issues tagged for newcomers."
+        ),
+    },
+]
+
 _BUILTIN_CARDS: dict[str, list[dict]] = {
     "Paid program": PAID_PROGRAMS,
     "Internship": INTERNSHIPS,
@@ -1442,18 +1797,24 @@ def programme_fields(payload: dict) -> dict:
 
 
 def seed_programmes(session: Session) -> int:
-    """Copy the built-in cards into the table once. Returns rows inserted."""
-    if session.exec(select(func.count()).select_from(ProgrammeEntry)).one():
-        return 0
-    seen: set[tuple[str, str]] = set()
+    """Insert built-in cards that are missing, preserving edits and tombstones.
+
+    Runs on every boot, not just the first: a card added to the lists has to
+    reach deployments that seeded before it existed. A row whose fields differ
+    from the constant is an admin edit and is left untouched; a retired row
+    still counts as existing, so deleting a built-in card sticks.
+    """
+    existing = {
+        (row.kind, row.title) for row in session.exec(select(ProgrammeEntry)).all()
+    }
     inserted = 0
     for cards in _BUILTIN_CARDS.values():
         for card in cards:
             fields = programme_fields(card)
             key = (fields["kind"], fields["title"])
-            if not fields["title"] or key in seen:
+            if not fields["title"] or key in existing:
                 continue
-            seen.add(key)
+            existing.add(key)
             session.add(ProgrammeEntry(**fields))
             inserted += 1
     session.commit()
@@ -1474,7 +1835,9 @@ def curated_cards(kind: str) -> list[dict]:
                 return list(_BUILTIN_CARDS.get(kind, []))
             # Build the dicts while the rows are still attached: the JSON
             # columns are lazy and the session is gone after this block.
-            return [programme_item(row) for row in rows if row.kind == kind]
+            return [
+        programme_item(row) for row in rows if row.kind == kind and not row.retired
+    ]
     except Exception as exc:  # noqa: BLE001 - a public page must still render
         log.warning("programme table unavailable (%s); serving built-ins", exc)
         return list(_BUILTIN_CARDS.get(kind, []))
@@ -1992,7 +2355,7 @@ async def get_opportunities() -> dict:
 WORKKE_INDEX_URL = "https://work.ke/job-index.json"
 WORKKE_TTL = 30 * 60.0        # a tab, not a job board: half an hour is plenty
 WORKKE_STALE_TTL = 24 * 3600.0  # an internship older than a day is a dead link
-MAX_LIVE_INTERNSHIPS = 40     # the tab stays readable; the index stays cheap
+MAX_LIVE_INTERNSHIPS = 80     # the tab stays readable; the index stays cheap
 
 
 @dataclass(slots=True)
@@ -2012,11 +2375,16 @@ def _is_internship(role: dict) -> bool:
     """True when work.ke marks the row as an internship.
 
     The index carries seniority ("Internship", "Entry level", …) and an
-    employment type; employers fill in one or both, so either counts.
+    employment type; employers fill in one or both, so either counts. Kenyan
+    employers also post attachments and graduate/trainee schemes, which are the
+    same first-role market under different names.
     """
     seniority = str(role.get("seniority") or "").lower()
     employment = str(role.get("employmentType") or "").lower()
-    return "intern" in seniority or "intern" in employment
+    haystack = f"{seniority} {employment}"
+    return any(
+        marker in haystack for marker in ("intern", "attachment", "trainee")
+    )
 
 
 def _workke_item(role: dict) -> dict | None:

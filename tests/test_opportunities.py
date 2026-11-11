@@ -583,6 +583,13 @@ def test_workke_index_rows_are_filtered_by_internship_markers():
     assert _is_internship({"seniority": "Internship"})
     assert _is_internship({"seniority": "", "employmentType": "Internship"})
     assert not _is_internship({"seniority": "Mid level", "employmentType": "Full-time"})
+
+
+def test_workke_attachments_and_trainee_schemes_count_as_first_roles():
+    """Kenyan employers label the same market "attachment" or "trainee"."""
+    assert _is_internship({"seniority": "Attachment"})
+    assert _is_internship({"seniority": "", "employmentType": "Graduate trainee"})
+    assert not _is_internship({"seniority": "Senior"})
     assert not _is_internship({})
 
 

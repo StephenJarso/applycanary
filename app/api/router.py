@@ -3185,6 +3185,8 @@ def _upsert_programme(session: Session, body: ProgrammeIn) -> ProgrammeEntry:
     else:
         for key, value in fields.items():
             setattr(row, key, value)
+        # Importing a retired card is how an admin restores it.
+        row.retired = False
         row.updated_at = utcnow()
     session.add(row)
     session.commit()
@@ -3199,7 +3201,9 @@ def admin_programmes(
 ) -> list[ProgrammeOut]:
     """Every curated card, including ones the public pages are not showing yet."""
     rows = session.exec(
-        select(ProgrammeEntry).order_by(ProgrammeEntry.kind, ProgrammeEntry.title)
+        select(ProgrammeEntry)
+        .where(ProgrammeEntry.retired.is_(False))
+        .order_by(ProgrammeEntry.kind, ProgrammeEntry.title)
     ).all()
     return [_programme_out(row) for row in rows]
 
@@ -3292,10 +3296,14 @@ def delete_programme(
     _admin: User = Depends(require_admin),
 ) -> ActionResult:
     row = session.get(ProgrammeEntry, entry_id)
-    if row is None:
+    if row is None or row.retired:
         raise HTTPException(404, "programme not found")
     title = row.title
-    session.delete(row)
+    # Soft delete: the seed runs on every boot and would re-create a deleted
+    # built-in card. Retiring keeps the tombstone that stops that.
+    row.retired = True
+    row.updated_at = utcnow()
+    session.add(row)
     session.commit()
     return ActionResult(ok=True, message=f"Deleted {title}.")
 
