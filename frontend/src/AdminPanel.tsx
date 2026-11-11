@@ -1305,8 +1305,10 @@ export function AdminPanel() {
                   acc[r.kind] = (acc[r.kind] ?? 0) + 1;
                   return acc;
                 }, {});
+                const expired = rows.filter((r) => r.expired).length;
                 const parts = Object.entries(counts).map(([k, n]) => `${n} ${k.toLowerCase()}${n === 1 ? "" : "s"}`);
-                return parts.length ? `${rows.length} curated cards · ${parts.join(" · ")}` : "No curated cards yet.";
+                const summary = parts.length ? `${rows.length} curated cards · ${parts.join(" · ")}` : "No curated cards yet.";
+                return expired ? `${summary} · ${expired} closed` : summary;
               })()}
             </p>
 
@@ -1316,7 +1318,9 @@ export function AdminPanel() {
                   <tr><th>Kind</th><th>Title</th><th>Org</th><th /></tr>
                 </thead>
                 <tbody>
-                  {(programmesQuery.data ?? []).map((card) => (
+                  {[...(programmesQuery.data ?? [])]
+                    .sort((a, b) => Number(a.expired) - Number(b.expired))
+                    .map((card) => (
                     <Fragment key={card.id}>
                       <tr>
                         <td className="cell-dim">{card.kind}</td>
