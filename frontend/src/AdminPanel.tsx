@@ -1298,6 +1298,18 @@ export function AdminPanel() {
               {importProgrammes.isPending ? "Importing…" : "Import"}
             </button>
 
+            <p className="cell-dim" style={{ fontSize: 12, margin: "8px 0 4px" }}>
+              {(() => {
+                const rows = programmesQuery.data ?? [];
+                const counts = rows.reduce<Record<string, number>>((acc, r) => {
+                  acc[r.kind] = (acc[r.kind] ?? 0) + 1;
+                  return acc;
+                }, {});
+                const parts = Object.entries(counts).map(([k, n]) => `${n} ${k.toLowerCase()}${n === 1 ? "" : "s"}`);
+                return parts.length ? `${rows.length} curated cards · ${parts.join(" · ")}` : "No curated cards yet.";
+              })()}
+            </p>
+
             <div className="table-wrap" style={{ marginTop: 12 }}>
               <table>
                 <thead>
