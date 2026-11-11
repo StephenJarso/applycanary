@@ -219,6 +219,17 @@ export function AdminPanel() {
       void qc.invalidateQueries({ queryKey: ["sources"] });
     },
   });
+  const pollBoard = useMutation({
+    mutationFn: api.pollBoard,
+    onSuccess: (result) => {
+      setContentMsg(result.message);
+      void qc.invalidateQueries({ queryKey: ["admin", "boards"] });
+      void qc.invalidateQueries({ queryKey: ["sources"] });
+      void qc.invalidateQueries({ queryKey: ["jobs"] });
+    },
+    onError: (err) =>
+      setContentMsg(err instanceof Error ? err.message : "Could not poll that board."),
+  });
   const removeBoard = useMutation({
     mutationFn: api.deleteBoard,
     onSuccess: () => {
@@ -1203,6 +1214,19 @@ export function AdminPanel() {
                           >
                             {board.enabled ? "Pause" : "Resume"}
                           </button>{" "}
+                          {board.enabled && (
+                            <>
+                              <button
+                                type="button"
+                                className="btn-ghost"
+                                style={{ fontSize: 11, padding: "2px 8px" }}
+                                disabled={pollBoard.isPending}
+                                onClick={() => pollBoard.mutate(board.id)}
+                              >
+                                {pollBoard.isPending ? "Polling…" : "Poll now"}
+                              </button>{" "}
+                            </>
+                          )}
                           <button
                             type="button"
                             className="btn-ghost"

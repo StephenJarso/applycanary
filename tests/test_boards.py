@@ -103,7 +103,7 @@ class TestPreview:
             )
         ]
         monkeypatch.setattr(
-            boards, "_build_one", lambda *args, **kwargs: _FakeSource(jobs)
+            boards, "build_board", lambda *args, **kwargs: _FakeSource(jobs)
         )
 
         result = await boards.preview(URL)
@@ -153,6 +153,24 @@ class TestAdminApi:
 
         assert boards.build_custom_boards(object(), kinds=boards.ATS_KINDS) == []
 
+    def test_poll_now_runs_that_board(self, admin_client, monkeypatch):
+        board = admin_client.post("/api/admin/boards", json={"url": URL}).json()
+        seen: list[BaseSource] = []
+
+        async def fake_run(sources):
+            from app.pipeline.ingest import IngestSummary
+
+            seen.extend(sources)
+            return IngestSummary(sources_run=1, found=3, new=2)
+
+        monkeypatch.setattr("app.pipeline.ingest.run_sources", fake_run)
+        monkeypatch.setattr(boards, "build_board", lambda *args, **kwargs: _FakeSource([]))
+
+        response = admin_client.post(f"/api/admin/boards/{board['id']}/poll")
+        assert response.status_code == 200
+        assert response.json()["detail"] == {"found": 3, "new": 2}
+        assert len(seen) == 1
+
     def test_a_duplicate_is_a_conflict(self, admin_client):
         assert admin_client.post("/api/admin/boards", json={"url": URL}).status_code == 200
         duplicate = admin_client.post("/api/admin/boards", json={"url": URL})
@@ -185,7 +203,7 @@ class TestPolling:
             seen.append((kind, token))
             return _FakeSource([])
 
-        monkeypatch.setattr(boards, "_build_one", fake_build)
+        monkeypatch.setattr(boards, "build_board", fake_build)
 
         assert len(boards.build_custom_boards(object(), kinds=boards.ATS_KINDS)) == 1
         assert seen == [("greenhouse", "pytestco")]

@@ -78,7 +78,7 @@ def recognise(url: str) -> tuple[str, str]:
     return CAREERS_KIND, ""
 
 
-def _build_one(kind: str, token: str, label: str, url: str, client: httpx.AsyncClient | None) -> BaseSource:
+def build_board(kind: str, token: str, label: str, url: str, client: httpx.AsyncClient | None) -> BaseSource:
     if kind == CAREERS_KIND:
         from app.sources.careers import OfficialCareersSource
 
@@ -119,7 +119,7 @@ def build_custom_boards(
     built: list[BaseSource] = []
     for kind, token, label, url in configs:
         try:
-            built.append(_build_one(kind, token, label, url, client))
+            built.append(build_board(kind, token, label, url, client))
         except (KeyError, TypeError, ValueError) as exc:
             log.warning("cannot build custom board %s: %s", url, exc)
     return built
@@ -132,7 +132,7 @@ async def preview(url: str) -> dict:
     inside a request and a broken site must not hold the admin's page open.
     """
     kind, token = recognise(url)
-    source = _build_one(kind, token, "", url, None)
+    source = build_board(kind, token, "", url, None)
     async with source:
         async with asyncio.timeout(PREVIEW_TIMEOUT):
             jobs: list[RawJob] = await source.fetch()

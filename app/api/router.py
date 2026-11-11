@@ -3044,6 +3044,52 @@ def add_board(
     return _board_out(row)
 
 
+@router.post("/admin/boards/{board_id}/poll", response_model=ActionResult)
+async def poll_board_now(
+    board_id: int,
+    session: Session = Depends(get_session),
+    _admin: User = Depends(require_admin),
+) -> ActionResult:
+    """Fetch one board immediately instead of waiting for the next cycle.
+
+    Adding or resuming a board used to mean up to five silent minutes before
+    anything appeared, which reads as "the URL did not work". The run is
+    recorded as a SourceRun like any other, so a bad URL still shows up on the
+    Sources page.
+    """
+    import httpx
+
+    from app.pipeline.ingest import run_sources
+    from app.sources.base import DEFAULT_TIMEOUT, USER_AGENT
+    from app.sources.boards import build_board
+
+    row = session.get(CustomBoard, board_id)
+    if row is None:
+        raise HTTPException(404, "board not found")
+
+    async with httpx.AsyncClient(
+        timeout=DEFAULT_TIMEOUT,
+        headers={"User-Agent": USER_AGENT},
+        follow_redirects=True,
+    ) as client:
+        source = build_board(row.kind, row.token, row.label, row.url, client)
+        summary = await run_sources([source])
+
+    label = row.label or row.url
+    if summary.sources_failed:
+        detail = summary.errors[0] if summary.errors else "unknown error"
+        return ActionResult(
+            ok=False,
+            message=f"Could not poll {label}: {detail}",
+            detail={"found": 0, "new": 0},
+        )
+    return ActionResult(
+        ok=True,
+        message=f"Polled {label}: {summary.found} found, {summary.new} new.",
+        detail={"found": summary.found, "new": summary.new},
+    )
+
+
 @router.patch("/admin/boards/{board_id}", response_model=BoardOut)
 def update_board(
     board_id: int,

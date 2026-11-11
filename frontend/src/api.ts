@@ -811,6 +811,8 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ url, label }),
     }),
+  pollBoard: (id: number) =>
+    request<ActionResult>(`/admin/boards/${id}/poll`, { method: "POST" }),
   updateBoard: (id: number, payload: { label?: string; enabled?: boolean }) =>
     request<CustomBoard>(`/admin/boards/${id}`, {
       method: "PATCH",
