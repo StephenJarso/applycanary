@@ -22,7 +22,7 @@ import {
  * programs.
  */
 
-const STATUSES = ["All", "Open now", "Opening soon", "Rolling"] as const;
+const STATUSES = ["All", "Open now", "Opening soon", "Rolling", "Closed"] as const;
 const TYPES = ["All", "Internship", "Paid program"] as const;
 const BASE_LOCATIONS = ["Tokyo", "Kenya", "Online"];
 

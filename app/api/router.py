@@ -201,6 +201,10 @@ class OpportunityOut(BaseModel):
     closes: str | None = None
     steps: list[str] | None = None
     stipend: str | None = None
+    # Server-side verdict on the deadline, so the page does not decide "closed"
+    # from the visitor's clock.
+    expired: bool = False
+    days_left: int | None = None
 
 
 class OpportunitiesOut(BaseModel):

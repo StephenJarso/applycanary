@@ -631,6 +631,9 @@ export interface Opportunity {
   closes: string | null;
   steps: string[] | null;
   stipend: string | null;
+  /** Server-side verdict on `closes`, so the browser clock is not the judge. */
+  expired?: boolean;
+  days_left?: number | null;
 }
 
 export interface Opportunities {

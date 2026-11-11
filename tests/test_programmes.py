@@ -6,6 +6,8 @@ a deploy. The constants are now only a seed; the admin API owns the table.
 
 from __future__ import annotations
 
+from datetime import date
+
 import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import Session, select
@@ -14,7 +16,12 @@ from app.auth import SESSION_COOKIE_NAME, create_session_token
 from app.db import engine, init_db
 from app.main import create_app
 from app.models import ProgrammeEntry, User
-from app.opportunities import curated_cards, seed_programmes
+from app.opportunities import (
+    curated_cards,
+    deadline_state,
+    programme_item,
+    seed_programmes,
+)
 
 TITLE = "Pytest Fellowship 2027"
 
@@ -145,3 +152,35 @@ def test_a_non_http_url_is_rejected(admin_client):
 
 def test_deleting_a_missing_card_is_a_404(admin_client):
     assert admin_client.delete("/api/admin/programmes/999999").status_code == 404
+
+
+class TestDeadlineState:
+    def test_a_past_deadline_is_expired(self):
+        state = deadline_state(
+            {"closes": "2026-01-01"}, today=date(2026, 2, 1)
+        )
+        assert state == {"expired": True, "days_left": -31}
+
+    def test_a_future_deadline_is_open(self):
+        state = deadline_state(
+            {"closes": "2026-12-24"}, today=date(2026, 12, 1)
+        )
+        assert state == {"expired": False, "days_left": 23}
+
+    def test_rolling_windows_carry_no_deadline(self):
+        assert deadline_state({"closes": "Rolling"}) == {
+            "expired": False,
+            "days_left": None,
+        }
+
+    def test_a_card_carries_its_own_state(self):
+        with Session(engine) as session:
+            session.add(_row(closes="2020-01-01"))
+            session.commit()
+            row = session.exec(
+                select(ProgrammeEntry).where(ProgrammeEntry.title == TITLE)
+            ).one()
+            card = programme_item(row)
+
+        assert card["expired"] is True
+        assert card["days_left"] < 0

@@ -24,7 +24,7 @@ export function opportunityStatus(o: Opportunity): string {
   // when it closes, not when it began, so a missing `opens` means "already
   // open" rather than "no application window".
   if (o.closes) {
-    if (daysUntil(o.closes) < 0) return "Closed";
+    if (o.expired ?? daysUntil(o.closes) < 0) return "Closed";
     return !o.opens || daysUntil(o.opens) <= 0 ? "Open now" : "Opening soon";
   }
   // Crew calls lifted from the events calendar carry the event's date.
@@ -32,11 +32,13 @@ export function opportunityStatus(o: Opportunity): string {
   return "Rolling";
 }
 
-/** Dated entries sort first, then rolling ones last. */
-export const opportunityDeadline = (o: Opportunity) =>
-  o.closes ? new Date(o.closes).getTime()
-  : o.date ? new Date(o.date).getTime()
-  : 9e15;
+/** Dated entries sort first, then rolling ones, and closed ones last. */
+export const opportunityDeadline = (o: Opportunity) => {
+  if (o.expired) return 9e15;
+  return o.closes ? new Date(o.closes).getTime()
+    : o.date ? new Date(o.date).getTime()
+    : 9e15;
+};
 
 function Steps({ item }: { item: Opportunity }) {
   if (!item.steps) return null;
@@ -65,9 +67,19 @@ function Timeline({ item }: { item: Opportunity }) {
   }
 
   if (item.closes) {
-    const left = daysUntil(item.closes);
+    const left = item.expired ? -1 : daysUntil(item.closes);
     const opens = item.opens ?? "";
     const opening = opens ? daysUntil(opens) : 0;
+    if (left < 0) {
+      return (
+        <>
+          <p>
+            🔒 <b>Applications closed</b> · Deadline <b>{fmtDate(item.closes)}</b>
+          </p>
+          <Steps item={item} />
+        </>
+      );
+    }
     return (
       <>
         <p>
@@ -160,6 +172,11 @@ export function OpportunityCard({
         >
           {item.kind}
         </span>
+        {item.expired && (
+          <span className="opp-source" style={{ fontWeight: 600 }}>
+            Closed
+          </span>
+        )}
         <span className="opp-source">via {item.source}</span>
         {onToggleWatch && (
           <button

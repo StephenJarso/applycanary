@@ -42,7 +42,7 @@ import logging
 import re
 import time
 from dataclasses import dataclass, field
-from datetime import UTC, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta, timezone
 
 import httpx
 from sqlmodel import Session, func, select
@@ -1368,9 +1368,26 @@ _BUILTIN_CARDS: dict[str, list[dict]] = {
 PROGRAMME_KINDS = tuple(_BUILTIN_CARDS)
 
 
+def deadline_state(item: dict, *, today: date | None = None) -> dict[str, object]:
+    """Whether a card's application window has closed, and by how much.
+
+    Computed on the server so the page, the API and any other consumer agree on
+    "closed"; a client clock is not allowed to decide whether a deadline has
+    passed. Non-ISO values ("Rolling", "TBA") simply carry no deadline.
+    """
+    today = today or datetime.now(UTC).date()
+    closes = str(item.get("closes") or "").strip()[:10]
+    try:
+        deadline = date.fromisoformat(closes)
+    except ValueError:
+        return {"expired": False, "days_left": None}
+    days_left = (deadline - today).days
+    return {"expired": days_left < 0, "days_left": days_left}
+
+
 def programme_item(entry: ProgrammeEntry) -> dict:
     """One table row in the shape the public pages expect."""
-    return {
+    payload = {
         "kind": entry.kind,
         "title": entry.title,
         "org": entry.org,
@@ -1386,6 +1403,7 @@ def programme_item(entry: ProgrammeEntry) -> dict:
         "url": entry.url,
         "desc": entry.desc,
     }
+    return {**payload, **deadline_state(payload)}
 
 
 def programme_fields(payload: dict) -> dict:
@@ -2153,6 +2171,9 @@ async def get_internships() -> dict:
         if str(item.get("title") or "").strip().lower() not in curated_titles
     ]
     items = [*curated, *live]
+    # Live work.ke rows carry their own deadline; the same server-side verdict
+    # applies so one tab cannot show an expired card as open.
+    items = [{**item, **deadline_state(item)} for item in items]
     items.sort(key=_sort_key)
     return {
         "items": items,
