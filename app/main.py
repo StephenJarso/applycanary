@@ -184,6 +184,10 @@ def create_app() -> FastAPI:
             or path == "/internships"
             or path == "/volunteers"
             or path.startswith("/api/public/")
+            # Driven by an external cron with no browser session. The route
+            # authenticates with its own shared token and fails closed when
+            # CRON_TOKEN is unset, so it must bypass the login wall here.
+            or path.startswith("/api/cron/")
             or path == "/favicon.ico"
         ):
             with Session(engine) as session:

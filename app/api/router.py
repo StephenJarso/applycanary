@@ -11,6 +11,7 @@ client has something real to mirror.
 
 from __future__ import annotations
 
+import hmac
 import logging
 import re
 from datetime import date, datetime, timedelta
@@ -1943,6 +1944,56 @@ async def make_prep(
         log.exception("interview prep failed for job %s", job_id)
         raise HTTPException(500, str(exc)) from exc
     return ActionResult(ok=True, message="Interview prep generated.")
+
+
+@router.post("/cron/poll", response_model=ActionResult)
+async def cron_poll(
+    request: Request,
+    token: str = Query("", description="CRON_TOKEN, or send X-Cron-Token instead."),
+) -> ActionResult:
+    """Poll the boards without a session, so an external cron can drive it.
+
+    The scheduler runs inside the web process (``app/main.py``), so a host that
+    sleeps — Render's free tier, a stopped container — silently stops polling.
+    This route lets a cheap outside cron keep the feed alive.
+
+    It fails closed: with no ``CRON_TOKEN`` configured it refuses rather than
+    serving an unauthenticated write path, and it does nothing while the
+    scheduler is running, so the two drivers cannot double-poll.
+    """
+    settings = get_settings()
+    if not settings.cron_token:
+        raise HTTPException(503, "CRON_TOKEN is not configured")
+    supplied = request.headers.get("X-Cron-Token") or token
+    if not hmac.compare_digest(supplied, settings.cron_token):
+        raise HTTPException(401, "bad cron token")
+
+    from app import scheduler as sched
+
+    scheduler = sched.get_scheduler()
+    if scheduler is not None and scheduler.running:
+        return ActionResult(
+            ok=True,
+            message="The scheduler is running; no extra poll needed.",
+            detail={"skipped": True},
+        )
+
+    from app.pipeline.ingest import poll_broad, poll_curated
+
+    curated = await poll_curated()
+    broad = await poll_broad()
+    # Polling without scoring leaves the feed full of unscored rows, which is
+    # exactly the state this route exists to prevent on a scheduler-less host.
+    await sched.job_score_new()
+
+    run = curated.sources_run + broad.sources_run
+    new = curated.new + broad.new
+    failed = curated.sources_failed + broad.sources_failed
+    return ActionResult(
+        ok=True,
+        message=f"Polled {run} sources: {new} new, {failed} failed.",
+        detail={"sources": run, "new": new, "failed": failed, "scored": True},
+    )
 
 
 @router.post("/actions/poll", response_model=ActionResult)

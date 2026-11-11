@@ -96,6 +96,12 @@ class Settings(BaseSettings):
     poll_broad_minutes: int = 30
     score_interval_minutes: int = 2
 
+    # Shared secret for the external-cron fallback (POST /api/cron/poll). The
+    # scheduler lives inside the web process, so a host that sleeps stops
+    # polling; an outside cron can wake it. Empty disables the route: it must
+    # never run unauthenticated.
+    cron_token: str = ""
+
     # --- github ---
     github_username: str = ""
     github_token: str = ""
