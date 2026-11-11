@@ -83,12 +83,15 @@ export default function Volunteers({ embedded = false }: { embedded?: boolean })
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
   const [city, setCity] = useState("All");
+  const [source, setSource] = useState("All");
   const [tags, setTags] = useState<string[]>([]);
 
   const locations = useMemo(() => {
     const extra = items.map((o) => o.city).filter((c) => c && !BASE_LOCATIONS.includes(c));
     return ["All", ...BASE_LOCATIONS, ...new Set(extra)];
   }, [items]);
+
+  const sources = useMemo(() => ["All", ...new Set(items.map((o) => o.source).filter(Boolean))], [items]);
 
   const interests = useMemo(
     () => [...new Set(items.flatMap((o) => o.tags))].sort(),
@@ -101,21 +104,23 @@ export default function Volunteers({ embedded = false }: { embedded?: boolean })
       .filter(
         (o) =>
           (city === "All" || o.city === city) &&
+          (source === "All" || o.source === source) &&
           (statusFilter === "All" || status(o) === statusFilter) &&
           (tags.length === 0 || tags.some((t) => o.tags.includes(t))) &&
           (!q ||
             `${o.title} ${o.org} ${o.desc} ${o.tags.join(" ")}`.toLowerCase().includes(q)),
       )
       .sort((a, b) => deadline(a) - deadline(b));
-  }, [items, query, city, tags, statusFilter]);
+  }, [items, query, city, source, tags, statusFilter]);
 
   const toggleTag = (tag: string) =>
     setTags((old) => (old.includes(tag) ? old.filter((t) => t !== tag) : [...old, tag]));
 
-  const filtersOn = tags.length > 0 || city !== "All" || statusFilter !== "All" || query !== "";
+  const filtersOn = tags.length > 0 || city !== "All" || source !== "All" || statusFilter !== "All" || query !== "";
   const clearAll = () => {
     setTags([]);
     setCity("All");
+    setSource("All");
     setQuery("");
     setStatusFilter("All");
   };
@@ -197,6 +202,23 @@ export default function Volunteers({ embedded = false }: { embedded?: boolean })
                   onClick={() => setCity(l)}
                 >
                   {l}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="opp-filter-group">
+            <p className="opp-filter-label" id="vol-source">Source</p>
+            <div className="opp-chips" role="group" aria-labelledby="vol-source">
+              {sources.map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  className="opp-chip"
+                  aria-pressed={source === s}
+                  onClick={() => setSource(s)}
+                >
+                  {s}
                 </button>
               ))}
             </div>

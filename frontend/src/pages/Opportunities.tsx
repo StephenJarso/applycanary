@@ -97,12 +97,15 @@ export default function Opportunities({ embedded = false }: { embedded?: boolean
   const [type, setType] = useState("All");
   const [statusFilter, setStatusFilter] = useState("All");
   const [city, setCity] = useState("All");
+  const [source, setSource] = useState("All");
   const [tags, setTags] = useState<string[]>([]);
 
   const locations = useMemo(() => {
     const extra = items.map((o) => o.city).filter((c) => c && !BASE_LOCATIONS.includes(c));
     return ["All", ...BASE_LOCATIONS, ...new Set(extra)];
   }, [items]);
+
+  const sources = useMemo(() => ["All", ...new Set(items.map((o) => o.source).filter(Boolean))], [items]);
 
   const interests = useMemo(
     () => [...new Set(items.flatMap((o) => o.tags))].sort(),
@@ -115,19 +118,21 @@ export default function Opportunities({ embedded = false }: { embedded?: boolean
       (o) =>
         (type === "All" || o.kind === type) &&
         (city === "All" || o.city === city) &&
+        (source === "All" || o.source === source) &&
         (statusFilter === "All" || status(o) === statusFilter) &&
         (tags.length === 0 || tags.some((t) => o.tags.includes(t))) &&
         (!q || `${o.title} ${o.org} ${o.desc} ${o.tags.join(" ")}`.toLowerCase().includes(q)),
     ).sort((a, b) => deadline(a) - deadline(b));
-  }, [items, query, type, city, tags, statusFilter]);
+  }, [items, query, type, city, source, tags, statusFilter]);
 
   const toggleTag = (tag: string) =>
     setTags((old) => (old.includes(tag) ? old.filter((t) => t !== tag) : [...old, tag]));
 
-  const filtersOn = tags.length > 0 || city !== "All" || statusFilter !== "All" || type !== "All" || query !== "";
+  const filtersOn = tags.length > 0 || city !== "All" || source !== "All" || statusFilter !== "All" || type !== "All" || query !== "";
   const clearAll = () => {
     setTags([]);
     setCity("All");
+    setSource("All");
     setType("All");
     setQuery("");
     setStatusFilter("All");
@@ -199,6 +204,15 @@ export default function Opportunities({ embedded = false }: { embedded?: boolean
             <div className="opp-chips" role="group" aria-labelledby="opp-location">
               {locations.map((l) => (
                 <Chip key={l} on={city === l} onClick={() => setCity(l)}>{l}</Chip>
+              ))}
+            </div>
+          </div>
+
+          <div className="opp-filter-group">
+            <p className="opp-filter-label" id="opp-source">Source</p>
+            <div className="opp-chips" role="group" aria-labelledby="opp-source">
+              {sources.map((s) => (
+                <Chip key={s} on={source === s} onClick={() => setSource(s)}>{s}</Chip>
               ))}
             </div>
           </div>
