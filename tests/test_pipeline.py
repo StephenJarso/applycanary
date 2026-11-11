@@ -6,13 +6,13 @@ from datetime import timedelta
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlmodel import Session
+from sqlmodel import Session, select
 
 from app.api.router import _pipeline_stage
 from app.auth import SESSION_COOKIE_NAME, create_session_token, hash_password
 from app.db import engine, init_db
 from app.main import create_app
-from app.models import Application, Job, User, utcnow
+from app.models import AgentMemory, Application, Job, User, utcnow
 
 # (model, primary key) for every row this module created, removed afterwards.
 # The shared test database is not ours to empty: earlier suites leave resume
@@ -29,6 +29,16 @@ def clean_db():
         yield
     finally:
         with Session(engine) as session:
+            # Recording an outcome also writes agent memory. Those rows point at
+            # the user, so they have to go before the user or the delete trips
+            # the foreign-key check.
+            for model, pk in _CREATED:
+                if model is not User:
+                    continue
+                for memory in session.exec(
+                    select(AgentMemory).where(AgentMemory.user_id == pk)
+                ).all():
+                    session.delete(memory)
             for model, pk in reversed(_CREATED):
                 row = session.get(model, pk)
                 if row is not None:
@@ -168,6 +178,27 @@ def test_recording_an_interview_ends_the_chase(clean_db):
     assert item["follow_up_due"] is None
     # And it sticks in the list, not just in the response.
     assert client.get("/api/pipeline").json()["items"][0]["stage"] == "interview"
+
+
+def test_an_outcome_is_written_to_agent_memory(clean_db):
+    """The tracker shows the result; memory is what later passes can recall."""
+    user = _user()
+    app_row = _job(user)
+
+    _client(user).patch(
+        f"/api/pipeline/{app_row.job_id}", json={"outcome": "rejected"}
+    )
+
+    with Session(engine) as session:
+        memories = session.exec(
+            select(AgentMemory).where(
+                AgentMemory.user_id == user.id,
+                AgentMemory.kind == "application_outcome",
+            )
+        ).all()
+    assert len(memories) == 1
+    assert "rejected" in memories[0].content
+    assert memories[0].meta["job_id"] == app_row.job_id
 
 
 def test_ghosted_is_not_a_reply(clean_db):

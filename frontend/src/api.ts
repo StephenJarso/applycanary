@@ -75,6 +75,21 @@ export interface Job {
   apply_email: string;
 }
 
+export interface ApplicationRequirements {
+  word_limit: number | null;
+  questions: string[];
+  links: string[];
+  attachments: string[];
+  extra_steps: string[];
+}
+
+export interface LetterCheckFinding {
+  rule: string;
+  severity: "block" | "flag" | string;
+  message: string;
+  fix: string;
+}
+
 export interface JobDetail extends Job {
   description: string;
   canonical_url: string;
@@ -92,6 +107,14 @@ export interface JobDetail extends Job {
     error: string;
     attempts: number;
     cover_letter: string;
+    /** Verdict from the deterministic letter gate; absent on older applications. */
+    cover_letter_check: {
+      passed?: boolean;
+      score?: number;
+      word_count?: number;
+      findings?: LetterCheckFinding[];
+      requirements?: ApplicationRequirements;
+    } | null;
     form_answers: Record<string, string>;
     outcome: string;
     apply_email: string;

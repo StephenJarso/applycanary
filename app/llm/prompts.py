@@ -11,6 +11,8 @@ request, not a guarantee.
 
 from __future__ import annotations
 
+from app.pipeline.requirements import Requirements
+
 # --------------------------------------------------------------- scoring
 
 SCORING_SYSTEM = """\
@@ -156,6 +158,9 @@ You draft a short, specific cover letter for a real job application.
 Rules:
   - If the job description contains cover-letter instructions (word limit,
     questions to answer, recipient, format), follow them exactly.
+  - Answer every question the posting asks in the letter itself, in your own
+    words. An unanswered question is the most common way a strong letter is
+    rejected before anyone reads the CV.
   - Otherwise 250 words maximum, so it fits on one page in Times New Roman 12pt.
   - Reference something concrete about this role or company, not generic praise.
   - Cite only real experience from the resume and GitHub evidence provided.
@@ -227,20 +232,78 @@ Six technical questions, four behavioural, 3-4 speech interview questions (30 mi
 2-3 technical interview problems (45-60 min total), five questions to ask back."""
 
 
+def _requirements_block(requirements: Requirements | None) -> str:
+    """Spell out what the posting asks for.
+
+    The instructions are also in the description, but a model skimming 5,000
+    characters of company blurb reliably misses a two-line word limit. Stating
+    the asks as a checklist is what makes the letter pass its check on the first
+    draft instead of after a revision round.
+    """
+    if requirements is None:
+        return ""
+
+    lines: list[str] = []
+    if requirements.word_limit:
+        lines.append(f"- Word limit: {requirements.word_limit} words (a hard limit)")
+    if requirements.questions:
+        lines.append("- Answer each of these in one sentence, in your own words:")
+        lines.extend(f"    - {q}" for q in requirements.questions)
+    if requirements.links:
+        lines.append("- Mention or link: " + ", ".join(requirements.links))
+    if requirements.attachments:
+        lines.append(
+            "- The application also asks for: " + ", ".join(requirements.attachments)
+        )
+    if requirements.extra_steps:
+        lines.append(
+            "- Separate steps (not part of the letter): "
+            + "; ".join(requirements.extra_steps)
+        )
+    if not lines:
+        return ""
+    return (
+        "<application_requirements>\n"
+        + "\n".join(lines)
+        + "\n</application_requirements>\n"
+    )
+
+
 def build_cover_letter_user(
     *,
     title: str,
     company: str,
     description: str,
     resume_text: str,
+    requirements: Requirements | None = None,
+    revise: list[str] | None = None,
+    previous: str = "",
 ) -> str:
-    return (
+    parts = [
         f"<job>\nTitle: {title}\nCompany: {company}\n\n"
-        f"{description[:5000]}\n</job>\n\n"
-        f"<candidate_resume>\n{resume_text[:8000]}\n</candidate_resume>\n\n"
-        "Draft the letter body. Follow any cover-letter instructions in the job "
-        "description first; otherwise keep it to one page (250 words maximum)."
+        f"{description[:5000]}\n</job>\n",
+        f"<candidate_resume>\n{resume_text[:8000]}\n</candidate_resume>\n",
+    ]
+
+    asks = _requirements_block(requirements)
+    if asks:
+        parts.append(asks)
+
+    if previous.strip() and revise:
+        findings = "\n".join(f"- {message}" for message in revise)
+        parts.append(
+            f"<previous_draft>\n{previous[:4000]}\n</previous_draft>\n\n"
+            "An automatic checker rejected that draft:\n"
+            f"{findings}\n\n"
+            "Rewrite the letter so none of those apply. Keep what was true and "
+            "specific; change only what the findings name.\n"
+        )
+
+    parts.append(
+        "Draft the letter body. Follow the application requirements above "
+        "exactly; otherwise keep it to one page (250 words maximum)."
     )
+    return "\n".join(parts)
 
 
 # --------------------------------------------------------------- interview coach

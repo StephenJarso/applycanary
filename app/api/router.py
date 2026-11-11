@@ -1087,6 +1087,7 @@ def job_detail(
                 "error": app_row.error,
                 "attempts": app_row.attempts,
                 "cover_letter": app_row.cover_letter,
+                "cover_letter_check": app_row.cover_letter_check or {},
                 "form_answers": app_row.form_answers or {},
                 "outcome": app_row.outcome,
                 "apply_email": app_row.apply_email or "",
@@ -1229,8 +1230,40 @@ def pipeline(
     return PipelineOut(items=items, counts=counts)
 
 
+async def _remember_outcome(
+    session: Session, user: User, app_row: Application
+) -> None:
+    """Keep an outcome as agent memory as well as on the application row.
+
+    The tracker shows the result; memory is what a later tailoring or prep pass
+    can recall, so a rejection teaches the agent something instead of
+    disappearing into a column nobody reads. Best-effort: the outcome is already
+    committed, so an embedding failure must not turn the update into a 500.
+    """
+    from app.memory.vectors import save_memory
+
+    job = session.get(Job, app_row.job_id)
+    company = job.company if job else ""
+    title = job.title if job else "an application"
+    outcome = (app_row.outcome or "").replace("_", " ")
+    try:
+        await save_memory(
+            session,
+            user_id=user.id,
+            kind="application_outcome",
+            content=f"Applied to {title} at {company}; the outcome was {outcome}.",
+            metadata={
+                "job_id": app_row.job_id,
+                "company": company,
+                "outcome": app_row.outcome,
+            },
+        )
+    except Exception:  # noqa: BLE001 - the row already carries the outcome
+        log.exception("job %s: could not write outcome to memory", app_row.job_id)
+
+
 @router.patch("/pipeline/{job_id}", response_model=PipelineItemOut)
-def update_pipeline(
+async def update_pipeline(
     job_id: int,
     body: PipelineUpdate,
     session: Session = Depends(get_session),
@@ -1277,6 +1310,9 @@ def update_pipeline(
     session.add(app_row)
     session.commit()
     session.refresh(app_row)
+
+    if body.outcome in _PIPELINE_OUTCOMES:
+        await _remember_outcome(session, user, app_row)
     return _pipeline_item(session, user, app_row)
 
 

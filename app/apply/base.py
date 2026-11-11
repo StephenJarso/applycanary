@@ -89,6 +89,23 @@ class SubmitGate:
                 "review and edit it before submitting",
             )
 
+        # The cover letter is the other document sent under the user's name, and
+        # it used to be the only one with no verification. Evaluated above the
+        # `force` branch for the same reason as truthcheck: approving a
+        # submission is not approving an unverified claim.
+        if existing is not None and existing.cover_letter:
+            letter = existing.cover_letter_check or {}
+            if letter and letter.get("passed") is False:
+                blocking = [
+                    f for f in letter.get("findings") or []
+                    if f.get("severity") == "block"
+                ]
+                return GateResult(
+                    False,
+                    "cover letter failed its check "
+                    f"({len(blocking)} blocking finding(s)); edit it before submitting",
+                )
+
         if not auto_submit and not force:
             return GateResult(True, "auto-submit is off for this profile", dry_run=True)
 

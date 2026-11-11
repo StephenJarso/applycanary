@@ -413,6 +413,12 @@ class Application(SQLModel, table=True):
     # Used when the posting doesn't state an email but the user knows where to send it.
     apply_email: str = ""
 
+    # Verdict from app/pipeline/lettercheck.py. The CV is gated by truthcheck;
+    # this is the same idea for the cover letter, which used to be the only
+    # document sent under the user's name with no verification at all. Empty on
+    # applications prepared before the check existed.
+    cover_letter_check: dict = Field(default_factory=dict, sa_column=Column(JSON))
+
     queued_at: datetime = Field(default_factory=utcnow)
     submitted_at: datetime | None = Field(default=None, index=True)
     confirmation: str = ""

@@ -71,6 +71,7 @@ export default function JobDetail() {
   const version = job.resume_version;
   const busy = tailor.isPending || submit.isPending || skip.isPending || save.isPending || setApplyEmail.isPending || prep.isPending;
   const blocked = version?.truthcheck_passed === false;
+  const letterCheck = job.application?.cover_letter_check;
 
   return (
     <>
@@ -397,6 +398,52 @@ export default function JobDetail() {
                   {copied === "cover" ? "Copied ✓" : "Copy cover letter"}
                 </button>
               </div>
+
+              {letterCheck &&
+              (letterCheck.findings?.length ||
+                letterCheck.requirements?.questions?.length) ? (
+                <div className="field" style={{ marginTop: 12 }}>
+                  <label>
+                    Letter check{" "}
+                    <span
+                      className={`chip ${letterCheck.passed ? "chip-hit" : "chip-miss"}`}
+                    >
+                      {letterCheck.passed ? "passed" : "blocked"}
+                    </span>
+                    {typeof letterCheck.word_count === "number" && (
+                      <span className="muted"> · {letterCheck.word_count} words</span>
+                    )}
+                  </label>
+
+                  {letterCheck.requirements?.questions?.length ? (
+                    <>
+                      <p className="muted" style={{ margin: "6px 0 2px" }}>
+                        Questions this posting asks:
+                      </p>
+                      <ul className="prose">
+                        {letterCheck.requirements.questions.map((q) => (
+                          <li key={q}>{q}</li>
+                        ))}
+                      </ul>
+                    </>
+                  ) : null}
+
+                  {letterCheck.findings?.length ? (
+                    <ul className="prose" style={{ marginTop: 6 }}>
+                      {letterCheck.findings.map((f, i) => (
+                        <li key={`${f.rule}-${i}`}>
+                          <span
+                            className={`chip ${f.severity === "block" ? "chip-miss" : ""}`}
+                          >
+                            {f.severity}
+                          </span>{" "}
+                          <strong>{f.message}</strong> {f.fix}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
+                </div>
+              ) : null}
             </div>
           ) : (
             <p className="muted" style={{ marginTop: 12 }}>

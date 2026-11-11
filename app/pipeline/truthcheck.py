@@ -227,6 +227,15 @@ def _normalise_numbers(text: str) -> list[str]:
     return out
 
 
+def numeric_claims(text: str) -> list[str]:
+    """Public view of the figure extractor, for the other verification gates.
+
+    `lettercheck` must judge a number exactly as bullet verification does, or
+    the two gates would disagree about what counts as a claim.
+    """
+    return _normalise_numbers(text)
+
+
 def _has_word(text: str, word: str) -> bool:
     return re.search(rf"\b{re.escape(word)}\b", text or "", re.I) is not None
 
