@@ -26,6 +26,7 @@ export function AdminPanel() {
   const [activeTab, setActiveTab] = useState<"services" | "users" | "feedback" | "sources" | "content">("services");
   const [boardUrl, setBoardUrl] = useState("");
   const [boardPreview, setBoardPreview] = useState<BoardPreview | null>(null);
+  const [boardLabels, setBoardLabels] = useState<Record<number, string>>({});
   const [programmeJson, setProgrammeJson] = useState("");
   const [contentMsg, setContentMsg] = useState("");
   const [feedbackStatus, setFeedbackStatus] = useState<string>("all");
@@ -199,6 +200,24 @@ export function AdminPanel() {
     },
     onError: (err) =>
       setContentMsg(err instanceof Error ? err.message : "Could not add that board."),
+  });
+  const updateBoard = useMutation({
+    mutationFn: ({
+      id,
+      payload,
+    }: {
+      id: number;
+      payload: { label?: string; enabled?: boolean };
+    }) => api.updateBoard(id, payload),
+    onSuccess: (row) => {
+      setBoardLabels((labels) => {
+        const next = { ...labels };
+        delete next[row.id];
+        return next;
+      });
+      void qc.invalidateQueries({ queryKey: ["admin", "boards"] });
+      void qc.invalidateQueries({ queryKey: ["sources"] });
+    },
   });
   const removeBoard = useMutation({
     mutationFn: api.deleteBoard,
@@ -1130,29 +1149,72 @@ export function AdminPanel() {
                   <tr><th>Board</th><th>Kind</th><th /></tr>
                 </thead>
                 <tbody>
-                  {(boardsQuery.data ?? []).map((board) => (
-                    <tr key={board.id}>
-                      <td>
-                        <a href={board.url} target="_blank" rel="noreferrer">
-                          {board.label || board.url}
-                        </a>
-                      </td>
-                      <td className="cell-dim">
-                        {board.kind}
-                        {board.token ? ` · ${board.token}` : ""}
-                      </td>
-                      <td>
-                        <button
-                          type="button"
-                          className="btn-ghost"
-                          style={{ fontSize: 11, padding: "2px 8px" }}
-                          onClick={() => removeBoard.mutate(board.id)}
-                        >
-                          Remove
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
+                  {(boardsQuery.data ?? []).map((board) => {
+                    const label = boardLabels[board.id] ?? board.label;
+                    const changed = label !== board.label;
+                    return (
+                      <tr key={board.id}>
+                        <td>
+                          <input
+                            type="text"
+                            aria-label="Board label"
+                            value={label}
+                            onChange={(e) =>
+                              setBoardLabels({ ...boardLabels, [board.id]: e.target.value })
+                            }
+                            style={{ fontSize: 12, padding: "3px 8px", minWidth: 170 }}
+                          />
+                          {changed && (
+                            <button
+                              type="button"
+                              className="btn-ghost"
+                              style={{ fontSize: 11, padding: "2px 8px", marginLeft: 6 }}
+                              disabled={!label.trim() || updateBoard.isPending}
+                              onClick={() =>
+                                updateBoard.mutate({ id: board.id, payload: { label } })
+                              }
+                            >
+                              Save
+                            </button>
+                          )}
+                        </td>
+                        <td className="cell-dim">
+                          {board.kind}
+                          {board.token ? ` · ${board.token}` : ""}{" "}
+                          <span
+                            className={`chip ${board.enabled ? "chip-hit" : ""}`}
+                            style={{ fontSize: 11 }}
+                          >
+                            {board.enabled ? "polling" : "paused"}
+                          </span>
+                        </td>
+                        <td style={{ whiteSpace: "nowrap" }}>
+                          <button
+                            type="button"
+                            className="btn-ghost"
+                            style={{ fontSize: 11, padding: "2px 8px" }}
+                            disabled={updateBoard.isPending}
+                            onClick={() =>
+                              updateBoard.mutate({
+                                id: board.id,
+                                payload: { enabled: !board.enabled },
+                              })
+                            }
+                          >
+                            {board.enabled ? "Pause" : "Resume"}
+                          </button>{" "}
+                          <button
+                            type="button"
+                            className="btn-ghost"
+                            style={{ fontSize: 11, padding: "2px 8px" }}
+                            onClick={() => removeBoard.mutate(board.id)}
+                          >
+                            Remove
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
                   {!boardsQuery.data?.length && (
                     <tr>
                       <td colSpan={3} className="cell-dim">

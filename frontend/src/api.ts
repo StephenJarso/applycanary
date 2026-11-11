@@ -805,6 +805,11 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ url, label }),
     }),
+  updateBoard: (id: number, payload: { label?: string; enabled?: boolean }) =>
+    request<CustomBoard>(`/admin/boards/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    }),
   deleteBoard: (id: number) =>
     request<ActionResult>(`/admin/boards/${id}`, { method: "DELETE" }),
   adminFeedback: (status = "all", limit = 50, offset = 0) =>

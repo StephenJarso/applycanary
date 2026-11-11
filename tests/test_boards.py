@@ -130,6 +130,29 @@ class TestAdminApi:
         assert admin_client.delete(f"/api/admin/boards/{body['id']}").status_code == 200
         assert admin_client.get("/api/admin/boards").json() == []
 
+    def test_rename_and_pause(self, admin_client):
+        board = admin_client.post("/api/admin/boards", json={"url": URL}).json()
+
+        renamed = admin_client.patch(
+            f"/api/admin/boards/{board['id']}", json={"label": "Acme Careers"}
+        )
+        assert renamed.status_code == 200
+        assert renamed.json()["label"] == "Acme Careers"
+
+        paused = admin_client.patch(
+            f"/api/admin/boards/{board['id']}", json={"enabled": False}
+        )
+        assert paused.json()["enabled"] is False
+
+    def test_a_paused_board_is_not_polled(self, db):
+        with Session(engine) as session:
+            session.add(
+                CustomBoard(url=URL, kind="greenhouse", token="pytestco", enabled=False)
+            )
+            session.commit()
+
+        assert boards.build_custom_boards(object(), kinds=boards.ATS_KINDS) == []
+
     def test_a_duplicate_is_a_conflict(self, admin_client):
         assert admin_client.post("/api/admin/boards", json={"url": URL}).status_code == 200
         duplicate = admin_client.post("/api/admin/boards", json={"url": URL})

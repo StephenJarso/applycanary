@@ -2938,6 +2938,11 @@ class BoardIn(BaseModel):
     label: str = ""
 
 
+class BoardUpdateIn(BaseModel):
+    label: str | None = Field(default=None, max_length=120)
+    enabled: bool | None = None
+
+
 class BoardOut(BaseModel):
     id: int
     url: str
@@ -3018,6 +3023,30 @@ def add_board(
         label=body.label.strip() or urlparse(url).netloc,
         created_by=admin.id,
     )
+    session.add(row)
+    session.commit()
+    session.refresh(row)
+    return _board_out(row)
+
+
+@router.patch("/admin/boards/{board_id}", response_model=BoardOut)
+def update_board(
+    board_id: int,
+    body: BoardUpdateIn,
+    session: Session = Depends(get_session),
+    _admin: User = Depends(require_admin),
+) -> BoardOut:
+    """Rename or pause a board without losing its URL and recognition."""
+    row = session.get(CustomBoard, board_id)
+    if row is None:
+        raise HTTPException(404, "board not found")
+    if body.label is not None:
+        label = body.label.strip()
+        if not label:
+            raise HTTPException(422, "label cannot be blank")
+        row.label = label
+    if body.enabled is not None:
+        row.enabled = body.enabled
     session.add(row)
     session.commit()
     session.refresh(row)
