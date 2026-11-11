@@ -29,6 +29,7 @@ from app.db import get_session
 from app.deps import current_user, require_admin, user_job
 from app.models import (
     Application,
+    CustomBoard,
     Feedback,
     InterviewPrep,
     InterviewSession,
@@ -2930,6 +2931,111 @@ def admin_update_llm_keys(
         "models_updated": models_updated,
         "note": "Keys and models updated live. Set environment variables to persist across server restarts.",
     }
+
+
+class BoardIn(BaseModel):
+    url: str = Field(min_length=8, max_length=500)
+    label: str = ""
+
+
+class BoardOut(BaseModel):
+    id: int
+    url: str
+    kind: str
+    token: str
+    label: str
+    enabled: bool
+
+
+class BoardPreviewOut(BaseModel):
+    kind: str
+    token: str
+    label: str
+    found: int
+    samples: list[dict[str, str]]
+
+
+def _board_out(row: CustomBoard) -> BoardOut:
+    return BoardOut(
+        id=row.id or 0,
+        url=row.url,
+        kind=row.kind,
+        token=row.token,
+        label=row.label,
+        enabled=row.enabled,
+    )
+
+
+@router.get("/admin/boards", response_model=list[BoardOut])
+def admin_boards(
+    session: Session = Depends(get_session),
+    _admin: User = Depends(require_admin),
+) -> list[BoardOut]:
+    rows = session.exec(select(CustomBoard).order_by(CustomBoard.label)).all()
+    return [_board_out(row) for row in rows]
+
+
+@router.post("/admin/boards/preview", response_model=BoardPreviewOut)
+async def preview_board(
+    body: BoardIn,
+    _admin: User = Depends(require_admin),
+) -> BoardPreviewOut:
+    """Parse a board once without saving it, so a typo fails before it polls."""
+    from app.sources.boards import preview
+
+    try:
+        result = await preview(body.url)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+    except Exception as exc:  # noqa: BLE001 - report the site's failure as a 502
+        raise HTTPException(502, f"could not read that board: {exc}") from exc
+    return BoardPreviewOut(**result)
+
+
+@router.post("/admin/boards", response_model=BoardOut)
+def add_board(
+    body: BoardIn,
+    session: Session = Depends(get_session),
+    admin: User = Depends(require_admin),
+) -> BoardOut:
+    from urllib.parse import urlparse
+
+    from app.sources.boards import recognise
+
+    url = body.url.strip()
+    try:
+        kind, token = recognise(url)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+
+    if session.exec(select(CustomBoard).where(CustomBoard.url == url)).first():
+        raise HTTPException(409, "that board is already added")
+
+    row = CustomBoard(
+        url=url,
+        kind=kind,
+        token=token,
+        label=body.label.strip() or urlparse(url).netloc,
+        created_by=admin.id,
+    )
+    session.add(row)
+    session.commit()
+    session.refresh(row)
+    return _board_out(row)
+
+
+@router.delete("/admin/boards/{board_id}", response_model=ActionResult)
+def delete_board(
+    board_id: int,
+    session: Session = Depends(get_session),
+    _admin: User = Depends(require_admin),
+) -> ActionResult:
+    row = session.get(CustomBoard, board_id)
+    if row is None:
+        raise HTTPException(404, "board not found")
+    session.delete(row)
+    session.commit()
+    return ActionResult(ok=True, message=f"Removed {row.label or row.url}.")
 
 
 class ProgrammeIn(BaseModel):

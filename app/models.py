@@ -694,6 +694,29 @@ class ProgrammeEntry(SQLModel, table=True):
     updated_at: datetime = Field(default_factory=utcnow)
 
 
+class CustomBoard(SQLModel, table=True):
+    """A job board added by URL, instead of editing ``companies.yaml``.
+
+    The YAML file needs a deploy and is shared by everyone; this is the same
+    configuration in the database, polled by the existing connectors. `kind`
+    is an ATS name (greenhouse, lever, ashby, workable, smartrecruiters) or
+    `careers` for an ordinary careers page.
+    """
+
+    __tablename__ = "custom_board"
+
+    id: int | None = Field(default=None, primary_key=True)
+    url: str = Field(index=True, unique=True)
+    kind: str = "careers"
+    token: str = ""
+    label: str = ""
+    enabled: bool = True
+    created_at: datetime = Field(default_factory=utcnow)
+    created_by: int | None = Field(
+        default=None, foreign_key="user.id", ondelete="SET NULL"
+    )
+
+
 class PushSubscription(SQLModel, table=True):
     """Browser Web Push subscription for one user device."""
 

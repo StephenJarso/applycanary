@@ -167,6 +167,12 @@ def build_curated(config: dict, client: httpx.AsyncClient) -> list[BaseSource]:
                              client=client))
         except TypeError as exc:
             log.warning("cannot build %s/%s: %s", platform, token, exc)
+
+    # Boards added by URL through the admin UI live in the database; they poll
+    # on the curated cadence, next to the YAML ones.
+    from app.sources.boards import ATS_KINDS, build_custom_boards
+
+    built.extend(build_custom_boards(client, kinds=ATS_KINDS))
     return built
 
 
@@ -197,6 +203,10 @@ def build_careers(config: dict, client: httpx.AsyncClient) -> list[BaseSource]:
             built.append(OfficialCareersSource(client=client, **kwargs))
         except TypeError as exc:
             log.warning("cannot build careers source %r: %s", entry.get("name"), exc)
+
+    from app.sources.boards import CAREERS_KIND, build_custom_boards
+
+    built.extend(build_custom_boards(client, kinds=(CAREERS_KIND,)))
     return built
 
 
