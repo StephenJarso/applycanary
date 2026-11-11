@@ -51,6 +51,19 @@ async def lifespan(app: FastAPI):  # noqa: ANN201, ARG001
     init_db()
     log.info("database ready at %s", settings.db_path)
 
+    # Curated programmes are seeded once, then owned by the table: publishing a
+    # new internship is an admin import rather than a deploy. Existing rows are
+    # never touched, so an admin's edits survive restarts.
+    from sqlmodel import Session
+
+    from app.db import engine
+    from app.opportunities import seed_programmes
+
+    with Session(engine) as session:
+        seeded = seed_programmes(session)
+    if seeded:
+        log.info("seeded %d curated programmes", seeded)
+
     if not settings.llm_enabled:
         log.warning(
             "no LLM API key configured (XAI_API_KEY, GEMINI_API_KEY, "

@@ -45,6 +45,10 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta, timezone
 
 import httpx
+from sqlmodel import Session, func, select
+
+from app.db import session_scope
+from app.models import ProgrammeEntry
 
 log = logging.getLogger(__name__)
 
@@ -1350,6 +1354,114 @@ CURATED_EVENTS: list[dict] = [
 ]
 
 
+# ------------------------------------------------------------ curated cards
+#
+# The lists above are the seed. They are copied into `programme_entry` on the
+# first boot and every public page reads the table afterwards, so publishing a
+# new internship or volunteer slot is a database change, not a deploy.
+
+_BUILTIN_CARDS: dict[str, list[dict]] = {
+    "Paid program": PAID_PROGRAMS,
+    "Internship": INTERNSHIPS,
+    "Volunteer": VOLUNTEER,
+}
+PROGRAMME_KINDS = tuple(_BUILTIN_CARDS)
+
+
+def programme_item(entry: ProgrammeEntry) -> dict:
+    """One table row in the shape the public pages expect."""
+    return {
+        "kind": entry.kind,
+        "title": entry.title,
+        "org": entry.org,
+        "when": entry.when,
+        "opens": entry.opens,
+        "closes": entry.closes,
+        "date": entry.date or "",
+        "steps": list(entry.steps or []),
+        "city": entry.city,
+        "tags": list(entry.tags or []),
+        "stipend": entry.stipend,
+        "source": entry.source,
+        "url": entry.url,
+        "desc": entry.desc,
+    }
+
+
+def programme_fields(payload: dict) -> dict:
+    """Whitelist an incoming dict down to the columns (seed and admin import)."""
+
+    def text(key: str) -> str:
+        value = payload.get(key)
+        return str(value).strip() if value not in (None, "") else ""
+
+    def optional(key: str) -> str | None:
+        value = text(key)
+        return value or None
+
+    def strings(key: str) -> list[str]:
+        value = payload.get(key) or []
+        if isinstance(value, str):
+            value = [value]
+        return [str(item).strip() for item in value if str(item).strip()]
+
+    return {
+        "kind": text("kind"),
+        "title": text("title"),
+        "org": text("org"),
+        "when": text("when"),
+        "opens": optional("opens"),
+        "closes": optional("closes"),
+        "date": optional("date"),
+        "steps": strings("steps"),
+        "city": text("city"),
+        "tags": strings("tags"),
+        "stipend": optional("stipend"),
+        "source": text("source"),
+        "url": text("url"),
+        "desc": text("desc"),
+    }
+
+
+def seed_programmes(session: Session) -> int:
+    """Copy the built-in cards into the table once. Returns rows inserted."""
+    if session.exec(select(func.count()).select_from(ProgrammeEntry)).one():
+        return 0
+    seen: set[tuple[str, str]] = set()
+    inserted = 0
+    for cards in _BUILTIN_CARDS.values():
+        for card in cards:
+            fields = programme_fields(card)
+            key = (fields["kind"], fields["title"])
+            if not fields["title"] or key in seen:
+                continue
+            seen.add(key)
+            session.add(ProgrammeEntry(**fields))
+            inserted += 1
+    session.commit()
+    return inserted
+
+
+def curated_cards(kind: str) -> list[dict]:
+    """Curated cards of one kind, read from the database.
+
+    Falls back to the built-in lists only while the table is completely empty
+    (a fresh database before the first seed). Once seeded, an empty kind stays
+    empty: deleting the last internship must not resurrect the constants.
+    """
+    try:
+        with session_scope() as session:
+            rows = session.exec(select(ProgrammeEntry)).all()
+            if not rows:
+                return list(_BUILTIN_CARDS.get(kind, []))
+            # Build the dicts while the rows are still attached: the JSON
+            # columns are lazy and the session is gone after this block.
+            return [programme_item(row) for row in rows if row.kind == kind]
+    except Exception as exc:  # noqa: BLE001 - a public page must still render
+        log.warning("programme table unavailable (%s); serving built-ins", exc)
+        return list(_BUILTIN_CARDS.get(kind, []))
+
+
 def _upcoming_curated_events() -> list[dict]:
     """Curated events that have not started yet, in the timezone they happen in.
 
@@ -1841,7 +1953,7 @@ async def get_opportunities() -> dict:
         feed = _feed
     # Curated events are static, so they are served even when the live feed is
     # down — a verified conference date does not depend on TGK being reachable.
-    items = [*feed.items, *_upcoming_curated_events(), *PAID_PROGRAMS]
+    items = [*feed.items, *_upcoming_curated_events(), *curated_cards("Paid program")]
     items.sort(key=_sort_key)
     return {
         "items": items,
@@ -2033,13 +2145,14 @@ async def get_internships() -> dict:
     except TimeoutError:  # the scheduled/manual refresh still lands in _live_feed
         feed = _live_feed
 
-    curated_titles = {str(item.get("title") or "").strip().lower() for item in INTERNSHIPS}
+    curated = curated_cards("Internship")
+    curated_titles = {str(item.get("title") or "").strip().lower() for item in curated}
     live = [
         item
         for item in feed.items
         if str(item.get("title") or "").strip().lower() not in curated_titles
     ]
-    items = [*INTERNSHIPS, *live]
+    items = [*curated, *live]
     items.sort(key=_sort_key)
     return {
         "items": items,
@@ -2092,14 +2205,15 @@ async def get_volunteers() -> dict:
     except TimeoutError:
         feed = _feed
 
-    curated_titles = {str(item.get("title") or "").strip().lower() for item in VOLUNTEER}
+    curated = curated_cards("Volunteer")
+    curated_titles = {str(item.get("title") or "").strip().lower() for item in curated}
     live = [
         item
         for item in _from_event_feed(feed.items)
         if str(item.get("title") or "").strip().lower() not in curated_titles
     ]
     return {
-        "items": sorted([*VOLUNTEER, *live], key=_sort_key),
+        "items": sorted([*curated, *live], key=_sort_key),
         "events_live": feed.ok,
         "events_updated_at": feed.fetched_at_wall,
     }

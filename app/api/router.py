@@ -38,6 +38,7 @@ from app.models import (
     JobScore,
     JobStatus,
     Profile,
+    ProgrammeEntry,
     PushSubscription,
     ResumeVersion,
     SourceRun,
@@ -2929,6 +2930,131 @@ def admin_update_llm_keys(
         "models_updated": models_updated,
         "note": "Keys and models updated live. Set environment variables to persist across server restarts.",
     }
+
+
+class ProgrammeIn(BaseModel):
+    """One curated card as an admin submits it, mirroring the public shape."""
+
+    kind: Literal["Paid program", "Internship", "Volunteer"]
+    title: str = Field(min_length=1, max_length=200)
+    org: str = ""
+    when: str = ""
+    opens: str | None = None
+    closes: str | None = None
+    date: str | None = None
+    steps: list[str] | None = None
+    city: str = ""
+    tags: list[str] = Field(default_factory=list)
+    stipend: str | None = None
+    source: str = "Admin"
+    url: str = ""
+    desc: str = ""
+
+
+class ProgrammeImportIn(BaseModel):
+    items: list[ProgrammeIn]
+
+
+class ProgrammeOut(ProgrammeIn):
+    id: int
+
+
+def _programme_out(row: ProgrammeEntry) -> ProgrammeOut:
+    from app.opportunities import programme_item
+
+    return ProgrammeOut(id=row.id or 0, **programme_item(row))
+
+
+def _upsert_programme(session: Session, body: ProgrammeIn) -> ProgrammeEntry:
+    """Create or update the row with the same kind and title."""
+    from app.opportunities import programme_fields
+
+    fields = programme_fields(body.model_dump())
+    if not fields["title"]:
+        raise HTTPException(422, "title cannot be blank")
+    url = fields["url"]
+    if url and not url.startswith(("http://", "https://")):
+        raise HTTPException(422, "url must start with http:// or https://")
+
+    row = session.exec(
+        select(ProgrammeEntry).where(
+            ProgrammeEntry.kind == fields["kind"],
+            ProgrammeEntry.title == fields["title"],
+        )
+    ).first()
+    if row is None:
+        row = ProgrammeEntry(**fields)
+    else:
+        for key, value in fields.items():
+            setattr(row, key, value)
+        row.updated_at = utcnow()
+    session.add(row)
+    session.commit()
+    session.refresh(row)
+    return row
+
+
+@router.get("/admin/programmes", response_model=list[ProgrammeOut])
+def admin_programmes(
+    session: Session = Depends(get_session),
+    _admin: User = Depends(require_admin),
+) -> list[ProgrammeOut]:
+    """Every curated card, including ones the public pages are not showing yet."""
+    rows = session.exec(
+        select(ProgrammeEntry).order_by(ProgrammeEntry.kind, ProgrammeEntry.title)
+    ).all()
+    return [_programme_out(row) for row in rows]
+
+
+@router.post("/admin/programmes", response_model=ProgrammeOut)
+def create_programme(
+    body: ProgrammeIn,
+    session: Session = Depends(get_session),
+    _admin: User = Depends(require_admin),
+) -> ProgrammeOut:
+    """Add a card, or update the one with the same kind and title."""
+    row = _upsert_programme(session, body)
+    return _programme_out(row)
+
+
+@router.post("/admin/programmes/import", response_model=ActionResult)
+def import_programmes(
+    body: ProgrammeImportIn,
+    session: Session = Depends(get_session),
+    _admin: User = Depends(require_admin),
+) -> ActionResult:
+    """Bulk add/update from a JSON list, so a whole cycle can be pasted in."""
+    created = updated = 0
+    for payload in body.items:
+        existed = session.exec(
+            select(ProgrammeEntry).where(
+                ProgrammeEntry.kind == payload.kind,
+                ProgrammeEntry.title == payload.title.strip(),
+            )
+        ).first()
+        _upsert_programme(session, payload)
+        created += existed is None
+        updated += existed is not None
+    return ActionResult(
+        ok=True,
+        message=f"Imported {len(body.items)} cards: {created} new, {updated} updated.",
+        detail={"created": created, "updated": updated},
+    )
+
+
+@router.delete("/admin/programmes/{entry_id}", response_model=ActionResult)
+def delete_programme(
+    entry_id: int,
+    session: Session = Depends(get_session),
+    _admin: User = Depends(require_admin),
+) -> ActionResult:
+    row = session.get(ProgrammeEntry, entry_id)
+    if row is None:
+        raise HTTPException(404, "programme not found")
+    title = row.title
+    session.delete(row)
+    session.commit()
+    return ActionResult(ok=True, message=f"Deleted {title}.")
 
 
 @router.get("/admin/source-runs")

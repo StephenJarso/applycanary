@@ -659,6 +659,41 @@ class WatchedOpportunity(SQLModel, table=True):
     created_at: datetime = Field(default_factory=utcnow)
 
 
+class ProgrammeEntry(SQLModel, table=True):
+    """One curated opportunity card: paid program, internship or volunteer slot.
+
+    These lived as Python literals in ``app/opportunities.py``, so publishing a
+    new programme meant a deploy. Rows are seeded from those literals once and
+    can then be added, imported or removed through the admin API — the source
+    of truth is this table, not the code.
+    """
+
+    __tablename__ = "programme_entry"
+    __table_args__ = (
+        UniqueConstraint("kind", "title", name="uq_programme_kind_title"),
+    )
+
+    id: int | None = Field(default=None, primary_key=True)
+    kind: str = Field(index=True)  # Paid program | Internship | Volunteer
+    title: str
+    org: str = ""
+    when: str = ""
+    opens: str | None = None
+    closes: str | None = None
+    # Volunteers count down to the event itself when no application window is
+    # published, so the card needs a date of its own.
+    date: str | None = None
+    steps: list[str] = Field(default_factory=list, sa_column=Column(JSON))
+    city: str = ""
+    tags: list[str] = Field(default_factory=list, sa_column=Column(JSON))
+    stipend: str | None = None
+    source: str = ""
+    url: str = ""
+    desc: str = Field(default="", sa_column=Column(Text))
+    created_at: datetime = Field(default_factory=utcnow)
+    updated_at: datetime = Field(default_factory=utcnow)
+
+
 class PushSubscription(SQLModel, table=True):
     """Browser Web Push subscription for one user device."""
 
