@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import logging
 import re
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any, Literal
 
@@ -118,6 +118,10 @@ class ReviewJobOut(JobOut):
     approval click so the user knows who receives their CV.
     """
     apply_email: str = ""
+    # Verdict from the cover-letter gate, including the posting's requirements.
+    # The queue is where applications are approved, so a blocked letter has to
+    # be visible here rather than only on the job page it links to.
+    letter: dict[str, Any] = Field(default_factory=dict)
 
 
 class ReviewListOut(BaseModel):
@@ -255,6 +259,8 @@ class ProfileOut(BaseModel):
     target_titles: list[str] = Field(default_factory=list)
     target_locations: list[str] = Field(default_factory=list)
     excluded_companies: list[str] = Field(default_factory=list)
+    # Company (lowercased) -> ISO date the cooldown lifts.
+    company_cooldowns: dict[str, str] = Field(default_factory=dict)
     work_authorization: str = ""
     years_experience: int | None = None
     remote_only: bool = False
@@ -1139,7 +1145,7 @@ def review_queue(
 ) -> ReviewListOut:
     """Applications prepared but not yet submitted."""
     stmt = (
-        select(Job, JobScore, UserJob)
+        select(Job, JobScore, UserJob, Application)
         .join(
             Application,
             (Application.job_id == Job.id) & (Application.user_id == user.id),
@@ -1168,8 +1174,9 @@ def review_queue(
             ReviewJobOut(
                 **_job_out(job, score, uj).model_dump(),
                 apply_email=application_email(job),
+                letter=app_row.cover_letter_check or {},
             )
-            for job, score, uj in rows
+            for job, score, uj, app_row in rows
         ],
         total=total,
     )
@@ -1386,6 +1393,7 @@ def get_profile(
         target_titles=list(profile.target_titles or []),
         target_locations=list(profile.target_locations or []),
         excluded_companies=list(profile.excluded_companies or []),
+        company_cooldowns=dict(profile.company_cooldowns or {}),
         work_authorization=profile.work_authorization,
         years_experience=profile.years_experience,
         remote_only=profile.remote_only,
@@ -1761,6 +1769,90 @@ async def submit(
         ok=result.ok,
         message=result.confirmation or result.error,
         detail={"method": str(result.method), "dry_run": result.dry_run},
+    )
+
+
+class CooldownIn(BaseModel):
+    """How long to hide a company. 0 clears an existing cooldown."""
+
+    months: int = Field(12, ge=0, le=24)
+
+
+@router.post("/jobs/{job_id}/cooldown", response_model=ActionResult)
+async def set_company_cooldown(
+    job_id: int,
+    body: CooldownIn,
+    session: Session = Depends(get_session),
+    user: User = Depends(current_user),
+) -> ActionResult:
+    """Hide a company for a while, or clear the block.
+
+    Rejections routinely say "apply again in 9-12 months", but
+    ``excluded_companies`` is permanent, so the only way to act on that was to
+    lose the company for good. The cooldown carries an expiry and is enforced by
+    the same tier-1 filter as an exclusion, so it lapses on its own.
+    """
+    job = session.get(Job, job_id)
+    if job is None:
+        raise HTTPException(404, "job not found")
+    profile = _profile_or_404(session, user)
+    key = (job.company or "").strip().lower()
+    if not key:
+        raise HTTPException(400, "this posting has no company name")
+
+    cooldowns = dict(profile.company_cooldowns or {})
+    if body.months <= 0:
+        cooldowns.pop(key, None)
+        message = f"Cleared the cooldown on {job.company}."
+        until = ""
+    else:
+        until = (date.today() + timedelta(days=30 * body.months)).isoformat()
+        cooldowns[key] = until
+        message = f"{job.company} hidden until {until}."
+    profile.company_cooldowns = cooldowns
+    session.add(profile)
+    session.commit()
+
+    # Stored scores keep yesterday's verdict; re-score so the company's other
+    # postings leave the feed now instead of after the next discovery cycle.
+    from app.pipeline.score import rescore_scored
+
+    rescored = await rescore_scored(session, user_id=user.id, limit=500)
+    return ActionResult(
+        ok=True,
+        message=message,
+        detail={"until": until, "rescored": rescored},
+    )
+
+
+class CooldownClearIn(BaseModel):
+    company: str
+
+
+@router.post("/profile/cooldowns/clear", response_model=ActionResult)
+async def clear_company_cooldown(
+    body: CooldownClearIn,
+    session: Session = Depends(get_session),
+    user: User = Depends(current_user),
+) -> ActionResult:
+    """Lift a cooldown early, so a company can be scored again immediately."""
+    profile = _profile_or_404(session, user)
+    key = body.company.strip().lower()
+    cooldowns = dict(profile.company_cooldowns or {})
+    if key not in cooldowns:
+        raise HTTPException(404, "no cooldown for that company")
+    cooldowns.pop(key)
+    profile.company_cooldowns = cooldowns
+    session.add(profile)
+    session.commit()
+
+    from app.pipeline.score import rescore_scored
+
+    rescored = await rescore_scored(session, user_id=user.id, limit=500)
+    return ActionResult(
+        ok=True,
+        message=f"Cleared the cooldown on {body.company}.",
+        detail={"rescored": rescored},
     )
 
 

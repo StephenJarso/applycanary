@@ -246,6 +246,10 @@ export default function ProfilePage() {
     onSuccess: invalidate,
   });
   const discover = useMutation({ mutationFn: api.discover, onSuccess: invalidate });
+  const clearCooldown = useMutation({
+    mutationFn: (company: string) => api.clearCooldown(company),
+    onSuccess: invalidate,
+  });
 
   const ats = useQuery({
     queryKey: ["ats"],
@@ -723,6 +727,34 @@ export default function ProfilePage() {
             />
           </div>
         ))}
+
+        {Object.keys(data.company_cooldowns ?? {}).length > 0 && (
+          <div className="field">
+            <label>Company cooldowns</label>
+            <p className="cell-dim">
+              Not scored until these dates. Set one from a rejected application; a
+              cooldown lapses on its own, unlike the exclusion list.
+            </p>
+            <ul className="prose">
+              {Object.entries(data.company_cooldowns)
+                .sort(([a], [b]) => a.localeCompare(b))
+                .map(([company, until]) => (
+                  <li key={company}>
+                    <strong style={{ textTransform: "capitalize" }}>{company}</strong>{" "}
+                    until {until}{" "}
+                    <button
+                      type="button"
+                      className="btn-ghost btn-sm"
+                      disabled={clearCooldown.isPending}
+                      onClick={() => clearCooldown.mutate(company)}
+                    >
+                      Clear
+                    </button>
+                  </li>
+                ))}
+            </ul>
+          </div>
+        )}
 
         <button type="submit" className="btn-primary" disabled={save.isPending}>
           {save.isPending && <span className="spinner" />} Save profile

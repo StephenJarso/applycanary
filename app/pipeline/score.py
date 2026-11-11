@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
+from datetime import date
 
 from sqlmodel import Session, select
 
@@ -58,12 +59,32 @@ class Decision:
 # ---------------------------------------------------------------- tier 1
 
 
+def active_cooldown(profile: Profile, company: str) -> str:
+    """The date a company's cooldown ends, or "" when it is not active.
+
+    Stored as a date per company rather than a flag, so it expires without a
+    background job and the disqualifier can quote the date it lifts.
+    """
+    until = (profile.company_cooldowns or {}).get((company or "").strip().lower(), "")
+    if not until:
+        return ""
+    try:
+        return until if date.fromisoformat(until) > date.today() else ""
+    except ValueError:
+        # A malformed date must not hide a company silently.
+        return ""
+
+
 def hard_disqualifier(job: Job, profile: Profile) -> str:
     """Return a reason string if the job is categorically unsuitable, else ""."""
     if profile.excluded_companies:
         excluded = {c.strip().lower() for c in profile.excluded_companies if c.strip()}
         if job.company.strip().lower() in excluded:
             return f"{job.company} is on your excluded list"
+
+    cooldown_until = active_cooldown(profile, job.company)
+    if cooldown_until:
+        return f"{job.company} is cooling down until {cooldown_until}"
 
     if profile.remote_only and not job.is_remote:
         return "role is not remote and you set remote_only"

@@ -159,6 +159,13 @@ class Profile(SQLModel, table=True):
     work_authorization: str = ""
     years_experience: int | None = None
     excluded_companies: list[str] = Field(default_factory=list, sa_column=Column(JSON))
+    # Company (lowercased) -> ISO date it becomes visible again. A rejection
+    # usually comes with "apply again in 9-12 months"; `excluded_companies` is
+    # permanent, so acting on that advice used to mean losing the company for
+    # good. Enforced by the same tier-1 filter as exclusions.
+    company_cooldowns: dict[str, str] = Field(
+        default_factory=dict, sa_column=Column(JSON)
+    )
 
     github_evidence: dict = Field(default_factory=dict, sa_column=Column(JSON))
     github_synced_at: datetime | None = None

@@ -60,6 +60,10 @@ export default function JobDetail() {
     onSuccess: refresh,
   });
   const prep = useMutation({ mutationFn: () => api.prep(jobId), onSuccess: refresh });
+  const cooldown = useMutation({
+    mutationFn: () => api.cooldown(jobId),
+    onSuccess: refresh,
+  });
 
   if (isPending) return <Loading label="Loading job" />;
   if (error) return <ErrorBox error={error} />;
@@ -69,7 +73,7 @@ export default function JobDetail() {
     job.salary_min, job.salary_max, job.salary_currency, job.salary_is_estimate,
   );
   const version = job.resume_version;
-  const busy = tailor.isPending || submit.isPending || skip.isPending || save.isPending || setApplyEmail.isPending || prep.isPending;
+  const busy = tailor.isPending || submit.isPending || skip.isPending || save.isPending || setApplyEmail.isPending || prep.isPending || cooldown.isPending;
   const blocked = version?.truthcheck_passed === false;
   const letterCheck = job.application?.cover_letter_check;
 
@@ -225,10 +229,10 @@ export default function JobDetail() {
         )}
       </div>
 
-      {[tailor, submit, skip, prep].map((m, i) =>
+      {[tailor, submit, skip, prep, cooldown].map((m, i) =>
         m.isError ? <ErrorBox key={i} error={m.error} /> : null,
       )}
-      {[tailor, submit, prep].map((m, i) =>
+      {[tailor, submit, prep, cooldown].map((m, i) =>
         m.isSuccess ? (
           <div key={i} className={`banner banner-${m.data.ok ? "ok" : "warn"}`} role="status">
             {m.data.message}
@@ -382,6 +386,29 @@ export default function JobDetail() {
             )}
             <dt>Attempts</dt><dd className="num">{job.application.attempts}</dd>
           </dl>
+
+          {job.application.submitted_at &&
+          (job.application.outcome === "rejected" ||
+            job.application.outcome === "ghosted") && (
+            <div className="field" style={{ marginTop: 12 }}>
+              <label>Company cooldown</label>
+              <p className="muted" style={{ marginTop: 4 }}>
+                Rejection often comes with &ldquo;apply again in 9&ndash;12
+                months&rdquo;. Hiding the company for a year acts on that without
+                putting it on the permanent exclusion list.
+              </p>
+              <div className="artifact-actions">
+                <button
+                  type="button"
+                  className="btn btn-sm"
+                  disabled={cooldown.isPending}
+                  onClick={() => cooldown.mutate()}
+                >
+                  Hide {job.company} for 12 months
+                </button>
+              </div>
+            </div>
+          )}
 
           {job.application.cover_letter ? (
             <div className="field" style={{ marginTop: 12 }}>

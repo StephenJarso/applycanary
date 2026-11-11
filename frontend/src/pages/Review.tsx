@@ -84,6 +84,24 @@ export default function Review() {
                     {job.score?.missing_keywords.length ? (
                       <Chips items={job.score.missing_keywords} variant="miss" max={4} />
                     ) : null}
+                    {job.letter?.findings?.length || job.letter?.requirements?.questions?.length ? (
+                      <div className="cell-dim" style={{ fontSize: 12, marginTop: 4 }}>
+                        {job.letter?.findings?.length ? (
+                          <>
+                            <span className={`chip ${job.letter.passed ? "chip-hit" : "chip-miss"}`}>
+                              {job.letter.passed ? "letter passed" : "letter blocked"}
+                            </span>{" "}
+                            {job.letter.findings.find((f) => f.severity === "block")?.message ||
+                              job.letter.findings?.[0]?.message}
+                          </>
+                        ) : (
+                          <>
+                            Asks {job.letter?.requirements?.questions?.length} question(s) and a {" "}
+                            {job.letter?.requirements?.word_limit}-word letter
+                          </>
+                        )}
+                      </div>
+                    ) : null}
                     {job.apply_email ? (
                       <div className="cell-dim" style={{ fontSize: 12 }}>
                         Will email <strong>{job.apply_email}</strong>

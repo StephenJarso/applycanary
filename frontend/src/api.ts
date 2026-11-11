@@ -169,6 +169,12 @@ export interface JobList {
 export interface ReviewJob extends Job {
   /** Address an email application would be sent to; empty for form-only postings. */
   apply_email: string;
+  /** Cover-letter verdict; absent on applications prepared before the gate. */
+  letter?: {
+    passed?: boolean;
+    findings?: LetterCheckFinding[];
+    requirements?: ApplicationRequirements;
+  };
 }
 
 export interface ReviewList {
@@ -269,6 +275,8 @@ export interface Profile {
   target_titles: string[];
   target_locations: string[];
   excluded_companies: string[];
+  /** Company (lowercased) -> ISO date the cooldown lifts. */
+  company_cooldowns: Record<string, string>;
   work_authorization: string;
   years_experience: number | null;
   remote_only: boolean;
@@ -682,6 +690,17 @@ export const api = {
       body: JSON.stringify({ apply_email: email }),
     }),
   prep: (id: number) => request<ActionResult>(`/jobs/${id}/prep`, { method: "POST" }),
+  /** Hide a company for a while (0 months clears the block). */
+  cooldown: (id: number, months = 12) =>
+    request<ActionResult>(`/jobs/${id}/cooldown`, {
+      method: "POST",
+      body: JSON.stringify({ months }),
+    }),
+  clearCooldown: (company: string) =>
+    request<ActionResult>("/profile/cooldowns/clear", {
+      method: "POST",
+      body: JSON.stringify({ company }),
+    }),
 
   poll: () => request<ActionResult>("/actions/poll", { method: "POST" }),
   score: () => request<ActionResult>("/actions/score", { method: "POST" }),
