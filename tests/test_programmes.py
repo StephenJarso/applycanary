@@ -32,7 +32,9 @@ def db():
     yield
     with Session(engine) as session:
         for row in session.exec(
-            select(ProgrammeEntry).where(ProgrammeEntry.title == TITLE)
+            select(ProgrammeEntry).where(
+                ProgrammeEntry.title.in_([TITLE, f"{TITLE} edited"])
+            )
         ).all():
             session.delete(row)
         for user in session.exec(
@@ -152,6 +154,47 @@ def test_a_non_http_url_is_rejected(admin_client):
 
 def test_deleting_a_missing_card_is_a_404(admin_client):
     assert admin_client.delete("/api/admin/programmes/999999").status_code == 404
+
+
+def test_admin_can_edit_a_card_in_place(admin_client):
+    created = admin_client.post(
+        "/api/admin/programmes", json={"kind": "Internship", "title": TITLE}
+    ).json()
+
+    response = admin_client.patch(
+        f"/api/admin/programmes/{created['id']}",
+        json={"org": "Renamed Org", "closes": "2020-01-01"},
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["org"] == "Renamed Org"
+    assert body["expired"] is True
+
+
+def test_editing_into_another_card_is_a_conflict(admin_client):
+    first = admin_client.post(
+        "/api/admin/programmes", json={"kind": "Internship", "title": TITLE}
+    ).json()
+    second = admin_client.post(
+        "/api/admin/programmes",
+        json={"kind": "Internship", "title": f"{TITLE} edited"},
+    ).json()
+
+    response = admin_client.patch(
+        f"/api/admin/programmes/{second['id']}",
+        json={"title": first["title"]},
+    )
+    assert response.status_code == 409
+
+
+def test_editing_to_a_blank_title_is_rejected(admin_client):
+    created = admin_client.post(
+        "/api/admin/programmes", json={"kind": "Internship", "title": TITLE}
+    ).json()
+    response = admin_client.patch(
+        f"/api/admin/programmes/{created['id']}", json={"title": "  "}
+    )
+    assert response.status_code == 422
 
 
 class TestDeadlineState:

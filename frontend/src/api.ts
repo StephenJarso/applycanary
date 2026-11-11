@@ -336,6 +336,9 @@ export interface ProgrammeCard {
   source: string;
   url: string;
   desc: string;
+  /** Server verdict on the deadline, included for the admin table. */
+  expired?: boolean;
+  days_left?: number | null;
 }
 
 /** A board added by URL; it polls like a companies.yaml entry. */
@@ -797,6 +800,11 @@ export const api = {
     request<ActionResult>("/admin/programmes/import", {
       method: "POST",
       body: JSON.stringify({ items }),
+    }),
+  updateProgramme: (id: number, payload: Partial<Omit<ProgrammeCard, "id">>) =>
+    request<ProgrammeCard>(`/admin/programmes/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
     }),
   deleteProgramme: (id: number) =>
     request<ActionResult>(`/admin/programmes/${id}`, { method: "DELETE" }),

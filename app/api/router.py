@@ -3153,6 +3153,8 @@ class ProgrammeImportIn(BaseModel):
 
 class ProgrammeOut(ProgrammeIn):
     id: int
+    expired: bool = False
+    days_left: int | None = None
 
 
 def _programme_out(row: ProgrammeEntry) -> ProgrammeOut:
@@ -3236,6 +3238,51 @@ def import_programmes(
         message=f"Imported {len(body.items)} cards: {created} new, {updated} updated.",
         detail={"created": created, "updated": updated},
     )
+
+
+@router.patch("/admin/programmes/{entry_id}", response_model=ProgrammeOut)
+def update_programme(
+    entry_id: int,
+    body: dict[str, Any] = Body(...),
+    session: Session = Depends(get_session),
+    _admin: User = Depends(require_admin),
+) -> ProgrammeOut:
+    """Edit part of a card in place, so a typo does not need a JSON repaste."""
+    from app.opportunities import PROGRAMME_KINDS, programme_fields, programme_item
+
+    row = session.get(ProgrammeEntry, entry_id)
+    if row is None:
+        raise HTTPException(404, "programme not found")
+
+    merged = programme_item(row)
+    merged.update({key: value for key, value in body.items() if key in merged})
+    fields = programme_fields(merged)
+
+    if fields["kind"] not in PROGRAMME_KINDS:
+        raise HTTPException(422, f"kind must be one of {', '.join(PROGRAMME_KINDS)}")
+    if not fields["title"]:
+        raise HTTPException(422, "title cannot be blank")
+    url = fields["url"]
+    if url and not url.startswith(("http://", "https://")):
+        raise HTTPException(422, "url must start with http:// or https://")
+
+    clash = session.exec(
+        select(ProgrammeEntry).where(
+            ProgrammeEntry.kind == fields["kind"],
+            ProgrammeEntry.title == fields["title"],
+            ProgrammeEntry.id != entry_id,
+        )
+    ).first()
+    if clash is not None:
+        raise HTTPException(409, "another card already has that kind and title")
+
+    for key, value in fields.items():
+        setattr(row, key, value)
+    row.updated_at = utcnow()
+    session.add(row)
+    session.commit()
+    session.refresh(row)
+    return _programme_out(row)
 
 
 @router.delete("/admin/programmes/{entry_id}", response_model=ActionResult)

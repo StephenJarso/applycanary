@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   api,
@@ -6,6 +6,7 @@ import {
   type BoardPreview,
   type EmailDeliveryReport,
   type FeedbackItem,
+  type ProgrammeCard,
 } from "./api";
 import { ErrorBox, Loading } from "./components";
 import { useAuth } from "./context/AuthContext";
@@ -28,6 +29,8 @@ export function AdminPanel() {
   const [boardPreview, setBoardPreview] = useState<BoardPreview | null>(null);
   const [boardLabels, setBoardLabels] = useState<Record<number, string>>({});
   const [programmeJson, setProgrammeJson] = useState("");
+  const [editingProgramme, setEditingProgramme] = useState<number | null>(null);
+  const [programmeDraft, setProgrammeDraft] = useState<Partial<ProgrammeCard>>({});
   const [contentMsg, setContentMsg] = useState("");
   const [feedbackStatus, setFeedbackStatus] = useState<string>("all");
   const [testedProviders, setTestedProviders] = useState<Record<string, { ok: boolean; msg: string }>>({});
@@ -252,6 +255,26 @@ export function AdminPanel() {
     onError: (err) =>
       setContentMsg(
         `Import failed: ${err instanceof Error ? err.message : String(err)}`,
+      ),
+  });
+  const updateProgramme = useMutation({
+    mutationFn: ({
+      id,
+      payload,
+    }: {
+      id: number;
+      payload: Partial<ProgrammeCard>;
+    }) => api.updateProgramme(id, payload),
+    onSuccess: (card) => {
+      setEditingProgramme(null);
+      setProgrammeDraft({});
+      setContentMsg(`Updated ${card.title}.`);
+      void qc.invalidateQueries({ queryKey: ["admin", "programmes"] });
+      void qc.invalidateQueries({ queryKey: ["opportunities"] });
+    },
+    onError: (err) =>
+      setContentMsg(
+        `Update failed: ${err instanceof Error ? err.message : String(err)}`,
       ),
   });
   const removeProgramme = useMutation({
@@ -1282,29 +1305,146 @@ export function AdminPanel() {
                 </thead>
                 <tbody>
                   {(programmesQuery.data ?? []).map((card) => (
-                    <tr key={card.id}>
-                      <td className="cell-dim">{card.kind}</td>
-                      <td>
-                        {card.url ? (
-                          <a href={card.url} target="_blank" rel="noreferrer">
-                            {card.title}
-                          </a>
-                        ) : (
-                          card.title
-                        )}
-                      </td>
-                      <td className="cell-dim">{card.org}</td>
-                      <td>
-                        <button
-                          type="button"
-                          className="btn-ghost"
-                          style={{ fontSize: 11, padding: "2px 8px" }}
-                          onClick={() => removeProgramme.mutate(card.id)}
-                        >
-                          Delete
-                        </button>
-                      </td>
-                    </tr>
+                    <Fragment key={card.id}>
+                      <tr>
+                        <td className="cell-dim">{card.kind}</td>
+                        <td>
+                          {card.url ? (
+                            <a href={card.url} target="_blank" rel="noreferrer">
+                              {card.title}
+                            </a>
+                          ) : (
+                            card.title
+                          )}
+                          {card.expired && (
+                            <span
+                              className="chip chip-warn"
+                              style={{ fontSize: 10.5, marginLeft: 6 }}
+                            >
+                              closed
+                            </span>
+                          )}
+                        </td>
+                        <td className="cell-dim">{card.org}</td>
+                        <td style={{ whiteSpace: "nowrap" }}>
+                          <button
+                            type="button"
+                            className="btn-ghost"
+                            style={{ fontSize: 11, padding: "2px 8px" }}
+                            onClick={() => {
+                              setEditingProgramme(card.id);
+                              setProgrammeDraft({});
+                            }}
+                          >
+                            Edit
+                          </button>{" "}
+                          <button
+                            type="button"
+                            className="btn-ghost"
+                            style={{ fontSize: 11, padding: "2px 8px" }}
+                            onClick={() => removeProgramme.mutate(card.id)}
+                          >
+                            Delete
+                          </button>
+                        </td>
+                      </tr>
+                      {editingProgramme === card.id && (
+                        <tr>
+                          <td colSpan={4}>
+                            <div
+                              style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "end" }}
+                            >
+                              <label style={{ fontSize: 11 }}>
+                                Title
+                                <input
+                                  type="text"
+                                  value={programmeDraft.title ?? card.title}
+                                  onChange={(e) =>
+                                    setProgrammeDraft({
+                                      ...programmeDraft,
+                                      title: e.target.value,
+                                    })
+                                  }
+                                  style={{ display: "block", fontSize: 12, padding: "3px 8px", minWidth: 220 }}
+                                />
+                              </label>
+                              <label style={{ fontSize: 11 }}>
+                                Org
+                                <input
+                                  type="text"
+                                  value={programmeDraft.org ?? card.org}
+                                  onChange={(e) =>
+                                    setProgrammeDraft({
+                                      ...programmeDraft,
+                                      org: e.target.value,
+                                    })
+                                  }
+                                  style={{ display: "block", fontSize: 12, padding: "3px 8px", minWidth: 140 }}
+                                />
+                              </label>
+                              <label style={{ fontSize: 11 }}>
+                                Closes (ISO date)
+                                <input
+                                  type="date"
+                                  value={
+                                    programmeDraft.closes ?? card.closes ?? ""
+                                  }
+                                  onChange={(e) =>
+                                    setProgrammeDraft({
+                                      ...programmeDraft,
+                                      closes: e.target.value || null,
+                                    })
+                                  }
+                                  style={{ display: "block", fontSize: 12, padding: "3px 8px" }}
+                                />
+                              </label>
+                              <label style={{ fontSize: 11, flex: "1 1 220px" }}>
+                                URL
+                                <input
+                                  type="url"
+                                  value={programmeDraft.url ?? card.url}
+                                  onChange={(e) =>
+                                    setProgrammeDraft({
+                                      ...programmeDraft,
+                                      url: e.target.value,
+                                    })
+                                  }
+                                  style={{ display: "block", fontSize: 12, padding: "3px 8px", width: "100%" }}
+                                />
+                              </label>
+                              <button
+                                type="button"
+                                className="btn-primary"
+                                style={{ fontSize: 11, padding: "4px 10px" }}
+                                disabled={
+                                  Object.keys(programmeDraft).length === 0 ||
+                                  updateProgramme.isPending
+                                }
+                                onClick={() =>
+                                  updateProgramme.mutate({
+                                    id: card.id,
+                                    payload: programmeDraft,
+                                  })
+                                }
+                              >
+                                {updateProgramme.isPending ? "Saving…" : "Save"}
+                              </button>
+                              <button
+                                type="button"
+                                className="btn-ghost"
+                                style={{ fontSize: 11, padding: "4px 10px" }}
+                                onClick={() => {
+                                  setEditingProgramme(null);
+                                  setProgrammeDraft({});
+                                }}
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
                   ))}
                   {!programmesQuery.data?.length && (
                     <tr>
