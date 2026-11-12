@@ -1785,6 +1785,44 @@ VOLUNTEER += [
     },
     {
         "kind": "Volunteer",
+        "title": "Wikimedia Kenya User Group — edit-a-thons & monthly meetup",
+        "org": "Wikimedia Community User Group Kenya",
+        "when": "Monthly Kikao (last Thursday) · campaigns through the year",
+        "opens": None,
+        "closes": None,
+        "steps": [
+            "Add your username to the group's join list on Meta-Wiki",
+            "Turn up to the monthly Kikao/meetup, held on the last Thursday",
+            "Join a campaign: Wiki Loves Africa, Wiki Loves Earth, SheSaid, Afrocine",
+            "Apply for a Wikimania scholarship when the annual call opens",
+        ],
+        "city": "Nairobi",
+        "tags": [
+            "Volunteer",
+            "Community",
+            "Open knowledge",
+            "Wikipedia",
+            "Remote",
+            "Nairobi",
+        ],
+        "stipend": (
+            "Unpaid + benefits: scholarships can cover travel and accommodation "
+            "for Wikimania and campaign events"
+        ),
+        "source": "Official",
+        "url": "https://meta.wikimedia.org/wiki/Wikimedia_Community_User_Group_Kenya",
+        "desc": (
+            "A recognised Wikimedia affiliate that documents Kenya and Africa "
+            "on Wikipedia, Wikidata and Commons. Work is campaign-shaped: "
+            "photo contests, edit-a-thons and translation drives, plus a "
+            "monthly community meetup in Nairobi. Wikimedia's scholarship "
+            "programme funds travel and accommodation to Wikimania, and the "
+            "group has used movement grants to cover facilitators' costs — "
+            "the volunteer route is free to join and needs no CV."
+        ),
+    },
+    {
+        "kind": "Volunteer",
         "title": "OpenStreetMap Kenya mapping community",
         "org": "OpenStreetMap",
         "when": "Rolling — contribute any time",
