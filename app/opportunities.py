@@ -1070,6 +1070,34 @@ VOLUNTEER: list[dict] = [
     },
     {
         "kind": "Volunteer",
+        "title": "PyCon Kenya — volunteer crew & speakers",
+        "org": "PyCon Kenya",
+        "when": "Annual · Nairobi (2026 edition ran 2–3 Oct)",
+        "opens": None,
+        "closes": None,
+        "steps": [
+            "Watch pycon.ke and the community Discord for the next edition's call",
+            "Submit a talk through the call for proposals on cfp.pycon.ke",
+            "First-time speakers can send an early draft for review before the CFP closes",
+            "Email info@pycon.ke to join the organising crew",
+        ],
+        "city": "Nairobi",
+        "tags": ["Volunteer", "Speaker", "Python", "Community", "On-site", "Nairobi"],
+        "stipend": "Unpaid volunteer crew; perks are announced with each call",
+        "source": "Official",
+        "url": "https://www.pycon.ke/",
+        "desc": (
+            "Kenya's own Python conference, run entirely by volunteers: the "
+            "2026 edition was held on 2–3 October at the Ngong Hills Hotel in "
+            "Nairobi with talks, workshops and a beginner-friendly track. The "
+            "CFP takes 30-minute talks, 5-minute lightning talks and "
+            "90-minute workshops, and offers proposal mentoring for first-time "
+            "speakers. Next edition's dates and call are not published yet, so "
+            "confirm on pycon.ke before planning around it."
+        ),
+    },
+    {
+        "kind": "Volunteer",
         "title": "Learning Lions — on-site volunteer (2–6 months)",
         "org": "Learning Lions",
         "when": "2–6 months on-site · rolling intakes",
