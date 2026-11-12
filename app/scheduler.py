@@ -447,7 +447,13 @@ async def job_refresh_opportunities() -> None:
 
 
 async def _send_deadline_pushes() -> None:
-    """Fire Web Push notifications for watched opportunities closing in 5 days."""
+    """Push watched opportunities whose window closes or opens in 7 days.
+
+    An announced opening deserves the alert as much as a closing date: by the
+    time a programme appears in the search it is usually either closed or the
+    window is days from shutting. Both dates are stored on the watch row so the
+    message can say which one it is.
+    """
     from datetime import date, timedelta
 
     from sqlmodel import Session as SyncSession
@@ -455,19 +461,31 @@ async def _send_deadline_pushes() -> None:
     from app.db import engine
 
     today = date.today()
-    target_date = (today + timedelta(days=5)).isoformat()
+    target_date = (today + timedelta(days=7)).isoformat()
 
     sent = 0
     stale_ids: list[int] = []
 
     with SyncSession(engine) as session:
-        watched = session.exec(
+        closing = session.exec(
             select(WatchedOpportunity).where(
                 WatchedOpportunity.deadline == target_date
             )
         ).all()
+        opening = session.exec(
+            select(WatchedOpportunity).where(
+                WatchedOpportunity.opens == target_date
+            )
+        ).all()
 
-        for w in watched:
+        # A row can carry both dates; one notification per row per day is enough.
+        reminders: dict[int, tuple[WatchedOpportunity, str, str]] = {}
+        for w in closing:
+            reminders[w.id or 0] = (w, "closes", w.deadline or target_date)
+        for w in opening:
+            reminders.setdefault(w.id or 0, (w, "opens", w.opens or target_date))
+
+        for w, verb, when in reminders.values():
             # Skip if already notified today
             if w.notified_at and w.notified_at.date() >= today:
                 continue
@@ -482,8 +500,11 @@ async def _send_deadline_pushes() -> None:
                     endpoint=sub.endpoint,
                     p256dh=sub.p256dh,
                     auth=sub.auth,
-                    title="ApplyCanary — Deadline in 5 days",
-                    body=f"{w.opp_title} ({w.opp_org}) closes on {w.deadline}. Don't miss it!",
+                    title=f"ApplyCanary — Applications {verb} in 7 days",
+                    body=(
+                        f"{w.opp_title} ({w.opp_org}) {verb} on {when}. "
+                        + ("Get your application ready." if verb == "opens" else "Don't miss it!")
+                    ),
                     url=w.opp_url,
                 )
                 if result == "ok":

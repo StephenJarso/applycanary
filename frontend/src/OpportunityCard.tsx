@@ -195,6 +195,7 @@ interface OpportunityCardProps {
     org: string,
     kind: string,
     deadline: string | null,
+    opens: string | null,
     currentlyWatched: boolean,
   ) => void;
 }
@@ -239,12 +240,12 @@ export function OpportunityCard({
           <button
             type="button"
             className={`opp-watch-btn${isWatched ? " opp-watch-active" : ""}`}
-            title={isWatched ? "Remove deadline alert" : "Get notified 5 days before deadline"}
-            aria-label={isWatched ? "Remove deadline alert" : "Notify me of deadline"}
+            title={isWatched ? "Remove deadline alert" : "Get notified 7 days before the window opens or closes"}
+            aria-label={isWatched ? "Remove deadline alert" : "Notify me about this deadline"}
             onClick={(e) => {
               e.preventDefault();
               e.stopPropagation();
-              onToggleWatch(item.url, item.title, item.org, item.kind, deadline, isWatched);
+              onToggleWatch(item.url, item.title, item.org, item.kind, deadline, item.opens ?? null, isWatched);
             }}
           >
             {isWatched ? "🔔" : "🔕"}

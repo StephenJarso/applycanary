@@ -1045,6 +1045,7 @@ export interface WatchedOpp {
   opp_org: string;
   opp_kind: string;
   deadline: string | null;
+  opens: string | null;
   created_at: string;
 }
 
@@ -1054,6 +1055,7 @@ export const watchOpp = (data: {
   org: string;
   kind: string;
   deadline: string | null;
+  opens?: string | null;
 }) => request<{ ok: boolean }>("POST", "/api/opportunities/watch", data);
 
 export const unwatchOpp = (url: string) =>

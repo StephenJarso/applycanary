@@ -48,6 +48,7 @@ export default function Volunteers({ embedded = false }: { embedded?: boolean })
       org: string;
       kind: string;
       deadline: string | null;
+      opens: string | null;
       isWatched: boolean;
     }) => {
       if (args.isWatched) {
@@ -63,6 +64,7 @@ export default function Volunteers({ embedded = false }: { embedded?: boolean })
           org: args.org,
           kind: args.kind,
           deadline: args.deadline,
+          opens: args.opens,
         });
       }
     },
@@ -276,13 +278,14 @@ export default function Volunteers({ embedded = false }: { embedded?: boolean })
                     isWatched={watchedUrls.has(item.url)}
                     onToggleWatch={
                       user
-                        ? (url, title, org, kind, deadline, isWatched) =>
+                        ? (url, title, org, kind, deadline, opens, isWatched) =>
                             toggleWatchMut.mutate({
                               url,
                               title,
                               org,
                               kind,
                               deadline,
+                              opens,
                               isWatched,
                             })
                         : undefined

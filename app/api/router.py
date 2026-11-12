@@ -2530,6 +2530,7 @@ class WatchIn(BaseModel):
     org: str = ""
     kind: str = ""
     deadline: str | None = None
+    opens: str | None = None
 
 
 @router.get("/push/vapid-public-key")
@@ -2624,6 +2625,7 @@ def watch_opp(
                 opp_org=body.org,
                 opp_kind=body.kind,
                 deadline=body.deadline,
+                opens=body.opens,
             )
         )
     else:
@@ -2634,6 +2636,7 @@ def watch_opp(
         existing.opp_org = body.org or existing.opp_org
         existing.opp_kind = body.kind or existing.opp_kind
         existing.deadline = body.deadline or existing.deadline
+        existing.opens = body.opens or existing.opens
         session.add(existing)
     session.commit()
     return {"ok": True, "watched": True}
@@ -2687,6 +2690,7 @@ def _opportunity_row(row: WatchedOpportunity) -> dict:
         "opp_org": row.opp_org,
         "opp_kind": row.opp_kind,
         "deadline": row.deadline,
+        "opens": row.opens,
         "watched": row.watched,
         "applied_at": row.applied_at,
         "response_received": row.response_received,

@@ -144,6 +144,7 @@ def test_watch_and_unwatch_opportunity(clean_db):
         "org": "TechCorp",
         "kind": "Internship",
         "deadline": "2026-12-01",
+        "opens": "2026-11-01",
     }
     res = client1.post("/api/opportunities/watch", json=opp_data)
     assert res.status_code == 200
@@ -161,6 +162,7 @@ def test_watch_and_unwatch_opportunity(clean_db):
     assert len(items1) == 1
     assert items1[0]["opp_url"] == "https://example.com/opp1"
     assert items1[0]["opp_title"] == "SWE Internship"
+    assert items1[0]["opens"] == "2026-11-01"
 
     # User 2 sees nothing
     res2 = client2.get("/api/opportunities/watched")
@@ -217,7 +219,7 @@ async def test_scheduler_send_deadline_pushes(clean_db, monkeypatch):
     get_settings.cache_clear()
 
     user = _create_user("alice@example.com")
-    target_deadline = (date.today() + timedelta(days=5)).isoformat()
+    target_deadline = (date.today() + timedelta(days=7)).isoformat()
     other_deadline = (date.today() + timedelta(days=10)).isoformat()
 
     with Session(engine) as session:
@@ -275,6 +277,46 @@ async def test_scheduler_send_deadline_pushes(clean_db, monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_scheduler_notifies_an_opening_window(clean_db, monkeypatch):
+    monkeypatch.setenv("VAPID_PRIVATE_KEY", "priv")
+    monkeypatch.setenv("VAPID_PUBLIC_KEY", "pub")
+    monkeypatch.setenv("VAPID_EMAIL", "mailto:admin@example.com")
+    get_settings.cache_clear()
+
+    user = _create_user("opening@example.com")
+    target_open = (date.today() + timedelta(days=7)).isoformat()
+
+    with Session(engine) as session:
+        session.add(
+            PushSubscription(
+                user_id=user.id,
+                endpoint="https://push.example.com/opening",
+                p256dh="key",
+                auth="auth",
+            )
+        )
+        # No closing date: the alert must still be driven by `opens`.
+        session.add(
+            WatchedOpportunity(
+                user_id=user.id,
+                opp_url="https://example.com/igalia",
+                opp_title="Igalia Coding Experience",
+                opp_org="Igalia",
+                opp_kind="Paid program",
+                opens=target_open,
+            )
+        )
+        session.commit()
+
+    with patch("app.scheduler.send_push", return_value="ok") as mock_push:
+        await _send_deadline_pushes()
+        assert mock_push.call_count == 1
+        args = mock_push.call_args[1]
+        assert "opens" in args["body"]
+        assert "Igalia Coding Experience" in args["body"]
+
+
+@pytest.mark.asyncio
 async def test_scheduler_cleans_stale_subscriptions(clean_db, monkeypatch):
     monkeypatch.setenv("VAPID_PRIVATE_KEY", "priv")
     monkeypatch.setenv("VAPID_PUBLIC_KEY", "pub")
@@ -282,7 +324,7 @@ async def test_scheduler_cleans_stale_subscriptions(clean_db, monkeypatch):
     get_settings.cache_clear()
 
     user = _create_user("bob@example.com")
-    target_deadline = (date.today() + timedelta(days=5)).isoformat()
+    target_deadline = (date.today() + timedelta(days=7)).isoformat()
 
     with Session(engine) as session:
         session.add(

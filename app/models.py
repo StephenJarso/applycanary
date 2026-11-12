@@ -647,8 +647,12 @@ class WatchedOpportunity(SQLModel, table=True):
     opp_url: str = Field(index=True)
     opp_title: str = ""
     opp_org: str = ""
-    opp_kind: str = ""  # Internship | Event | Paid program
+    opp_kind: str = ""  # Internship | Apprenticeship | Event | Paid program
     deadline: str | None = None  # ISO date e.g. '2025-01-15'
+    # When an application window has an announced opening but no closing date,
+    # the alert is for that opening. Kept separate from `deadline` so the
+    # notification can say "opens" rather than "closes".
+    opens: str | None = None
     notified_at: datetime | None = None
     # True while the deadline push is wanted. A tracked-only row carries False,
     # so the bell and the Pipeline entry never overwrite one another.
