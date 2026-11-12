@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from datetime import date, timedelta
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from fastapi.testclient import TestClient
@@ -314,6 +314,57 @@ async def test_scheduler_notifies_an_opening_window(clean_db, monkeypatch):
         args = mock_push.call_args[1]
         assert "opens" in args["body"]
         assert "Igalia Coding Experience" in args["body"]
+
+
+@pytest.mark.asyncio
+async def test_scheduler_falls_back_to_email_when_push_fails(clean_db, monkeypatch):
+    monkeypatch.setenv("VAPID_PRIVATE_KEY", "priv")
+    monkeypatch.setenv("VAPID_PUBLIC_KEY", "pub")
+    monkeypatch.setenv("VAPID_EMAIL", "mailto:admin@example.com")
+    get_settings.cache_clear()
+
+    user = _create_user("emailfallback@example.com")
+    target_open = (date.today() + timedelta(days=7)).isoformat()
+
+    with Session(engine) as session:
+        session.add(
+            PushSubscription(
+                user_id=user.id,
+                endpoint="https://push.example.com/broken",
+                p256dh="key",
+                auth="auth",
+            )
+        )
+        session.add(
+            WatchedOpportunity(
+                user_id=user.id,
+                opp_url="https://example.com/zone01",
+                opp_title="Zone01 Kisumu",
+                opp_org="LakeHub",
+                opp_kind="Apprenticeship",
+                opens=target_open,
+            )
+        )
+        session.commit()
+
+    with (
+        patch("app.scheduler.send_push", return_value="error"),
+        patch(
+            "app.notify.email.send_opportunity_reminder",
+            new=AsyncMock(return_value=True),
+        ) as mock_email,
+    ):
+        await _send_deadline_pushes()
+        assert mock_email.await_count == 1
+        assert mock_email.await_args.kwargs["verb"] == "opens"
+
+    with Session(engine) as session:
+        row = session.exec(
+            select(WatchedOpportunity).where(
+                WatchedOpportunity.opp_url == "https://example.com/zone01"
+            )
+        ).one()
+        assert row.notified_at is not None
 
 
 @pytest.mark.asyncio

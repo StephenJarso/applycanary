@@ -459,6 +459,7 @@ async def _send_deadline_pushes() -> None:
     from sqlmodel import Session as SyncSession
 
     from app.db import engine
+    from app.notify import email as notify
 
     today = date.today()
     target_date = (today + timedelta(days=7)).isoformat()
@@ -511,6 +512,21 @@ async def _send_deadline_pushes() -> None:
                     any_sent = True
                 elif result == "stale":
                     stale_ids.append(sub.id)
+
+            # No browser subscription (or all of them stale): fall back to
+            # email so a saved programme is not silently missed. This is the
+            # only reminder path for users who never granted push permission.
+            if not any_sent:
+                user = session.get(User, w.user_id)
+                if user is not None and user.email:
+                    any_sent = await notify.send_opportunity_reminder(
+                        title=w.opp_title,
+                        org=w.opp_org,
+                        url=w.opp_url,
+                        verb=verb,
+                        when=when,
+                        user=user,
+                    )
 
             if any_sent:
                 w.notified_at = utcnow()

@@ -824,6 +824,48 @@ async def send_alert(
 # ---------------------------------------------------------------------------
 
 
+async def send_opportunity_reminder(
+    *,
+    title: str,
+    org: str,
+    url: str,
+    verb: str,
+    when: str,
+    user=None,  # noqa: ANN001
+    profile=None,  # noqa: ANN001
+) -> bool:
+    """Email reminder for a watched programme whose window opens or closes.
+
+    The push channel is the primary one; this is the fallback for people who
+    never granted notification permission, and it says which of the two dates
+    is approaching so an opening is not mistaken for a shutdown.
+    """
+    action = "opens" if verb == "opens" else "closes"
+    subject = f"{title} {action} in 7 days"
+    text = (
+        f"{subject}\n\n"
+        f"{title} ({org}) {action} on {when}.\n"
+        + ("Get your application ready.\n" if verb == "opens" else "Don't miss it.\n")
+        + f"\nDetails: {url}\n"
+    )
+    body = (
+        "<table role='presentation' width='100%' cellspacing='0' cellpadding='0'>"
+        "<tr><td style='padding-bottom:4px'>"
+        f"<h2 style='margin:0;font-size:20px;color:{_BRAND_TEXT}'>"
+        f"{escape(title)}</h2>"
+        f"<p style='margin:4px 0 0;font-size:15px;color:{_BRAND_DIM}'>"
+        f"{escape(org)}</p></td></tr>"
+        "<tr><td style='padding:12px 0;font-size:14px;line-height:1.6;"
+        "color:#374151'>"
+        f"The application window {action} on <strong>{escape(when)}</strong>."
+        + (" Get your CV and answers ready now." if verb == "opens" else " Don't miss it.")
+        + "</td></tr>"
+        + _cta_button(url or "#", "Open programme")
+    )
+    html = _wrap(body, preheader=subject)
+    return await send(subject, html, text, to=_recipient(profile, user))
+
+
 async def send_follow_up_reminder(
     job: Job,
     *,
