@@ -12,6 +12,7 @@ the automated path, only through the user explicitly overriding it in the UI.
 from __future__ import annotations
 
 import logging
+import re
 
 from sqlmodel import Session, select
 
@@ -25,6 +26,20 @@ from app.pipeline.keywords import extract_skills, keyword_overlap
 from app.pipeline.truthcheck import verify
 
 log = logging.getLogger(__name__)
+
+# Roles where the reader expects potential and shipped work rather than a
+# tenure count. Kept deliberately narrow: a "graduate" in the title is a
+# learning role, "5+ years" in the body is not.
+_LEARNING_ROLE_RE = re.compile(
+    r"\b(apprentice(?:ship)?|intern(?:ship)?|trainee|graduate\s+(?:programme|program|scheme|trainee)|"
+    r"entry[- ]level|paid[- ]to[- ]learn|no\s+(?:prior\s+)?experience\s+(?:required|necessary))\b",
+    re.IGNORECASE,
+)
+
+
+def is_learning_role(title: str, description: str = "") -> bool:
+    """Whether this posting is an apprenticeship/internship/entry-level role."""
+    return bool(_LEARNING_ROLE_RE.search(f"{title} {description}"))
 
 
 class TailorError(RuntimeError):
@@ -93,6 +108,7 @@ async def tailor_for_job(
         resume_text=resume_text,
         missing_keywords=missing,
         github_evidence=evidence_text,
+        learning_role=is_learning_role(job.title, job.description or ""),
     )
 
     model_name = "ats-rules-engine"

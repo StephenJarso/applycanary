@@ -131,9 +131,18 @@ def build_tailoring_user(
     resume_text: str,
     missing_keywords: list[str],
     github_evidence: str,
+    learning_role: bool = False,
 ) -> str:
     gaps = ", ".join(missing_keywords[:20]) if missing_keywords else "none identified"
     evidence = github_evidence or "(no GitHub evidence available)"
+    learning_note = (
+        "\n\nThis is a paid-to-learn, apprenticeship, internship or entry-level "
+        "role. Lead with learning velocity, shipped projects and collaboration "
+        "rather than years of experience: surface concrete things the candidate "
+        "built or maintained, and do not inflate seniority to match the posting."
+        if learning_role
+        else ""
+    )
     return (
         f"<target_job>\n"
         f"Title: {title}\n"
@@ -147,6 +156,7 @@ def build_tailoring_user(
         "layout, and authentic phrasing intact. Do not over-massage or buzzword-stuff. "
         "Update projects using concrete evidence from their GitHub repositories where relevant. "
         "Where requirements are genuinely not met, list them in honest_gaps."
+        f"{learning_note}"
     )
 
 
