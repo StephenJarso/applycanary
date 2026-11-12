@@ -1794,6 +1794,43 @@ VOLUNTEER += [
 # the seed even before the first card is added.
 APPRENTICESHIPS: list[dict] = []
 
+PAID_PROGRAMS += [
+    {
+        "kind": "Paid program",
+        "title": "Moringa × I&M Foundation Software Engineering Scholarship",
+        "org": "Moringa School & I&M Foundation",
+        "when": "9 months · next intake announced by Moringa",
+        "opens": None,
+        "closes": None,
+        "steps": [
+            "Watch Moringa's scholarship page for the next application window",
+            "Apply and complete the technical and aptitude assessments",
+            "Shortlisted applicants are interviewed and financially verified",
+            "Stage 1 is in-person in Nairobi, then Stage 2 is hybrid",
+        ],
+        "city": "Nairobi",
+        "tags": ["Scholarship", "Free tuition", "Laptop", "Kenya", "Beginners", "On-site"],
+        "stipend": (
+            "Funded: tuition, a laptop and internet bundles. No stipend, and "
+            "you must arrange your own accommodation in Nairobi."
+        ),
+        "accommodation": "not_included",
+        "eligibility": ["kenya_resident", "age_18_35", "beginners"],
+        "paid_to_learn": False,
+        "source": "Official",
+        "url": "https://moringaschool.com/im-foundation-scholarship/",
+        "desc": (
+            "A fully funded nine-month software engineering pathway for young "
+            "Kenyans, covering tuition, a laptop and internet bundles. The "
+            "2026 window closed on 6 November; dates and terms move with each "
+            "intake, so treat the official page as the source of truth. The "
+            "practical catch is housing: applicants must already live in "
+            "Nairobi or arrange their own accommodation, which the "
+            "scholarship does not provide."
+        ),
+    },
+]
+
 # Apprenticeships: programmes whose deal is explicit — the training is free or
 # stipended, and the expensive parts (a laptop, a room, a flight) are covered.
 # Funding is stated only where the organiser publishes it; an unpublished

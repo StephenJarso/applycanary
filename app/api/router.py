@@ -187,7 +187,7 @@ class OpportunityOut(BaseModel):
     date or to an application deadline.
     """
 
-    kind: Literal["Event", "Paid program", "Internship", "Volunteer"]
+    kind: Literal["Event", "Paid program", "Internship", "Apprenticeship", "Volunteer"]
     title: str
     org: str
     when: str
@@ -201,10 +201,22 @@ class OpportunityOut(BaseModel):
     closes: str | None = None
     steps: list[str] | None = None
     stipend: str | None = None
+    # Structured funding. Empty means the organiser did not publish it.
+    stipend_amount: int | None = None
+    stipend_currency: str = ""
+    stipend_period: str = ""
+    accommodation: Literal["included", "not_included", "not_stated"] = "not_stated"
+    airfare_covered: bool = False
+    relocation_support: bool = False
+    remote_friendly: bool = False
+    eligibility: list[str] = Field(default_factory=list)
+    paid_to_learn: bool = False
     # Server-side verdict on the deadline, so the page does not decide "closed"
     # from the visitor's clock.
     expired: bool = False
     days_left: int | None = None
+    status: Literal["open", "opening_soon", "closed", "rolling"] = "rolling"
+    opens_in: int | None = None
 
 
 class OpportunitiesOut(BaseModel):

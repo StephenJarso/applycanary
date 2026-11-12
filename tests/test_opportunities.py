@@ -21,6 +21,7 @@ from fastapi.testclient import TestClient
 
 from app.main import create_app
 from app.opportunities import (
+    APPRENTICESHIPS,
     CURATED_EVENTS,
     INTERNSHIPS,
     PAID_PROGRAMS,
@@ -551,8 +552,10 @@ def test_internships_endpoint_is_public_and_only_internships(client, monkeypatch
     body = res.json()
 
     assert body["items"]
-    assert {item["kind"] for item in body["items"]} == {"Internship"}
-    assert {item["title"] for item in body["items"]} == {i["title"] for i in INTERNSHIPS}
+    assert {item["kind"] for item in body["items"]} == {"Internship", "Apprenticeship"}
+    assert {item["title"] for item in body["items"]} == {
+        i["title"] for i in (*INTERNSHIPS, *APPRENTICESHIPS)
+    }
     assert body["events_live"] is True
 
 
@@ -656,7 +659,7 @@ def test_internships_endpoint_merges_the_live_kenyan_collection(client, monkeypa
     assert body["events_live"] is True
     assert "Backend Intern (Go) — M-KOPA" in titles
     assert {i["title"] for i in INTERNSHIPS} <= set(titles)
-    assert {item["kind"] for item in body["items"]} == {"Internship"}
+    assert {item["kind"] for item in body["items"]} == {"Internship", "Apprenticeship"}
     # A dated live role sorts ahead of the rolling curated placements.
     assert titles.index("Backend Intern (Go) — M-KOPA") < titles.index(
         "HENNGE Global Internship Program (GIP)"
@@ -671,7 +674,9 @@ def test_internships_endpoint_keeps_curated_roles_when_workke_is_down(client, mo
 
     body = client.get("/api/public/internships").json()
     assert body["events_live"] is False
-    assert {item["title"] for item in body["items"]} == {i["title"] for i in INTERNSHIPS}
+    assert {item["title"] for item in body["items"]} == {
+        i["title"] for i in (*INTERNSHIPS, *APPRENTICESHIPS)
+    }
 
 
 def test_a_live_internship_matching_a_curated_title_is_served_once(client, monkeypatch):
