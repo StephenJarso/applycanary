@@ -620,7 +620,7 @@ export async function request<T>(
 
 /** One listing on the public events, programs, internships or volunteer pages. */
 export interface Opportunity {
-  kind: "Event" | "Paid program" | "Internship" | "Volunteer";
+  kind: "Event" | "Paid program" | "Internship" | "Apprenticeship" | "Volunteer";
   title: string;
   org: string;
   /** Human-readable timing: "15 Oct 2026 · 08:00–11:00", "Coding May–Aug". */
@@ -637,9 +637,21 @@ export interface Opportunity {
   closes: string | null;
   steps: string[] | null;
   stipend: string | null;
+  /** Structured funding; absent/empty means the organiser did not publish it. */
+  stipend_amount?: number | null;
+  stipend_currency?: string;
+  stipend_period?: "month" | "year" | "total" | "";
+  accommodation?: "included" | "not_included" | "not_stated";
+  airfare_covered?: boolean;
+  relocation_support?: boolean;
+  remote_friendly?: boolean;
+  eligibility?: string[];
+  paid_to_learn?: boolean;
   /** Server-side verdict on `closes`, so the browser clock is not the judge. */
   expired?: boolean;
   days_left?: number | null;
+  status?: "open" | "opening_soon" | "closed" | "rolling";
+  opens_in?: number | null;
 }
 
 export interface Opportunities {

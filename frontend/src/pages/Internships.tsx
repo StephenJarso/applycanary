@@ -23,8 +23,49 @@ import {
  */
 
 const STATUSES = ["All", "Open now", "Opening soon", "Rolling", "Closed"] as const;
-const TYPES = ["All", "Internship", "Paid program"] as const;
+const TYPES = ["All", "Internship", "Apprenticeship", "Paid program"] as const;
 const BASE_LOCATIONS = ["Tokyo", "Kenya", "Online"];
+
+/** Chips that read the structured funding/eligibility fields, not the prose. */
+const FUNDING_FILTERS = [
+  "Paid to learn",
+  "Stipend",
+  "Accommodation",
+  "Airfare",
+  "Kenya",
+  "18–35",
+  "Students",
+  "Self-taught",
+] as const;
+
+type FundingFilter = (typeof FUNDING_FILTERS)[number];
+
+const hasEligibility = (item: { eligibility?: string[] }, ...keys: string[]) =>
+  keys.some((key) => (item.eligibility ?? []).includes(key));
+
+const matchesFunding = (
+  item: { paid_to_learn?: boolean; stipend_amount?: number | null; accommodation?: string; airfare_covered?: boolean; eligibility?: string[] },
+  filter: FundingFilter,
+) => {
+  switch (filter) {
+    case "Paid to learn":
+      return item.paid_to_learn === true;
+    case "Stipend":
+      return Boolean(item.stipend_amount);
+    case "Accommodation":
+      return item.accommodation === "included";
+    case "Airfare":
+      return item.airfare_covered === true;
+    case "Kenya":
+      return hasEligibility(item, "kenya_resident", "africa_only");
+    case "18–35":
+      return hasEligibility(item, "age_18_35");
+    case "Students":
+      return hasEligibility(item, "students", "student_only", "recent_grads");
+    case "Self-taught":
+      return hasEligibility(item, "self_taught_ok");
+  }
+};
 
 export default function Internships({ embedded = false }: { embedded?: boolean }) {
   const { user } = useAuth();
@@ -99,6 +140,7 @@ export default function Internships({ embedded = false }: { embedded?: boolean }
   const [city, setCity] = useState("All");
   const [source, setSource] = useState("All");
   const [tags, setTags] = useState<string[]>([]);
+  const [funding, setFunding] = useState<FundingFilter[]>([]);
 
   const locations = useMemo(() => {
     const extra = items.map((o) => o.city).filter((c) => c && !BASE_LOCATIONS.includes(c));
@@ -121,16 +163,23 @@ export default function Internships({ embedded = false }: { embedded?: boolean }
         (source === "All" || o.source === source) &&
         (statusFilter === "All" || status(o) === statusFilter) &&
         (tags.length === 0 || tags.some((t) => o.tags.includes(t))) &&
+        (funding.length === 0 || funding.every((f) => matchesFunding(o, f))) &&
         (!q || `${o.title} ${o.org} ${o.desc} ${o.tags.join(" ")}`.toLowerCase().includes(q)),
     ).sort((a, b) => deadline(a) - deadline(b));
-  }, [items, query, type, city, source, tags, statusFilter]);
+  }, [items, query, type, city, source, tags, statusFilter, funding]);
 
   const toggleTag = (tag: string) =>
     setTags((old) => (old.includes(tag) ? old.filter((t) => t !== tag) : [...old, tag]));
 
-  const filtersOn = tags.length > 0 || city !== "All" || source !== "All" || statusFilter !== "All" || type !== "All" || query !== "";
+  const toggleFunding = (filter: FundingFilter) =>
+    setFunding((old) =>
+      old.includes(filter) ? old.filter((f) => f !== filter) : [...old, filter],
+    );
+
+  const filtersOn = tags.length > 0 || funding.length > 0 || city !== "All" || source !== "All" || statusFilter !== "All" || type !== "All" || query !== "";
   const clearAll = () => {
     setTags([]);
+    setFunding([]);
     setCity("All");
     setSource("All");
     setType("All");
@@ -141,18 +190,21 @@ export default function Internships({ embedded = false }: { embedded?: boolean }
   const paid = items.filter((o) => o.kind === "Internship" && o.stipend?.startsWith("Paid:")).length;
   const unpaid = items.filter((o) => o.kind === "Internship" && o.stipend?.startsWith("Unpaid")).length;
   const programs = items.filter((o) => o.kind === "Paid program").length;
+  const paidToLearn = items.filter((o) => o.paid_to_learn).length;
 
   const blurb = embedded ? (
     <>
-      Internships and paid programs in one place, with compensation, location
-      and application steps stated upfront. Deadlines are estimated from past
-      cycles — confirm on the official site.
+      Internships, apprenticeships and paid programs in one place, with
+      compensation, accommodation and eligibility stated upfront. Deadlines
+      appear only where the organiser published them — confirm on the official
+      site.
     </>
   ) : (
     <>
-      Paid, unpaid-with-benefits and free internships, with compensation,
-      location and application steps stated upfront. Deadlines are estimated
-      from past cycles — confirm on the official site.
+      Paid, unpaid-with-benefits and paid-to-learn placements, with funding,
+      accommodation, eligibility and application steps stated upfront.
+      Deadlines are only shown when the organiser publishes them — confirm on
+      the official site.
     </>
   );
 
@@ -257,6 +309,23 @@ export default function Internships({ embedded = false }: { embedded?: boolean }
           </div>
 
           <div className="opp-filter-group">
+            <p className="opp-filter-label" id="intern-funding">Funding &amp; eligibility</p>
+            <div className="opp-chips" role="group" aria-labelledby="intern-funding">
+              {FUNDING_FILTERS.map((f) => (
+                <button
+                  key={f}
+                  type="button"
+                  className="opp-chip"
+                  aria-pressed={funding.includes(f)}
+                  onClick={() => toggleFunding(f)}
+                >
+                  {f}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="opp-filter-group">
             <p className="opp-filter-label" id="intern-interests">Pay &amp; interests</p>
             <div className="opp-chips" role="group" aria-labelledby="intern-interests">
               {interests.map((t) => (
@@ -294,6 +363,7 @@ export default function Internships({ embedded = false }: { embedded?: boolean }
 
               <p className="opp-count">
                 {results.length} results · {paid} paid · {unpaid} unpaid with benefits
+                {paidToLearn > 0 && ` · ${paidToLearn} paid to learn`}
                 {programs > 0 && ` · ${programs} paid programs`}
               </p>
 

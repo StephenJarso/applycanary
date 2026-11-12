@@ -20,6 +20,14 @@ export const fmtDate = (iso: string) =>
 /** Status shown in the box at the bottom of each card. */
 export function opportunityStatus(o: Opportunity): string {
   if (o.kind === "Event") return o.date && daysUntil(o.date) < 0 ? "Closed" : "Upcoming event";
+  // Prefer the server's verdict when it sent one; the local clock is only a
+  // fallback for cached payloads from before the field existed.
+  if (o.status) {
+    return o.status === "closed" ? "Closed"
+      : o.status === "opening_soon" ? "Opening soon"
+      : o.status === "open" ? "Open now"
+      : "Rolling";
+  }
   // A published deadline is enough to be open: a volunteer call advertises
   // when it closes, not when it began, so a missing `opens` means "already
   // open" rather than "no application window".
@@ -39,6 +47,54 @@ export const opportunityDeadline = (o: Opportunity) => {
     : o.date ? new Date(o.date).getTime()
     : 9e15;
 };
+
+const ELIGIBILITY_LABELS: Record<string, string> = {
+  kenya_resident: "Kenya resident",
+  age_18_35: "Age 18–35",
+  no_degree_required: "No degree needed",
+  student_only: "Students only",
+  students: "Students",
+  graduates: "Graduates",
+  recent_grads: "Recent graduates",
+  self_taught_ok: "Self-taught welcome",
+  women_and_underrepresented: "Women & underrepresented",
+  underrepresented: "Underrepresented groups",
+  beginners: "Beginners",
+  africa_only: "Africa only",
+  global: "Open worldwide",
+  open_to_all: "Open to all",
+};
+
+function Funding({ item }: { item: Opportunity }) {
+  const badges: string[] = [];
+  if (item.stipend_amount) {
+    const period = item.stipend_period === "month" ? "/month"
+      : item.stipend_period === "year" ? "/year" : " total";
+    badges.push(
+      `Stipend ${item.stipend_currency ? `${item.stipend_currency} ` : ""}${item.stipend_amount.toLocaleString()}${period}`,
+    );
+  }
+  if (item.accommodation === "included") badges.push("Accommodation included");
+  if (item.airfare_covered) badges.push("Airfare covered");
+  if (item.relocation_support) badges.push("Relocation support");
+  if (item.remote_friendly) badges.push("Remote-friendly");
+  if (badges.length === 0) return null;
+  return (
+    <div className="opp-funding">
+      {badges.map((badge) => (
+        <span key={badge} className="opp-funding-badge">{badge}</span>
+      ))}
+    </div>
+  );
+}
+
+function Eligibility({ item }: { item: Opportunity }) {
+  const labels = (item.eligibility ?? [])
+    .map((key) => ELIGIBILITY_LABELS[key])
+    .filter(Boolean);
+  if (labels.length === 0) return null;
+  return <p className="opp-eligibility">Eligibility: {labels.join(" · ")}</p>;
+}
 
 function Steps({ item }: { item: Opportunity }) {
   if (!item.steps) return null;
@@ -163,9 +219,10 @@ export function OpportunityCard({
     >
       <div className="opp-card-top">
         <span
-          className={
+          className=        {
             "opp-kind" +
             (item.kind === "Paid program" ? " opp-kind-program"
+              : item.kind === "Apprenticeship" ? " opp-kind-apprentice"
               : item.kind === "Internship" ? " opp-kind-intern"
               : item.kind === "Volunteer" ? " opp-kind-volunteer" : "")
           }
@@ -242,6 +299,8 @@ export function OpportunityCard({
 
       {item.desc && <p className="opp-desc">{item.desc}</p>}
       {item.stipend && <p className="opp-stipend">💰 {item.stipend}</p>}
+      <Funding item={item} />
+      <Eligibility item={item} />
 
       <div className="opp-timeline">
         <Timeline item={item} />
