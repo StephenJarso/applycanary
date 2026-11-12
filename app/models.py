@@ -674,10 +674,14 @@ class ProgrammeEntry(SQLModel, table=True):
     )
 
     id: int | None = Field(default=None, primary_key=True)
-    kind: str = Field(index=True)  # Paid program | Internship | Volunteer
+    # Paid program | Internship | Apprenticeship | Volunteer. Apprenticeship
+    # is the "earn while you learn" shape: Zone01 Kisumu, HENNGE, Igalia.
+    kind: str = Field(index=True)
     title: str
     org: str = ""
     when: str = ""
+    # Application window, not the programme's own dates. Either may be absent:
+    # an unpublished date is left NULL rather than guessed.
     opens: str | None = None
     closes: str | None = None
     # Volunteers count down to the event itself when no application window is
@@ -687,6 +691,21 @@ class ProgrammeEntry(SQLModel, table=True):
     city: str = ""
     tags: list[str] = Field(default_factory=list, sa_column=Column(JSON))
     stipend: str | None = None
+    # Structured funding, so a page can filter "stipend + accommodation"
+    # without parsing the prose above. Unknown values stay empty, never guessed.
+    stipend_amount: int | None = None
+    stipend_currency: str = ""
+    stipend_period: str = ""          # month | year | total | ""
+    accommodation: str = "not_stated"  # included | not_included | not_stated
+    airfare_covered: bool = False
+    relocation_support: bool = False
+    remote_friendly: bool = False
+    # Free-form eligibility labels: kenya_resident, student_only, age_18_35,
+    # women_and_underrepresented, self_taught_ok, africa_only.
+    eligibility: list[str] = Field(default_factory=list, sa_column=Column(JSON))
+    # True for programmes whose point is learning while being funded, whether
+    # they are filed as an apprenticeship, internship or paid program.
+    paid_to_learn: bool = False
     source: str = ""
     url: str = ""
     desc: str = Field(default="", sa_column=Column(Text))

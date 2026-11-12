@@ -1715,9 +1715,16 @@ VOLUNTEER += [
     },
 ]
 
+# "Earn while you learn": tuition-free or stipended software training that
+# comes with housing, a flight or a living allowance. Seeded in its own block
+# further down; the list exists here so the kind is registered with the API and
+# the seed even before the first card is added.
+APPRENTICESHIPS: list[dict] = []
+
 _BUILTIN_CARDS: dict[str, list[dict]] = {
     "Paid program": PAID_PROGRAMS,
     "Internship": INTERNSHIPS,
+    "Apprenticeship": APPRENTICESHIPS,
     "Volunteer": VOLUNTEER,
 }
 PROGRAMME_KINDS = tuple(_BUILTIN_CARDS)
@@ -1731,13 +1738,45 @@ def deadline_state(item: dict, *, today: date | None = None) -> dict[str, object
     passed. Non-ISO values ("Rolling", "TBA") simply carry no deadline.
     """
     today = today or datetime.now(UTC).date()
-    closes = str(item.get("closes") or "").strip()[:10]
-    try:
-        deadline = date.fromisoformat(closes)
-    except ValueError:
-        return {"expired": False, "days_left": None}
-    days_left = (deadline - today).days
-    return {"expired": days_left < 0, "days_left": days_left}
+
+    def parsed(key: str) -> date | None:
+        raw = str(item.get(key) or "").strip()[:10]
+        try:
+            return date.fromisoformat(raw)
+        except ValueError:
+            return None
+
+    opens = parsed("opens")
+    closes = parsed("closes")
+    opens_in = (opens - today).days if opens else None
+    if closes is not None:
+        days_left = (closes - today).days
+        if days_left < 0:
+            status = "closed"
+        elif opens is not None and opens_in is not None and opens_in > 0:
+            status = "opening_soon"
+        else:
+            status = "open"
+        return {
+            "expired": days_left < 0,
+            "days_left": days_left,
+            "status": status,
+            "opens_in": opens_in,
+        }
+    if opens is not None and opens_in is not None and opens_in > 0:
+        return {
+            "expired": False,
+            "days_left": None,
+            "status": "opening_soon",
+            "opens_in": opens_in,
+        }
+    # No published deadline: cohort-based or year-round, not "expired".
+    return {
+        "expired": False,
+        "days_left": None,
+        "status": "rolling",
+        "opens_in": opens_in,
+    }
 
 
 def programme_item(entry: ProgrammeEntry) -> dict:
@@ -1754,6 +1793,15 @@ def programme_item(entry: ProgrammeEntry) -> dict:
         "city": entry.city,
         "tags": list(entry.tags or []),
         "stipend": entry.stipend,
+        "stipend_amount": entry.stipend_amount,
+        "stipend_currency": entry.stipend_currency,
+        "stipend_period": entry.stipend_period,
+        "accommodation": entry.accommodation,
+        "airfare_covered": entry.airfare_covered,
+        "relocation_support": entry.relocation_support,
+        "remote_friendly": entry.remote_friendly,
+        "eligibility": list(entry.eligibility or []),
+        "paid_to_learn": entry.paid_to_learn,
         "source": entry.source,
         "url": entry.url,
         "desc": entry.desc,
@@ -1778,6 +1826,22 @@ def programme_fields(payload: dict) -> dict:
             value = [value]
         return [str(item).strip() for item in value if str(item).strip()]
 
+    def integer(key: str) -> int | None:
+        value = payload.get(key)
+        if value in (None, ""):
+            return None
+        try:
+            return int(str(value).replace(",", "").strip())
+        except (TypeError, ValueError):
+            return None
+
+    def flag(key: str) -> bool:
+        return bool(payload.get(key))
+
+    accommodation = text("accommodation").lower()
+    if accommodation not in {"included", "not_included", "not_stated"}:
+        accommodation = "not_stated"
+
     return {
         "kind": text("kind"),
         "title": text("title"),
@@ -1790,6 +1854,15 @@ def programme_fields(payload: dict) -> dict:
         "city": text("city"),
         "tags": strings("tags"),
         "stipend": optional("stipend"),
+        "stipend_amount": integer("stipend_amount"),
+        "stipend_currency": text("stipend_currency").upper(),
+        "stipend_period": text("stipend_period").lower(),
+        "accommodation": accommodation,
+        "airfare_covered": flag("airfare_covered"),
+        "relocation_support": flag("relocation_support"),
+        "remote_friendly": flag("remote_friendly"),
+        "eligibility": strings("eligibility"),
+        "paid_to_learn": flag("paid_to_learn"),
         "source": text("source"),
         "url": text("url"),
         "desc": text("desc"),
@@ -2531,7 +2604,9 @@ async def get_internships() -> dict:
     except TimeoutError:  # the scheduled/manual refresh still lands in _live_feed
         feed = _live_feed
 
-    curated = curated_cards("Internship")
+    # Apprenticeships belong on this tab too: they are the paid-to-learn
+    # placements most people mean when they search "internship in Kenya".
+    curated = [*curated_cards("Internship"), *curated_cards("Apprenticeship")]
     curated_titles = {str(item.get("title") or "").strip().lower() for item in curated}
     live = [
         item

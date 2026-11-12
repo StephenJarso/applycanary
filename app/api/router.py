@@ -3131,7 +3131,7 @@ def delete_board(
 class ProgrammeIn(BaseModel):
     """One curated card as an admin submits it, mirroring the public shape."""
 
-    kind: Literal["Paid program", "Internship", "Volunteer"]
+    kind: Literal["Paid program", "Internship", "Apprenticeship", "Volunteer"]
     title: str = Field(min_length=1, max_length=200)
     org: str = ""
     when: str = ""
@@ -3142,6 +3142,15 @@ class ProgrammeIn(BaseModel):
     city: str = ""
     tags: list[str] = Field(default_factory=list)
     stipend: str | None = None
+    stipend_amount: int | None = None
+    stipend_currency: str = ""
+    stipend_period: str = ""
+    accommodation: Literal["included", "not_included", "not_stated"] = "not_stated"
+    airfare_covered: bool = False
+    relocation_support: bool = False
+    remote_friendly: bool = False
+    eligibility: list[str] = Field(default_factory=list)
+    paid_to_learn: bool = False
     source: str = "Admin"
     url: str = ""
     desc: str = ""
@@ -3155,6 +3164,9 @@ class ProgrammeOut(ProgrammeIn):
     id: int
     expired: bool = False
     days_left: int | None = None
+    # open | opening_soon | closed | rolling, computed server-side.
+    status: str = "rolling"
+    opens_in: int | None = None
 
 
 def _programme_out(row: ProgrammeEntry) -> ProgrammeOut:

@@ -271,19 +271,38 @@ class TestDeadlineState:
         state = deadline_state(
             {"closes": "2026-01-01"}, today=date(2026, 2, 1)
         )
-        assert state == {"expired": True, "days_left": -31}
+        assert state["expired"] is True
+        assert state["days_left"] == -31
+        assert state["status"] == "closed"
 
     def test_a_future_deadline_is_open(self):
         state = deadline_state(
             {"closes": "2026-12-24"}, today=date(2026, 12, 1)
         )
-        assert state == {"expired": False, "days_left": 23}
+        assert state["expired"] is False
+        assert state["days_left"] == 23
+        assert state["status"] == "open"
 
     def test_rolling_windows_carry_no_deadline(self):
-        assert deadline_state({"closes": "Rolling"}) == {
-            "expired": False,
-            "days_left": None,
-        }
+        state = deadline_state({"closes": "Rolling"})
+        assert state["expired"] is False
+        assert state["days_left"] is None
+        assert state["status"] == "rolling"
+
+    def test_a_future_open_date_is_opening_soon(self):
+        state = deadline_state(
+            {"opens": "2027-02-01", "closes": "2027-04-03"},
+            today=date(2026, 12, 1),
+        )
+        assert state["status"] == "opening_soon"
+        assert state["opens_in"] == 62
+
+    def test_a_published_open_date_in_the_past_is_open(self):
+        state = deadline_state(
+            {"opens": "2026-11-01", "closes": "2026-12-21"},
+            today=date(2026, 11, 12),
+        )
+        assert state["status"] == "open"
 
     def test_a_card_carries_its_own_state(self, db):
         with Session(engine) as session:
