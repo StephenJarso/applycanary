@@ -113,6 +113,10 @@ PAID_PROGRAMS: list[dict] = [
         "city": "Online",
         "tags": ["Open source", "Students", "Beginners"],
         "stipend": "USD 750–6,600 (by region & size)",
+        "stipend_period": "total",
+        "remote_friendly": True,
+        "eligibility": ["students", "beginners", "global"],
+        "paid_to_learn": True,
         "source": "Official",
         "url": "https://summerofcode.withgoogle.com/",
         "desc": "Paid, mentored open-source projects. Open to students and beginners in open source.",
@@ -133,6 +137,12 @@ PAID_PROGRAMS: list[dict] = [
         "city": "Online",
         "tags": ["Paid", "Open source", "Women in tech", "Beginners"],
         "stipend": "Paid: USD 7,000 stipend",
+        "stipend_amount": 7000,
+        "stipend_currency": "USD",
+        "stipend_period": "total",
+        "remote_friendly": True,
+        "eligibility": ["underrepresented", "beginners", "global"],
+        "paid_to_learn": True,
         "source": "Official",
         "url": "https://www.outreachy.org/",
         "desc": "Remote, 3-month open-source internships for people underrepresented in tech. Kenyans eligible.",
@@ -153,6 +163,12 @@ PAID_PROGRAMS: list[dict] = [
         "city": "Online",
         "tags": ["Paid", "Open source", "Women in tech", "Beginners"],
         "stipend": "Paid: USD 7,000 stipend",
+        "stipend_amount": 7000,
+        "stipend_currency": "USD",
+        "stipend_period": "total",
+        "remote_friendly": True,
+        "eligibility": ["underrepresented", "beginners", "global"],
+        "paid_to_learn": True,
         "source": "Official",
         "url": "https://www.outreachy.org/",
         "desc": "Second yearly Outreachy cohort, same remote format and stipend.",
@@ -173,6 +189,11 @@ PAID_PROGRAMS: list[dict] = [
         "city": "Online",
         "tags": ["Open source", "Cloud", "Backend"],
         "stipend": "USD 3,000–6,600",
+        "stipend_currency": "USD",
+        "stipend_period": "total",
+        "remote_friendly": True,
+        "eligibility": ["open_to_all", "global"],
+        "paid_to_learn": True,
         "source": "Official",
         "url": "https://mentorship.lfx.linuxfoundation.org/",
         "desc": "Paid mentorships on CNCF, Kubernetes, Linux kernel and other LF projects.",
@@ -188,6 +209,11 @@ PAID_PROGRAMS: list[dict] = [
         "city": "Online",
         "tags": ["Open source", "Blockchain", "Backend"],
         "stipend": "USD 3,000–6,600",
+        "stipend_currency": "USD",
+        "stipend_period": "total",
+        "remote_friendly": True,
+        "eligibility": ["open_to_all", "global"],
+        "paid_to_learn": True,
         "source": "Official",
         "url": "https://www.lfdecentralizedtrust.org/mentorship",
         "desc": "Paid, part- or full-time mentorship on Hyperledger and other decentralized-trust projects.",
@@ -203,6 +229,12 @@ PAID_PROGRAMS: list[dict] = [
         "city": "Online",
         "tags": ["Paid", "Bitcoin", "Open source", "Students"],
         "stipend": "Paid: USD 3,000 stipend",
+        "stipend_amount": 3000,
+        "stipend_currency": "USD",
+        "stipend_period": "total",
+        "remote_friendly": True,
+        "eligibility": ["students", "global"],
+        "paid_to_learn": True,
         "source": "Official",
         "url": "https://www.summerofbitcoin.org/",
         "desc": "Global summer internship in Bitcoin open-source development for university students.",
@@ -252,14 +284,35 @@ PAID_PROGRAMS: list[dict] = [
         "kind": "Paid program",
         "title": "Igalia Coding Experience",
         "org": "Igalia",
-        "when": "Flexible 12-week projects",
-        "steps": ["Rolling applications", "Pick browser/graphics/compilers area", "Remote mentored work"],
+        "when": "450 hours · 3 or 6 months · annual window (2026 closed)",
+        "opens": None,
+        "closes": None,
+        "steps": [
+            "Watch igalia.com/coding-experience for the next window (2026 ran Feb–Apr)",
+            "Pick an area: Linux packaging, graphics, JavaScript DevTools, multimedia/GStreamer or web standards",
+            "Apply with your background — students and self-taught developers both qualify",
+            "Work 450 hours over 3 or 6 months with an Igalia mentor",
+        ],
         "city": "Online",
-        "tags": ["Open source", "Students", "Systems"],
-        "stipend": "EUR 6,500",
+        "tags": ["Paid to learn", "Open source", "Students", "Self-taught", "Systems"],
+        "stipend": "Paid: EUR 7,000 for 450 hours",
+        "stipend_amount": 7000,
+        "stipend_currency": "EUR",
+        "stipend_period": "total",
+        "remote_friendly": True,
+        "eligibility": ["students", "self_taught_ok", "global"],
+        "paid_to_learn": True,
         "source": "Official",
         "url": "https://www.igalia.com/coding-experience/",
-        "desc": "Paid, mentored remote work on browsers, graphics and compilers.",
+        "desc": (
+            "Paid, mentored remote work on browsers, graphics and compilers: "
+            "EUR 7,000 for 450 hours over three or six months, on a schedule "
+            "you choose. Open to people studying computer science or free "
+            "software formally or informally, so self-taught developers are "
+            "eligible. The 2026 selection is closed; the next application "
+            "window is announced on the programme page, usually early in the "
+            "year."
+        ),
     },
     {
         "kind": "Paid program",
@@ -437,8 +490,20 @@ INTERNSHIPS.append(
             "Pick a Full-Stack or Front-End pathway and join a batch",
         ],
         "city": "Tokyo",
-        "tags": ["Unpaid", "Benefits", "Japan", "Go", "Students", "On-site"],
-        "stipend": "Unpaid + benefits: monthly subsidy, round-trip airfare, medical insurance, mobile, visa support",
+        "tags": ["Paid to learn", "Unpaid", "Benefits", "Japan", "Go", "Students", "On-site"],
+        "stipend": (
+            "Unpaid + benefits: up to JPY 150,000/month subsidy for "
+            "accommodation, meals and transport, round-trip airfare, medical "
+            "insurance, mobile and visa support"
+        ),
+        "stipend_amount": 150000,
+        "stipend_currency": "JPY",
+        "stipend_period": "month",
+        "accommodation": "not_stated",
+        "airfare_covered": True,
+        "relocation_support": True,
+        "eligibility": ["students", "recent_grads", "global"],
+        "paid_to_learn": True,
         "source": "Official",
         "url": "https://recruit.hennge.com/en/gip/",
         "desc": "On-site, English-speaking software engineering internship in Tokyo. Full-Stack pathway uses Python, Go or TypeScript (React/Vue), front-end on TypeScript, with AWS and DevOps training. Slots are first-come, first-served, and outstanding interns may be offered full-time roles.",
@@ -1380,6 +1445,10 @@ PAID_PROGRAMS += [
         "city": "Online",
         "tags": ["Open source", "Cloud", "Mentored"],
         "stipend": "Stipend — amount is stated per project",
+        "stipend_period": "total",
+        "remote_friendly": True,
+        "eligibility": ["open_to_all", "global"],
+        "paid_to_learn": True,
         "source": "Official",
         "url": "https://github.com/cncf/mentoring",
         "desc": (
@@ -1403,6 +1472,10 @@ PAID_PROGRAMS += [
         "city": "Online",
         "tags": ["Open source", "Desktop", "Design"],
         "stipend": "Stipend — see the programme page",
+        "stipend_period": "total",
+        "remote_friendly": True,
+        "eligibility": ["open_to_all", "global"],
+        "paid_to_learn": True,
         "source": "Official",
         "url": "https://season.kde.org/",
         "desc": (
@@ -1720,6 +1793,89 @@ VOLUNTEER += [
 # further down; the list exists here so the kind is registered with the API and
 # the seed even before the first card is added.
 APPRENTICESHIPS: list[dict] = []
+
+# Apprenticeships: programmes whose deal is explicit — the training is free or
+# stipended, and the expensive parts (a laptop, a room, a flight) are covered.
+# Funding is stated only where the organiser publishes it; an unpublished
+# stipend amount stays None with the prose saying so.
+APPRENTICESHIPS += [
+    {
+        "kind": "Apprenticeship",
+        "title": "Zone01 Kisumu",
+        "org": "LakeHub Foundation & 01 Talent",
+        "when": "12 months in-person · cohort intakes",
+        "opens": None,
+        "closes": None,
+        "steps": [
+            "Apply on learn.zone01kisumu.ke — no coding background or grades required",
+            "Attend the four-week Piscine selection challenge on campus",
+            "Join a cohort for peer-to-peer, project-based training at Lake Basin Mall, Kisumu",
+            "Complete the programme for job-placement support with partner companies",
+        ],
+        "city": "Kisumu",
+        "tags": [
+            "Paid to learn", "Stipend", "Free tuition", "Laptop", "Kenya",
+            "On-site", "Software",
+        ],
+        "stipend": (
+            "Paid: monthly stipend during training, zero tuition, laptop and "
+            "free internet"
+        ),
+        "stipend_currency": "KES",
+        "stipend_period": "month",
+        "accommodation": "not_stated",
+        "remote_friendly": False,
+        "eligibility": ["kenya_resident", "age_18_35", "no_degree_required"],
+        "paid_to_learn": True,
+        "source": "Official",
+        "url": "https://www.zone01kisumu.ke/",
+        "desc": (
+            "A tuition-free, peer-to-peer software engineering school in Kisumu "
+            "for anyone over 18, with no grade or coding requirement. Admitted "
+            "apprentices receive a monthly stipend for twelve months of "
+            "in-person training, plus a laptop and free internet, and the "
+            "programme supports job placement afterwards. LakeHub's FAQ also "
+            "describes a two-year training arc followed by a three-year job "
+            "contract; cohort terms change, so confirm the current structure "
+            "on the official page before applying."
+        ),
+    },
+    {
+        "kind": "Apprenticeship",
+        "title": "ATAN Technical Apprenticeship (Kenya & Ghana)",
+        "org": "African Technical Apprenticeship Network",
+        "when": "12 months full-time · rolling cohort matching",
+        "opens": None,
+        "closes": None,
+        "steps": [
+            "Apply through atanafrica.com as a recent technical graduate",
+            "ATAN matches you with a small or medium enterprise partner",
+            "Work full-time for twelve months with a living stipend and a mentor",
+            "Most apprentices convert to full-time roles after the programme",
+        ],
+        "city": "Kenya",
+        "tags": [
+            "Paid to learn", "Stipend", "Kenya", "Ghana", "Graduate",
+            "On-site", "Software",
+        ],
+        "stipend": "Paid: living stipend for the 12-month apprenticeship",
+        "stipend_period": "month",
+        "accommodation": "not_stated",
+        "remote_friendly": False,
+        "eligibility": ["kenya_resident", "graduates", "africa_only"],
+        "paid_to_learn": True,
+        "source": "Official",
+        "url": "https://www.atanafrica.com/",
+        "desc": (
+            "A twelve-month paid apprenticeship that places recent technical "
+            "graduates with SME partners in Kenya and Ghana. Apprentices get "
+            "a living stipend and a mentor while doing real work, and ATAN "
+            "reports that over 80% of them move into full-time employment "
+            "afterwards. The stipend amount is set per placement rather than "
+            "published, so ask about it during matching."
+        ),
+    },
+]
 
 _BUILTIN_CARDS: dict[str, list[dict]] = {
     "Paid program": PAID_PROGRAMS,

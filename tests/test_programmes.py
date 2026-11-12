@@ -260,10 +260,31 @@ class TestSeedMerge:
         volunteers = {card["title"] for card in curated_cards("Volunteer")}
         internships = {card["title"] for card in curated_cards("Internship")}
         programmes = {card["title"] for card in curated_cards("Paid program")}
+        apprenticeships = {
+            card["title"]: card for card in curated_cards("Apprenticeship")
+        }
 
         assert "UN Online Volunteering" in volunteers
         assert "Safaricom Graduate Management Trainee" in internships
         assert "CNCF Mentoring" in programmes
+        assert "Zone01 Kisumu" in apprenticeships
+        zone01 = apprenticeships["Zone01 Kisumu"]
+        assert zone01["paid_to_learn"] is True
+        assert zone01["accommodation"] == "not_stated"
+        assert zone01["stipend_amount"] is None, "an unpublished stipend is not guessed"
+
+    def test_structured_funding_reaches_the_public_shape(self, db):
+        with Session(engine) as session:
+            seed_programmes(session)
+
+        igalia = next(
+            card for card in curated_cards("Paid program")
+            if card["title"] == "Igalia Coding Experience"
+        )
+        assert igalia["stipend_amount"] == 7000
+        assert igalia["stipend_currency"] == "EUR"
+        assert igalia["remote_friendly"] is True
+        assert igalia["paid_to_learn"] is True
 
 
 class TestDeadlineState:
