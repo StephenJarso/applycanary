@@ -1739,6 +1739,43 @@ VOLUNTEER += [
     },
     {
         "kind": "Volunteer",
+        "title": "Microsoft Learn Student Ambassadors",
+        "org": "Microsoft",
+        "when": "Rolling · register any time, open to students worldwide",
+        "opens": None,
+        "closes": None,
+        "steps": [
+            "Register at StudentAmbassadors.com, then complete the onboarding activities",
+            "Pick activities that match your interests — events, content or mentoring",
+            "Once invited, host campus sessions or publish learning content",
+            "Progress through milestones to unlock the full benefits",
+        ],
+        "city": "Online",
+        "tags": [
+            "Volunteer",
+            "Students",
+            "Community",
+            "Microsoft",
+            "Azure",
+            "Online",
+        ],
+        "stipend": (
+            "Unpaid + benefits: USD 150/month Azure credits, Microsoft 365, "
+            "Visual Studio Enterprise, badges and swag"
+        ),
+        "source": "Official",
+        "url": "https://mvp.microsoft.com/studentambassadors",
+        "desc": (
+            "Microsoft's student community programme, open to anyone enrolled "
+            "at a higher-education institution in any field. Registration is "
+            "quick and open rather than a competitive application, and membership "
+            "unlocks Azure credits and developer licences that would otherwise "
+            "cost money — the closest thing here to being paid to learn without "
+            "a stipend. Being an ambassador is a leadership line for a CV, not a job."
+        ),
+    },
+    {
+        "kind": "Volunteer",
         "title": "TED Translators",
         "org": "TED",
         "when": "Rolling — apply any time",
