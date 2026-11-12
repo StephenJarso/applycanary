@@ -1368,6 +1368,43 @@ CURATED_EVENTS: list[dict] = [
     },
     {
         "kind": "Event",
+        "title": "Startup Grind Nairobi Tech Week 2026",
+        "org": "Startup Grind Nairobi",
+        "date": "2026-11-23",
+        "when": "23–27 Nov 2026",
+        "city": "Nairobi",
+        "tags": ["Conference", "Startups", "Deep tech", "Networking", "Nairobi"],
+        "source": "Curated",
+        "url": "https://www.startupgrind.com/nairobi/",
+        "stipend": None,
+        "desc": (
+            "Five days of the Nairobi chapter's 'Deep Tech Frontier' week: "
+            "founders, engineers and investors across AI, hardware, climate "
+            "and health tech, with a hard-tech day for the people building "
+            "for the physical world. Chapter events are ticketed separately, "
+            "so check the chapter page for each day."
+        ),
+    },
+    {
+        "kind": "Event",
+        "title": "Women in Tech Summit Kenya 2026",
+        "org": "Tambua Women In Tech",
+        "date": "2026-11-27",
+        "when": "27–28 Nov 2026",
+        "city": "Nairobi",
+        "tags": ["Conference", "Women in tech", "Career", "Community", "Nairobi"],
+        "source": "Curated",
+        "url": "https://summit.womenintechblog.dev/",
+        "stipend": None,
+        "desc": (
+            "The second edition of the Nairobi summit, themed 'Beyond "
+            "Systems: Thrive. Build. Govern.' Two days of talks, workshops "
+            "and mentorship access at iHub in Lavington, aimed at women "
+            "building careers in tech across Kenya and beyond."
+        ),
+    },
+    {
+        "kind": "Event",
         "title": "Africa Tech Summit Nairobi 2027",
         "org": "Africa Tech Summit",
         "date": "2027-02-10",
