@@ -2702,6 +2702,66 @@ APPRENTICESHIPS += [
             "published, so ask about it during matching."
         ),
     },
+    {
+        "kind": "Hackathon",
+        "title": "Android Kenya Challenge 2026",
+        "cash_prize": True,
+        "airfare_covered": False,
+        "accommodation": "not_included",
+        "org": "Google Developers Group Kenya",
+        "when": "15–17 Dec 2026 · iHub, Nairobi",
+        "opens": None,
+        "closes": None,
+        "date": "2026-12-15",
+        "steps": [
+            "Apply through the GDG Nairobi event page",
+            "Build an Android app using Jetpack Compose or a SDK of your choice",
+            "Work solo or in a team on a problem that matters to Kenyan communities",
+            "Demo on the final day; pitch to judges and the GDG community",
+        ],
+        "city": "Nairobi",
+        "tags": ["Hackathon", "Cash prize", "On-site", "Nairobi", "Android"],
+        "stipend": (
+            r"Cash prize: $5,000 pool — $2,500 first, $1,500 second, $1,000 third\; no travel or accommodation funding published"
+        ),
+        "source": "Official",
+        "url": "https://gdg.community.dev/gdg-nairobi/",
+        "desc": (
+            "A 3-day Android hackathon run by GDG Nairobi at iHub in December. "
+            "Focus on solving local community problems with Android. No intercity "
+            "travel support published, but the event itself is in Nairobi."
+        ),
+    },
+    {
+        "kind": "Hackathon",
+        "title": "AI for Good Global Hackathon 2027",
+        "cash_prize": True,
+        "airfare_covered": False,
+        "accommodation": "not_included",
+        "org": "Microsoft AI for Good Lab",
+        "when": "Online · 15–28 Jan 2027",
+        "opens": "2027-01-15",
+        "closes": "2027-01-28",
+        "steps": [
+            "Register on the Microsoft AI for Good page",
+            "Build an AI solution that addresses one of the UN Sustainable Development Goals",
+            "Use Azure AI services or any ML framework of your choice",
+            "Submit a public repo, a demo video and a short impact statement by 28 Jan 2027",
+        ],
+        "city": "Online",
+        "tags": ["Hackathon", "Cash prize", "Online", "AI", "SDG"],
+        "stipend": (
+            r"Cash prize: $25,000 pool — multiple awards; fully online, no travel needed"
+        ),
+        "source": "Official",
+        "url": "https://ai-for-good.microsoft.com/hackathon",
+        "desc": (
+            "Microsoft's annual AI-for-SDG hackathon, open globally. Teams build "
+            "AI prototypes that tackle education, health, climate or equity challenges. "
+            "Local mentorship is provided in regional time zones; no intercity travel "
+            "or accommodation funding is published."
+        ),
+    },
 ]
 
 _BUILTIN_CARDS: dict[str, list[dict]] = {
