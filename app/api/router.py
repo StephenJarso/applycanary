@@ -187,7 +187,14 @@ class OpportunityOut(BaseModel):
     date or to an application deadline.
     """
 
-    kind: Literal["Event", "Paid program", "Internship", "Apprenticeship", "Volunteer"]
+    kind: Literal[
+        "Event",
+        "Paid program",
+        "Internship",
+        "Apprenticeship",
+        "Volunteer",
+        "Hackathon",
+    ]
     title: str
     org: str
     when: str
@@ -883,6 +890,21 @@ async def public_volunteers() -> OpportunitiesOut:
     from app.opportunities import get_volunteers
 
     return OpportunitiesOut(**await get_volunteers())
+
+
+@router.get("/public/hackathons", response_model=OpportunitiesOut)
+async def public_hackathons() -> OpportunitiesOut:
+    """Curated hackathons with a verified cash prize and travel answer.
+
+    Kept apart from the events feed because the trade-offs are different: a
+    hackathon abroad is only worth listing when the organisers cover travel
+    and accommodation, which no calendar records in a field. Past deadlines
+    are dropped by ``app.opportunities`` so the tab never advertises a closed
+    submission window.
+    """
+    from app.opportunities import get_hackathons
+
+    return OpportunitiesOut(**await get_hackathons())
 
 
 @router.get("/public/kenya-jobs", response_model=EntryLevelFeedOut)

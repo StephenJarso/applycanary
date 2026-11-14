@@ -196,6 +196,7 @@ def create_app() -> FastAPI:
             or path == "/opportunities"
             or path == "/internships"
             or path == "/volunteers"
+            or path == "/hackathons"
             or path.startswith("/api/public/")
             # Driven by an external cron with no browser session. The route
             # authenticates with its own shared token and fails closed when

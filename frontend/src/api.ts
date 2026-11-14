@@ -620,7 +620,13 @@ export async function request<T>(
 
 /** One listing on the public events, programs, internships or volunteer pages. */
 export interface Opportunity {
-  kind: "Event" | "Paid program" | "Internship" | "Apprenticeship" | "Volunteer";
+  kind:
+    | "Event"
+    | "Paid program"
+    | "Internship"
+    | "Apprenticeship"
+    | "Volunteer"
+    | "Hackathon";
   title: string;
   org: string;
   /** Human-readable timing: "15 Oct 2026 · 08:00–11:00", "Coding May–Aug". */
@@ -702,6 +708,7 @@ export const api = {
   opportunities: () => request<Opportunities>("/public/opportunities"),
   internships: () => request<Opportunities>("/public/internships"),
   volunteers: () => request<Opportunities>("/public/volunteers"),
+  hackathons: () => request<Opportunities>("/public/hackathons"),
   kenyaJobs: (refresh = false) =>
     request<EntryLevelFeed>(`/public/kenya-jobs${refresh ? "?refresh=true" : ""}`),
   entryLevel: (refresh = false) =>

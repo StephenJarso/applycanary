@@ -1,7 +1,8 @@
 """Events, programs, internships and volunteer slots for the public pages.
 
 Served through ``GET /api/public/opportunities`` (events and paid programs),
-``/api/public/internships`` and ``/api/public/volunteers``.
+``/api/public/internships``, ``/api/public/volunteers`` and
+``/api/public/hackathons``.
 
 The page is fed by two very different kinds of data:
 
@@ -27,6 +28,11 @@ The page is fed by two very different kinds of data:
   They are curated here like the paid programs, and the live event calendars
   are additionally scanned for volunteer and speaker calls the organisers
   wrote into the event description itself.
+
+* **Hackathons** are curated for a different reason: the prize and the travel
+  answer are the whole decision. Every entry states the cash pool or says it
+  has none, online events say no travel is needed, and an in-person event
+  abroad is only listed when travel and accommodation are covered.
 
 A failed fetch never fails the request. The last good event list keeps being
 served for ``STALE_TTL`` and ``events_live`` reports the difference, so the UI
@@ -1585,6 +1591,209 @@ VOLUNTEER: list[dict] = [
             "and vetted civil-society organisations. Anyone 18 or over can "
             "register, and the platform lets you filter online from on-site "
             "before you apply."
+        ),
+    },
+]
+
+# -------------------------------------------------------------- hackathons
+#
+# Hackathons are the one opportunity type where the money is the headline, so
+# every entry has to state the prize pool honestly and say whether getting
+# there costs the entrant anything. The rule for this list: an online event is
+# listed because there is no travel to fund; a Kenyan in-person event is listed
+# with its venue; and a hackathon abroad is only listed when the organisers
+# cover BOTH travel and accommodation. Anything that leaves the entrant to
+# book a flight and a bed is not worth the trip from Nairobi.
+#
+# Entries with a published deadline are dropped once it passes, like the
+# curated events. The Zindi entry has no date because the platform posts new
+# cash challenges year-round.
+
+HACKATHONS: list[dict] = [
+    {
+        "kind": "Hackathon",
+        "title": "Kiroween 2026 — $100,000 online hackathon",
+        "org": "Kiro (AWS)",
+        "when": "Online · 30 Oct–4 Dec 2026",
+        "opens": "2026-10-30",
+        "closes": "2026-12-04",
+        "steps": [
+            "Register on the Devpost page and pick one of the four categories",
+            "Build a brand-new app with Kiro (IDE, CLI, Web or Kiro Crew) — old projects do not count",
+            "Publish a public repo with the .kiro directory, a working demo and a video under 3 minutes",
+            "Submit by 4 Dec 2026, 2:00pm Pacific Time",
+        ],
+        "city": "Online",
+        "tags": ["Hackathon", "Cash prize", "Online", "AI", "Open source"],
+        "stipend": (
+            "Cash prize: $100,000 pool — $30k first, $20k second, $10k third "
+            "· fully online, so no travel or accommodation needed"
+        ),
+        "source": "Official",
+        "url": "https://kiroween.devpost.com/",
+        "desc": (
+            "Kiro's annual Halloween hackathon, run by AWS on Devpost: about "
+            "five weeks to build a new app around a crew of AI agents, with "
+            "categories for resurrecting dead tech, stitching incompatible "
+            "stacks together, one template shown as two products, and pure "
+            "interface polish. Teams of up to three, adults only, and some "
+            "jurisdictions are excluded by the rules — check the list before "
+            "you start. Because it is fully remote, there is no travel or "
+            "accommodation budget to worry about."
+        ),
+    },
+    {
+        "kind": "Hackathon",
+        "title": "QNX Global Hackathon 2026 — $50,000 in prizes",
+        "org": "QNX (BlackBerry)",
+        "when": "Online · 2 Nov–15 Dec 2026",
+        "opens": "2026-11-02",
+        "closes": "2026-12-15",
+        "steps": [
+            "Register on qnx.devpost.com and get QNX 8.0 free through QNX Everywhere",
+            "Pick one category — robotics, automotive, low-level software, tooling, ports or tutorials",
+            "Build a working project on or for QNX 8.0; QEMU or a Raspberry Pi 5 is enough hardware",
+            "Submit a public repo, build instructions and a demo video by 15 Dec 2026",
+        ],
+        "city": "Online",
+        "tags": ["Hackathon", "Cash prize", "Online", "Embedded", "Open source"],
+        "stipend": (
+            "Cash prize: $50,000 pool across 14 prizes, including a $10,000 "
+            "grand prize · fully online, so no travel or accommodation needed"
+        ),
+        "source": "Official",
+        "url": "https://qnx.devpost.com/",
+        "desc": (
+            "BlackBerry's first global QNX hackathon: six weeks to build on the "
+            "real-time OS that runs in cars, medical devices and trains. QNX "
+            "8.0 is free for non-commercial use, and the event is explicitly "
+            "hardware-light — QEMU and a Raspberry Pi 5 are both supported — "
+            "so the barrier is learning the platform, not buying a board. "
+            "Adults and teams, with standard Devpost jurisdiction exclusions."
+        ),
+    },
+    {
+        "kind": "Hackathon",
+        "title": "#BuildHybridAI 2026 — Firebase AI hackathon",
+        "org": "Google (Firebase)",
+        "when": "Online · 9–30 Nov 2026",
+        "opens": "2026-11-09",
+        "closes": "2026-11-30",
+        "steps": [
+            "Register on the Devpost page before 30 Nov 2026",
+            "Build an app that runs AI on-device and in the cloud with Firebase AI Logic",
+            "Submit solo or as a team, with a working demo and a short write-up",
+        ],
+        "city": "Online",
+        "tags": ["Hackathon", "Cash prize", "Online", "AI", "Mobile"],
+        "stipend": (
+            "Cash prize: $10,000 · fully online, so no travel or accommodation "
+            "needed"
+        ),
+        "source": "Official",
+        "url": "https://firebasehybridaihackathon.devpost.com/",
+        "desc": (
+            "A short, focused Google/Firebase hackathon for hybrid AI: models "
+            "that run locally on the device and hand off to the cloud when the "
+            "task needs it. It is a Devpost event, so entry is free and fully "
+            "online; the usual exclusions for sanctioned jurisdictions apply. "
+            "The deadline is close enough that a weekend plus a couple of "
+            "evenings is the realistic scope."
+        ),
+    },
+    {
+        "kind": "Hackathon",
+        "title": "Gemma 4 Developer Agent Competition — $110,000",
+        "org": "Google DeepMind (Kaggle)",
+        "when": "Online · entry by 25 Nov, final submission 2 Dec 2026",
+        "opens": "2026-09-23",
+        "closes": "2026-12-02",
+        "steps": [
+            "Join the competition on Kaggle and accept the rules by 25 Nov 2026",
+            "Post-train Gemma 4 into an offline coding agent that fixes real Python bugs",
+            "Submit an agent config with prompts, tools and optional LoRA adapters",
+            "Final submissions close 2 Dec 2026; the optional paper track closed 12 Nov",
+        ],
+        "city": "Online",
+        "tags": ["Hackathon", "Cash prize", "Online", "AI", "Data science"],
+        "stipend": (
+            "Cash prize: $110,000 total — $65,000 agent competition plus "
+            "$35,000 paper track · fully online, so no travel or accommodation "
+            "needed"
+        ),
+        "source": "Official",
+        "url": "https://www.kaggle.com/competitions/gemma-4-developer-agent",
+        "desc": (
+            "Less a weekend build and more a research sprint: take an open "
+            "Gemma 4 model and post-train it into an agent that navigates real "
+            "repositories and drafts fixes, judged on 129 public development "
+            "tasks with hidden tests. Teams of up to five, one submission a "
+            "day, and it runs entirely on Kaggle — no travel, no venue, no "
+            "accommodation. This is the strongest cash-per-hour option here "
+            "if you already work with fine-tuning or reinforcement learning."
+        ),
+    },
+    {
+        "kind": "Hackathon",
+        "title": "kood/Garage48 Empowering Women Kenya",
+        "org": "Garage48 & kood",
+        "when": "6–8 Dec 2026 · CEMASTEA, Nairobi",
+        "opens": None,
+        "closes": None,
+        "date": "2026-12-06",
+        "steps": [
+            "Apply through the Typeform linked on the event page",
+            "No team, idea or technical background needed — you form teams on the first day",
+            "Spend 48 hours with mentors turning a community problem into a working prototype",
+            "Pitch on the final day; the programme is for ages 16–26, with women at the centre",
+        ],
+        "city": "Nairobi",
+        "tags": ["Hackathon", "Non-cash", "On-site", "Nairobi", "Beginner friendly"],
+        "stipend": (
+            "Non-cash: free to attend, with mentors, meals during the event and a "
+            "working prototype by Sunday; no prize money is published"
+        ),
+        "source": "Official",
+        "url": "https://garage48.org/events/empoweringwomenkenya",
+        "desc": (
+            "A free 48-hour hackathon at CEMASTEA in Nairobi, run by Garage48 "
+            "and kood with Estonian development funding. It is deliberately "
+            "beginner-friendly: no coding experience, business plan or team "
+            "required, and every team has at least two women with mentors and "
+            "jury drawn heavily from women in tech. No cash prize or travel "
+            "stipend is published, so treat it as portfolio and network rather "
+            "than income — and it is in Nairobi, so there is no flight to fund."
+        ),
+    },
+    {
+        "kind": "Hackathon",
+        "title": "Zindi — cash-prize AI challenges",
+        "org": "Zindi",
+        "when": "Rolling · new challenges posted year-round",
+        "opens": None,
+        "closes": None,
+        "steps": [
+            "Create a free Zindi profile",
+            "Open the competitions list and filter by open status and prize",
+            "Read the eligibility first — some challenges are Africa-only, others global",
+            "Join solo or as a team and submit before that challenge's own deadline",
+        ],
+        "city": "Online",
+        "tags": ["Hackathon", "Cash prize", "Online", "AI", "Africa"],
+        "stipend": (
+            "Cash prize: each challenge states its own USD pool · fully online, "
+            "so no travel or accommodation needed"
+        ),
+        "source": "Official",
+        "url": "https://zindi.africa/competitions",
+        "desc": (
+            "Africa's data-science competition platform, and the most reliable "
+            "place to find a paid challenge from Nairobi: prizes range from a "
+            "few hundred dollars to tens of thousands, and Zindi also hosts "
+            "hackathons around events such as Deep Learning Indaba. Because "
+            "challenges rotate constantly, this entry stays live rather than "
+            "naming a single competition — open the list, read the prize and "
+            "the eligibility, and enter the one that matches your stack."
         ),
     },
 ]
@@ -3250,3 +3459,39 @@ async def get_volunteers() -> dict:
         "events_live": feed.ok,
         "events_updated_at": feed.fetched_at_wall,
     }
+
+
+def _upcoming_hackathons(today: date | None = None) -> list[dict]:
+    """Hackathons that have not closed yet, plus the undated platform entry.
+
+    A hackathon's date is load-bearing: a submission window that closed last
+    month is not an opportunity, it is a dead link with a prize attached, so
+    the list is filtered at request time instead of relying on someone to
+    prune the constants. Entries with neither a deadline nor an event date
+    (the Zindi platform) stay because they are always live.
+    """
+    current = today or datetime.now(EAT).date()
+    upcoming: list[dict] = []
+    for item in HACKATHONS:
+        key = item.get("closes") or item.get("date")
+        if not key:
+            upcoming.append(item)
+            continue
+        try:
+            if datetime.fromisoformat(str(key)).date() >= current:
+                upcoming.append(item)
+        except ValueError:
+            continue  # a typo in a date must not hide the whole feed
+    return upcoming
+
+
+async def get_hackathons() -> dict:
+    """The payload for ``GET /api/public/hackathons``.
+
+    Curated only: there is no public hackathon calendar worth scraping, and
+    the entries have to carry a verified prize and travel answer, which no
+    aggregator guarantees. ``events_live`` stays true so the page does not
+    show the event-feed outage notice for a feed it never used.
+    """
+    items = sorted(_upcoming_hackathons(), key=_sort_key)
+    return {"items": items, "events_live": True, "events_updated_at": None}

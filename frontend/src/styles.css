@@ -2999,6 +2999,7 @@ input[type="range"]::-moz-range-thumb {
 .opp-kind-intern { background: var(--ac-primary); color: var(--ac-on-primary); }
 .opp-kind-apprentice { background: var(--ac-secondary-container, #d7e8c8); color: var(--ac-on-secondary-container, #1b3a10); }
 .opp-kind-volunteer { background: var(--ac-tertiary-container); color: var(--ac-on-tertiary-container); }
+.opp-kind-hackathon { background: var(--ac-primary-fixed); color: var(--ac-primary); }
 .opp-source { color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .opp-watch-btn {
   background: none;

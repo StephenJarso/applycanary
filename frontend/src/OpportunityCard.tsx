@@ -206,8 +206,11 @@ export function OpportunityCard({
   isWatched = false,
   onToggleWatch,
 }: OpportunityCardProps) {
-  const deadline = item.closes ?? (item.kind === "Event" ? item.date : null) ?? null;
-  // Tracking is per application, so volunteer and speaking slots count too.
+  const deadline =
+    item.closes ??
+    (item.kind === "Event" || item.kind === "Hackathon" ? item.date : null) ??
+    null;
+  // Tracking is per application, so volunteer, speaking and hackathon slots count too.
   const tracking = useOpportunityTracking();
   const stage = tracking.stageFor(item.url);
 
@@ -225,7 +228,8 @@ export function OpportunityCard({
             (item.kind === "Paid program" ? " opp-kind-program"
               : item.kind === "Apprenticeship" ? " opp-kind-apprentice"
               : item.kind === "Internship" ? " opp-kind-intern"
-              : item.kind === "Volunteer" ? " opp-kind-volunteer" : "")
+              : item.kind === "Volunteer" ? " opp-kind-volunteer"
+              : item.kind === "Hackathon" ? " opp-kind-hackathon" : "")
           }
         >
           {item.kind}

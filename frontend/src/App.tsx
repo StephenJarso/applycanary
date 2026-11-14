@@ -18,6 +18,7 @@ import Opportunities from "./pages/Opportunities";
 import Internships from "./pages/Internships";
 import KenyaJobs from "./pages/KenyaJobs";
 import Volunteers from "./pages/Volunteers";
+import Hackathons from "./pages/Hackathons";
 import Pipeline from "./pages/Pipeline";
 import { useAuth } from "./context/AuthContext";
 import { FeedbackModal } from "./FeedbackModal";
@@ -46,6 +47,8 @@ const NAV = [
   { to: "/opportunities", label: "Programs", icon: "event", end: true },
   // Crew, mentoring and speaking slots at tech events — rare, and never on a job board
   { to: "/volunteers", label: "Volunteer", icon: "volunteer_activism", end: true },
+  // Cash-prize builds: online, or Kenyan in-person with the venue named
+  { to: "/hackathons", label: "Hackathons", icon: "emoji_events", end: true },
   // What came back after applying: outcomes, replies and follow-ups due.
   { to: "/pipeline", label: "Pipeline", icon: "view_kanban", end: true },
   { to: "/memory", label: "Memory", icon: "psychology", mobile: true },
@@ -56,6 +59,7 @@ const MOBILE_DRAWER_PAGES = [
   { to: "/internships", label: "Internships & Opportunities", icon: "school", end: true },
   { to: "/opportunities", label: "Programs", icon: "event", end: true },
   { to: "/volunteers", label: "Volunteer", icon: "volunteer_activism", end: true },
+  { to: "/hackathons", label: "Hackathons", icon: "emoji_events", end: true },
   { to: "/pipeline", label: "Pipeline", icon: "view_kanban", end: true },
   { to: "/applications", label: "Applications", icon: "work_history", end: true },
   { to: "/sources", label: "Sources Status", icon: "cable", end: true },
@@ -68,7 +72,7 @@ const MOBILE_MORE_PATHS = [
   "/sources",
 ];
 
-function Dashboard({ page }: { page?: "internships" | "programs" | "kenya-jobs" | "volunteers" }) {
+function Dashboard({ page }: { page?: "internships" | "programs" | "kenya-jobs" | "volunteers" | "hackathons" }) {
   const { user, logout } = useAuth();
   const location = useLocation();
   const [moreOpen, setMoreOpen] = useState(false);
@@ -134,6 +138,12 @@ function Dashboard({ page }: { page?: "internships" | "programs" | "kenya-jobs" 
     staleTime: 12 * 60 * 60_000,
     refetchOnWindowFocus: false,
   });
+  const hackathons = useQuery({
+    queryKey: ["hackathons"],
+    queryFn: api.hackathons,
+    staleTime: 60 * 60_000,
+    refetchOnWindowFocus: false,
+  });
 
   // Volunteer calls close and are gone; they belong in the deadline banner as
   // much as a program application does.
@@ -141,6 +151,7 @@ function Dashboard({ page }: { page?: "internships" | "programs" | "kenya-jobs" 
     ...(internships.data?.items ?? []),
     ...(opportunities.data?.items ?? []),
     ...(volunteers.data?.items ?? []),
+    ...(hackathons.data?.items ?? []),
   ];
 
   const upcomingDeadlines = getUpcomingDeadlines(allOpportunities, 7);
@@ -408,6 +419,7 @@ function Dashboard({ page }: { page?: "internships" | "programs" | "kenya-jobs" 
                     to={
                       nearest.kind === "Internship" ? "/internships"
                       : nearest.kind === "Volunteer" ? "/volunteers"
+                      : nearest.kind === "Hackathon" ? "/hackathons"
                       : "/opportunities"
                     }
                     className="banner-action"
@@ -468,6 +480,8 @@ function Dashboard({ page }: { page?: "internships" | "programs" | "kenya-jobs" 
             <Opportunities embedded />
           ) : page === "volunteers" ? (
             <Volunteers embedded />
+          ) : page === "hackathons" ? (
+            <Hackathons embedded />
           ) : page === "kenya-jobs" ? (
             <KenyaJobs embedded />
           ) : (
@@ -514,6 +528,7 @@ export default function App() {
     <Route path="/opportunities" element={user ? <Dashboard page="programs" /> : <Opportunities />} />
     <Route path="/internships" element={user ? <Dashboard page="internships" /> : <Navigate to="/" replace />} />
     <Route path="/volunteers" element={user ? <Dashboard page="volunteers" /> : <Navigate to="/" replace />} />
+    <Route path="/hackathons" element={user ? <Dashboard page="hackathons" /> : <Navigate to="/" replace />} />
     <Route path="/kenya-jobs" element={user ? <Dashboard page="kenya-jobs" /> : <KenyaJobs embedded={false} />} />
     <Route path="/entry-level" element={<Navigate to="/kenya-jobs" replace />} />
     {/* Public regardless of session: these are opened from an email, and the

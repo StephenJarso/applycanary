@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import asyncio
 import time
-from datetime import UTC, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta, timezone
 
 import httpx
 import pytest
@@ -23,6 +23,7 @@ from app.main import create_app
 from app.opportunities import (
     APPRENTICESHIPS,
     CURATED_EVENTS,
+    HACKATHONS,
     INTERNSHIPS,
     PAID_PROGRAMS,
     VOLUNTEER,
@@ -37,6 +38,7 @@ from app.opportunities import (
     _is_internship,
     _to_item,
     _upcoming_curated_events,
+    _upcoming_hackathons,
     _workke_item,
     parse_card_date,
     parse_event_cards,
@@ -857,3 +859,73 @@ def test_volunteers_endpoint_keeps_curated_roles_when_the_calendar_is_down(clien
     assert body["events_live"] is False
     assert {item["title"] for item in body["items"]} == {v["title"] for v in VOLUNTEER}
     assert {item["kind"] for item in body["items"]} == {"Volunteer"}
+
+
+# ------------------------------------------------------------------ hackathons
+
+
+def test_hackathon_entries_carry_everything_the_card_renders():
+    titles = [h["title"] for h in HACKATHONS]
+    assert len(titles) == len(set(titles))
+    assert all(h["kind"] == "Hackathon" for h in HACKATHONS)
+    for entry in HACKATHONS:
+        assert entry["url"].startswith("https://")
+        assert entry["org"] and entry["when"] and entry["city"] and entry["desc"] and entry["tags"]
+        assert entry["steps"], f"{entry['title']} never says how to enter"
+        # The card prints this line as the money line; it must lead with the
+        # truth, not bury it in the description.
+        assert entry["stipend"].startswith(("Cash prize", "Non-cash")), entry["stipend"]
+
+
+def test_hackathon_travel_rule_is_stated_on_every_entry():
+    """Online needs no travel; in-person has to answer the travel question."""
+    for entry in HACKATHONS:
+        text = f"{entry['stipend']} {entry['desc']}".lower()
+        if entry["city"] == "Online":
+            assert "no travel or accommodation needed" in text, entry["title"]
+        else:
+            assert entry.get("date") or entry.get("closes"), entry["title"]
+            assert "travel" in text, entry["title"]
+
+
+def test_hackathon_feed_covers_cash_online_and_kenya():
+    tags = {tag for entry in HACKATHONS for tag in entry["tags"]}
+    assert {"Hackathon", "Cash prize", "Online", "Nairobi"} <= tags
+    assert any(
+        entry["city"] == "Online" and entry["stipend"].startswith("Cash prize")
+        for entry in HACKATHONS
+    )
+    assert any(entry["city"] == "Nairobi" for entry in HACKATHONS)
+
+
+def test_hackathon_dates_are_iso_so_the_card_can_count_down():
+    for entry in HACKATHONS:
+        for key in ("opens", "closes", "date"):
+            if entry.get(key):
+                datetime.fromisoformat(entry[key])
+
+
+def test_closed_hackathons_are_dropped_but_the_platform_entry_stays():
+    """A passed deadline is a dead link with a prize attached, so it goes."""
+    undated = [e for e in HACKATHONS if not (e.get("closes") or e.get("date"))]
+    assert undated, "nothing exercises the always-live branch"
+    assert _upcoming_hackathons(date(2030, 1, 1)) == undated
+
+    today = datetime.now(timezone(timedelta(hours=3))).date()
+    for entry in _upcoming_hackathons():
+        key = entry.get("closes") or entry.get("date")
+        if key:
+            assert datetime.fromisoformat(key).date() >= today, entry["title"]
+
+
+def test_hackathons_endpoint_serves_only_live_hackathons(client):
+    res = client.get("/api/public/hackathons")
+    assert res.status_code == 200
+    body = res.json()
+
+    assert body["events_live"] is True
+    assert body["items"]
+    assert {item["kind"] for item in body["items"]} == {"Hackathon"}
+    assert {item["title"] for item in body["items"]} == {
+        h["title"] for h in _upcoming_hackathons()
+    }
