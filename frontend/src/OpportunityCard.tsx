@@ -223,7 +223,7 @@ export function OpportunityCard({
     >
       <div className="opp-card-top">
         <span
-          className=        {
+          className={
             "opp-kind" +
             (item.kind === "Paid program" ? " opp-kind-program"
               : item.kind === "Apprenticeship" ? " opp-kind-apprentice"

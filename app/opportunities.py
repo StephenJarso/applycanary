@@ -1359,37 +1359,6 @@ VOLUNTEER: list[dict] = [
     },
     {
         "kind": "Volunteer",
-        "title": "Wikimedia Kenya User Group — editors & campaign volunteers",
-        "org": "Wikimedia Kenya User Group",
-        "when": "Rolling · edit-a-thons and campaigns across Kenya",
-        "opens": None,
-        "closes": None,
-        "steps": [
-            "Join the user group through its Meta page and introduce yourself",
-            "Register for a campaign — Wiki Loves Africa, Art+Feminism, Wiki for Human Rights",
-            "Start with small edits, or translate a Kenyan article into Swahili",
-            "Experienced editors can lead a campaign or train new editors",
-        ],
-        "city": "Kenya",
-        "tags": ["Volunteer", "Open knowledge", "Editing", "Remote", "Kenya"],
-        "stipend": "Unpaid volunteer editing",
-        "source": "Official",
-        "url": "https://meta.wikimedia.org/wiki/Wikimedia_Community_User_Group_Kenya",
-        "desc": (
-            "The recognised Wikimedia affiliate for Kenya, founded in 2022 and "
-            "run by volunteers who close the gaps in how Kenya, Africa, women "
-            "and local languages appear on Wikipedia, Wikidata and Wikimedia "
-            "Commons. Work runs in English and Swahili: edit-a-thons, "
-            "photowalks, Wiki Loves Africa and training for new editors, with "
-            "campaigns led by volunteer coordinators. Editing and campaign "
-            "roles are unpaid and travel to in-person events is not "
-            "guaranteed — the return is editing experience, a public "
-            "contribution record and a route into the wider Wikimedia "
-            "community."
-        ),
-    },
-    {
-        "kind": "Volunteer",
         "title": "OpenStreetMap Kenya — volunteer mapper",
         "org": "OpenStreetMap Kenya",
         "when": "Rolling · mapathons and field mapping across Kenya",
@@ -2159,29 +2128,6 @@ INTERNSHIPS += [
 ]
 
 VOLUNTEER += [
-    {
-        "kind": "Volunteer",
-        "title": "UN Online Volunteering",
-        "org": "United Nations Volunteers",
-        "when": "Rolling — assignments posted continuously",
-        "opens": None,
-        "closes": None,
-        "steps": [
-            "Create a profile on the UNV platform",
-            "Filter assignments by skill and remote",
-            "Apply to individual postings",
-        ],
-        "city": "Online",
-        "tags": ["Remote", "Online", "Development"],
-        "stipend": "Unpaid — volunteer role",
-        "source": "Official",
-        "url": "https://www.onlinevolunteering.org/",
-        "desc": (
-            "Remote assignments for UN agencies and NGOs, from translation and "
-            "research to web development and data work. Task length and time "
-            "commitment vary by posting."
-        ),
-    },
     {
         "kind": "Volunteer",
         "title": "Microsoft Learn Student Ambassadors",
