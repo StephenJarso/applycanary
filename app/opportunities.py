@@ -1351,6 +1351,242 @@ VOLUNTEER: list[dict] = [
             "otherwise."
         ),
     },
+    {
+        "kind": "Volunteer",
+        "title": "Wikimedia Kenya User Group — editors & campaign volunteers",
+        "org": "Wikimedia Kenya User Group",
+        "when": "Rolling · edit-a-thons and campaigns across Kenya",
+        "opens": None,
+        "closes": None,
+        "steps": [
+            "Join the user group through its Meta page and introduce yourself",
+            "Register for a campaign — Wiki Loves Africa, Art+Feminism, Wiki for Human Rights",
+            "Start with small edits, or translate a Kenyan article into Swahili",
+            "Experienced editors can lead a campaign or train new editors",
+        ],
+        "city": "Kenya",
+        "tags": ["Volunteer", "Open knowledge", "Editing", "Remote", "Kenya"],
+        "stipend": "Unpaid volunteer editing",
+        "source": "Official",
+        "url": "https://meta.wikimedia.org/wiki/Wikimedia_Community_User_Group_Kenya",
+        "desc": (
+            "The recognised Wikimedia affiliate for Kenya, founded in 2022 and "
+            "run by volunteers who close the gaps in how Kenya, Africa, women "
+            "and local languages appear on Wikipedia, Wikidata and Wikimedia "
+            "Commons. Work runs in English and Swahili: edit-a-thons, "
+            "photowalks, Wiki Loves Africa and training for new editors, with "
+            "campaigns led by volunteer coordinators. Editing and campaign "
+            "roles are unpaid and travel to in-person events is not "
+            "guaranteed — the return is editing experience, a public "
+            "contribution record and a route into the wider Wikimedia "
+            "community."
+        ),
+    },
+    {
+        "kind": "Volunteer",
+        "title": "OpenStreetMap Kenya — volunteer mapper",
+        "org": "OpenStreetMap Kenya",
+        "when": "Rolling · mapathons and field mapping across Kenya",
+        "opens": None,
+        "closes": None,
+        "steps": [
+            "Create a free OpenStreetMap account and learn the iD editor",
+            "Join OSM Kenya through osmkenya.org and follow its events",
+            "Attend a mapathon and map buildings, roads or facilities",
+            "Take on validation, or help run a mapping party in your county",
+        ],
+        "city": "Kenya",
+        "tags": ["Volunteer", "Mapping", "Open data", "Community", "On-site", "Kenya"],
+        "stipend": "Unpaid volunteer mapping",
+        "source": "Official",
+        "url": "https://osmkenya.org/",
+        "desc": (
+            "A volunteer community active since 2018 that builds Kenya's open "
+            "map: roads, schools, health facilities and informal settlements, "
+            "used for humanitarian response, planning and research. OSM Kenya "
+            "runs mapathons and field mapping with partners such as the Kenya "
+            "Red Cross and the Humanitarian OpenStreetMap Team, and trains new "
+            "mappers from students to professionals. GIS experience helps but "
+            "is not a requirement — the first shift is usually tracing "
+            "satellite imagery, and the community validates what you draw."
+        ),
+    },
+    {
+        "kind": "Volunteer",
+        "title": "She Code Africa — mentorship programme mentor",
+        "org": "She Code Africa",
+        "when": "Mentorship cycles through the year · apply per cycle",
+        "opens": None,
+        "closes": None,
+        "steps": [
+            "Open the mentorship programme on shecodeafrica.org",
+            "Apply to be a mentor in a track you work in",
+            "Check the bar: mid-to-senior level and 3+ years of experience",
+            "Commit to the full cycle and engage your mentees regularly",
+        ],
+        "city": "Online",
+        "tags": ["Volunteer", "Mentoring", "Remote", "Women in tech", "Community"],
+        "stipend": "Unpaid + benefits: certificate of contribution and public recognition",
+        "source": "Official",
+        "url": "https://shecodeafrica.org/",
+        "desc": (
+            "A pan-African non-profit with a 40,000-strong community and "
+            "chapters across the continent, including Kenyan university "
+            "chapters. Its virtual mentorship programme matches African women "
+            "in tech with mentors for a full cycle, and the mentor call is "
+            "explicit about the bar: mid-to-senior professionals with at least "
+            "three years in one of the available tracks. Mentors get a "
+            "certificate of contribution and public recognition; the value is "
+            "leadership and coaching experience, not a stipend."
+        ),
+    },
+    {
+        "kind": "Volunteer",
+        "title": "Zindi Ambassador Programme — community lead",
+        "org": "Zindi",
+        "when": "Cohorts recruited periodically · host events in your city",
+        "opens": None,
+        "closes": None,
+        "steps": [
+            "Create a Zindi profile and read the ambassador FAQ",
+            "Apply when a cohort opens — the previous call closed in August",
+            "Host a meetup, workshop or hackathon for data scientists locally",
+            "Report back on the event and stay active in the ambassador network",
+        ],
+        "city": "Various",
+        "tags": ["Volunteer", "Data science", "Community", "Speaking", "Africa"],
+        "stipend": "Unpaid + benefits: leadership experience, training and mentorship",
+        "source": "Official",
+        "url": "https://zindi.africa/",
+        "desc": (
+            "Zindi's ambassador network is the volunteer layer behind Africa's "
+            "largest data-science community: ambassadors run meetups, "
+            "workshops and hackathons in their own cities and bring new people "
+            "into the competitions. The programme recruits in cohorts rather "
+            "than continuously — the call before this one closed in August — "
+            "so the FAQ's 'How do I become a Zindi Ambassador?' entry is the "
+            "honest starting point when nothing is open. Ambassadors gain "
+            "leadership and public-speaking experience plus training; there "
+            "is no salary attached."
+        ),
+    },
+    {
+        "kind": "Volunteer",
+        "title": "Django Girls — workshop coach or organizer",
+        "org": "Django Girls",
+        "when": "One-day workshops · rolling across Africa and online",
+        "opens": None,
+        "closes": None,
+        "steps": [
+            "Find a workshop near you on djangogirls.org and open its page",
+            "Apply through that event's coach form",
+            "Read the coaching manual before the day",
+            "No event nearby? Apply to organize one with the organizer manual",
+        ],
+        "city": "Various",
+        "tags": ["Volunteer", "Mentoring", "Teaching", "Python", "On-site"],
+        "stipend": "Unpaid volunteer coaching",
+        "source": "Official",
+        "url": "https://djangogirls.org/en/contribute",
+        "desc": (
+            "A volunteer-run charity that has put on more than 1,200 free "
+            "one-day workshops in 111 countries since 2014, with groups of "
+            "three attendees per coach. Coaches do not need deep Django "
+            "knowledge — the organisers look for people who can teach and "
+            "keep a beginner calm — and the coaching manual covers the "
+            "installation session as well as the tutorial. The organisers are "
+            "blunt that coaches, speakers and organizers are not paid, so "
+            "treat it as experience and community rather than income."
+        ),
+    },
+    {
+        "kind": "Volunteer",
+        "title": "PyLadiesCon — volunteer crew",
+        "org": "PyLadies",
+        "when": "Annual online conference · volunteer sign-up open",
+        "opens": None,
+        "closes": None,
+        "steps": [
+            "Open the PyLadiesCon portal and fill in a volunteer profile",
+            "Say which region and languages you can cover and how you want to help",
+            "Get matched to a team, then join the crew Discord onboarding",
+            "Propose a session separately if you also want to speak",
+        ],
+        "city": "Online",
+        "tags": ["Volunteer", "Remote", "Conference", "Speaker", "Community"],
+        "stipend": "Unpaid remote volunteering",
+        "source": "Official",
+        "url": "https://portal.pyladies.com/",
+        "desc": (
+            "PyLadiesCon is free, online, global and multilingual, and it is "
+            "run entirely by volunteers — the portal's own count of volunteers "
+            "who have already signed up is on the home page. Signing up is a "
+            "profile rather than an application: region, languages and the "
+            "kind of work you want, then the team matches you to programme, "
+            "marketing, technical or session support. It is the "
+            "lowest-commitment way onto a conference crew, and proposing a "
+            "talk uses the same portal."
+        ),
+    },
+    {
+        "kind": "Volunteer",
+        "title": "freeCodeCamp — open-source contributor",
+        "org": "freeCodeCamp",
+        "when": "Rolling · contribute from anywhere",
+        "opens": None,
+        "closes": None,
+        "steps": [
+            "Read contribute.freecodecamp.org and the Code of Conduct",
+            "Pick a path: curriculum, UI/client, mobile app, docs or quick fixes",
+            "Find an issue labelled 'help wanted' on the GitHub repo",
+            "Answer learners on the forum if you prefer teaching to code",
+        ],
+        "city": "Online",
+        "tags": ["Volunteer", "Open source", "Remote", "Coding", "Mentoring"],
+        "stipend": "Unpaid open-source volunteering",
+        "source": "Official",
+        "url": "https://contribute.freecodecamp.org/",
+        "desc": (
+            "The largest learn-to-code community is built by thousands of "
+            "volunteers, and the contributor docs split the work into paths: "
+            "curriculum and challenges, the web client, the mobile app, "
+            "documentation and small fixes. The repo labels beginner-friendly "
+            "issues, so a first pull request is a realistic goal. One current "
+            "exception worth knowing: the FAQ says curriculum translation is "
+            "paused while the team reworks it, so apply for code, docs, forum "
+            "support or article and video contributions instead."
+        ),
+    },
+    {
+        "kind": "Volunteer",
+        "title": "UN Online Volunteering — remote assignments",
+        "org": "United Nations Volunteers",
+        "when": "Task-based · up to 20 hrs/week for up to 12 weeks",
+        "opens": None,
+        "closes": None,
+        "steps": [
+            "Register on the Unified Volunteering Platform (app.unv.org)",
+            "Filter for online assignments and the skills you have",
+            "Apply to short task-based roles — data, mapping, web or design",
+            "Deliver the task and collect the certificate of appreciation",
+        ],
+        "city": "Online",
+        "tags": ["Volunteer", "Remote", "Global", "Data", "Web"],
+        "stipend": "Unpaid remote volunteering (certificate of appreciation)",
+        "source": "Official",
+        "url": "https://www.unv.org/become-online-volunteer",
+        "desc": (
+            "The remote half of UNV, and a different thing from the on-site UN "
+            "Volunteer assignments listed above: these are task-based, capped "
+            "at 20 hours a week for up to 12 weeks, and carry no allowance or "
+            "benefits — the reward is a certificate of appreciation. "
+            "Assignments range from data analysis and mapping to web and "
+            "graphic design, translation and outreach, posted by UN agencies "
+            "and vetted civil-society organisations. Anyone 18 or over can "
+            "register, and the platform lets you filter online from on-site "
+            "before you apply."
+        ),
+    },
 ]
 
 # A conference's call for help usually lives in its own event description, so
