@@ -1582,6 +1582,9 @@ HACKATHONS: list[dict] = [
     {
         "kind": "Hackathon",
         "title": "Kiroween 2026 — $100,000 online hackathon",
+        "cash_prize": True,
+        "airfare_covered": False,
+        "accommodation": "not_included",
         "org": "Kiro (AWS)",
         "when": "Online · 30 Oct–4 Dec 2026",
         "opens": "2026-10-30",
@@ -1614,6 +1617,9 @@ HACKATHONS: list[dict] = [
     {
         "kind": "Hackathon",
         "title": "QNX Global Hackathon 2026 — $50,000 in prizes",
+        "cash_prize": True,
+        "airfare_covered": False,
+        "accommodation": "not_included",
         "org": "QNX (BlackBerry)",
         "when": "Online · 2 Nov–15 Dec 2026",
         "opens": "2026-11-02",
@@ -1644,6 +1650,9 @@ HACKATHONS: list[dict] = [
     {
         "kind": "Hackathon",
         "title": "#BuildHybridAI 2026 — Firebase AI hackathon",
+        "cash_prize": True,
+        "airfare_covered": False,
+        "accommodation": "not_included",
         "org": "Google (Firebase)",
         "when": "Online · 9–30 Nov 2026",
         "opens": "2026-11-09",
@@ -1673,6 +1682,9 @@ HACKATHONS: list[dict] = [
     {
         "kind": "Hackathon",
         "title": "Gemma 4 Developer Agent Competition — $110,000",
+        "cash_prize": True,
+        "airfare_covered": False,
+        "accommodation": "not_included",
         "org": "Google DeepMind (Kaggle)",
         "when": "Online · entry by 25 Nov, final submission 2 Dec 2026",
         "opens": "2026-09-23",
@@ -1705,6 +1717,9 @@ HACKATHONS: list[dict] = [
     {
         "kind": "Hackathon",
         "title": "kood/Garage48 Empowering Women Kenya",
+        "cash_prize": False,
+        "airfare_covered": False,
+        "accommodation": "not_included",
         "org": "Garage48 & kood",
         "when": "6–8 Dec 2026 · CEMASTEA, Nairobi",
         "opens": None,
@@ -1737,6 +1752,9 @@ HACKATHONS: list[dict] = [
     {
         "kind": "Hackathon",
         "title": "Zindi — cash-prize AI challenges",
+        "cash_prize": True,
+        "airfare_covered": False,
+        "accommodation": "not_included",
         "org": "Zindi",
         "when": "Rolling · new challenges posted year-round",
         "opens": None,
@@ -1763,6 +1781,125 @@ HACKATHONS: list[dict] = [
             "challenges rotate constantly, this entry stays live rather than "
             "naming a single competition — open the list, read the prize and "
             "the eligibility, and enter the one that matches your stack."
+        ),
+    },
+    {
+        "kind": "Hackathon",
+        "title": "Africa's Talking Women in Tech Hackathon: EdTech Solutions",
+        "cash_prize": True,
+        "airfare_covered": False,
+        "accommodation": "not_included",
+        "org": "Africa's Talking Women in Tech",
+        "when": "25 Nov 2026 · Africa's Talking, Kabarsiran Ave, Nairobi",
+        "opens": None,
+        "closes": None,
+        "date": "2026-11-25",
+        "steps": [
+            "RSVP on the community event page; use the same email as your Uber account",
+            "Register by Monday 23 Nov 2026 to receive a transport code to and from the venue",
+            "Form a team and pick an education problem that works on a basic phone",
+            "Build with an Africa's Talking API (SMS, USSD, Voice, Airtime or Chat) and demo before 7pm",
+        ],
+        "city": "Nairobi",
+        "tags": ["Hackathon", "Cash prize", "Women in tech", "Nairobi", "EdTech"],
+        "stipend": (
+            "Cash prize: $100 winner, $50 second, $25 third, plus a local "
+            "transport code for registrations by 23 Nov"
+        ),
+        "source": "Official",
+        "url": (
+            "https://community.africastalking.com/events/details/"
+            "africas-talking-africas-talking-women-in-tech-community-presents-"
+            "africas-talking-women-in-tech-hackathon-edtech-solutions-nairobi/"
+        ),
+        "desc": (
+            "A one-day EdTech hackathon at Africa's Talking's Nairobi office, "
+            "run by its Women in Tech community and open to developers, "
+            "students, educators, designers and founders. The brief is "
+            "deliberately low-bandwidth: lessons by SMS, quizzes over USSD, "
+            "voice broadcasts to parents, airtime rewards for learners. There "
+            "is a small cash pool and a transport code for people who "
+            "register early, but no accommodation or intercity travel — if "
+            "you are outside Nairobi, the trip is yours to fund."
+        ),
+    },
+    {
+        "kind": "Hackathon",
+        "title": "Africa's Talking Open Hackathon: Hospitality & Tourism",
+        "cash_prize": True,
+        "airfare_covered": False,
+        "accommodation": "not_included",
+        "org": "Africa's Talking",
+        "when": "26 Nov 2026 · Nairobi Garage Kilimani, Nairobi",
+        "opens": None,
+        "closes": None,
+        "date": "2026-11-26",
+        "steps": [
+            "RSVP on the Africa's Talking community event page",
+            "Submit your idea through the hackathon idea form linked on the page",
+            "Bring a laptop and build with SMS, USSD, Voice, Airtime or Payments APIs",
+            "Demo your prototype at the end of the day and publish it to the Marketplace to be considered",
+        ],
+        "city": "Nairobi",
+        "tags": ["Hackathon", "Cash prize", "Nairobi", "Tourism", "APIs"],
+        "stipend": (
+            "Cash prize: $100 winner, $50 second, $25 third; no travel or "
+            "accommodation funding published"
+        ),
+        "source": "Official",
+        "url": (
+            "https://community.africastalking.com/events/details/"
+            "africas-talking-africas-talking-open-community-east-africa-presents-"
+            "africas-talking-open-hackathon-hospitality-amp-tourism-nairobi-kenya/"
+        ),
+        "desc": (
+            "A full-day build at Nairobi Garage Kilimani on the practical "
+            "problems of African travel: bookings over USSD, M-Pesa deposits, "
+            "SMS check-in, tour-operator dispatch and community tourism. "
+            "Africa's Talking supplies the APIs and mentors, and the winning "
+            "team takes a small cash prize; the bigger draw is the talent "
+            "bench, where attendees can pick up a job or gig on the spot. It "
+            "is free to enter and in Nairobi, with no travel or accommodation "
+            "support."
+        ),
+    },
+    {
+        "kind": "Hackathon",
+        "title": "Innovate Mombasa: Hospitality & Tourism Hackathon",
+        "cash_prize": False,
+        "airfare_covered": False,
+        "accommodation": "not_included",
+        "org": "Africa's Talking",
+        "when": "27 Nov 2026 · Westerwelle Startup Haus, Mombasa",
+        "opens": None,
+        "closes": None,
+        "date": "2026-11-27",
+        "steps": [
+            "RSVP on the Africa's Talking community event page",
+            "Bring a laptop and a coastal tourism problem worth solving",
+            "Build with Africa's Talking APIs through the day with mentors on hand",
+            "Demo to the room before the 5:30pm close",
+        ],
+        "city": "Mombasa",
+        "tags": ["Hackathon", "Non-cash", "Mombasa", "Tourism", "APIs"],
+        "stipend": (
+            "Non-cash: free to attend; no prize money or travel funding published"
+        ),
+        "source": "Official",
+        "url": (
+            "https://community.africastalking.com/events/details/"
+            "africas-talking-africas-talking-open-community-east-africa-presents-"
+            "innovate-mombasa-hospitality-and-tourism-hackathon/"
+        ),
+        "desc": (
+            "The coast edition of Africa's Talking's tourism series, a free "
+            "one-day hackathon at Westerwelle Startup Haus in Mombasa. "
+            "Developers, designers and tourism operators work through "
+            "booking, payments and guest-experience problems specific to the "
+            "coast. No prize pool or transport support is published for this "
+            "one, so treat it as a build day and a network rather than "
+            "income — and if you are travelling from Nairobi, that trip is "
+            "on you."
         ),
     },
 ]
@@ -2315,6 +2452,128 @@ VOLUNTEER += [
         "desc": (
             "Contribute to the open-source crisis-mapping platform built in Nairobi. "
             "Work is asynchronous on GitHub, with issues tagged for newcomers."
+        ),
+    },
+    {
+        "kind": "Volunteer",
+        "title": "Kenya Red Cross — volunteer software developer (Frappe/Python)",
+        "org": "Kenya Red Cross Society",
+        "when": "Hybrid Nairobi · 3 months, 30–35 hrs/week",
+        "opens": None,
+        "closes": None,
+        "steps": [
+            "Create a profile on the Kenya Red Cross OneRC volunteer portal",
+            "Open the Volunteer Software Developer listing and apply with a CV and GitHub profile",
+            "Expect remote-first work with occasional reporting at the Nairobi headquarters",
+            "Commit 30–35 hours a week for three months, with a possible extension",
+        ],
+        "city": "Nairobi",
+        "tags": ["Volunteer", "Software development", "Python", "Frappe", "Hybrid", "Nairobi"],
+        "stipend": (
+            "Unpaid volunteer role: 3-month placement at 30–35 hrs/week; no "
+            "stipend is published"
+        ),
+        "source": "Official",
+        "url": "https://onerc.redcross.or.ke/vmms/opportunities/HR-OPN-2026-0006",
+        "desc": (
+            "A substantive backend role inside Kenya Red Cross's digital "
+            "transformation team: build and customise Frappe applications, "
+            "REST APIs and role-based access for the society's internal "
+            "platforms. It asks for two years of experience with Python, Git "
+            "and Frappe, and is hybrid — mostly remote but with occasional "
+            "visits to the Nairobi HQ. The placement runs three months at "
+            "30–35 hours a week and is unpaid, so it suits someone building a "
+            "humanitarian portfolio rather than needing income."
+        ),
+    },
+    {
+        "kind": "Volunteer",
+        "title": "Civic Education Kenya — volunteer software developer / reviewer",
+        "org": "Civic Education Kenya (CEKA)",
+        "when": "Remote · flexible, ongoing",
+        "opens": None,
+        "closes": None,
+        "steps": [
+            "Open the CEKA volunteer board and choose the software developer role",
+            "Submit the application form with links to code you have shipped",
+            "Start with code review and bug triage on the existing app",
+            "Agree a flexible weekly rhythm with the core team",
+        ],
+        "city": "Online",
+        "tags": ["Volunteer", "Software development", "React", "Supabase", "Remote"],
+        "stipend": "Unpaid volunteer role",
+        "source": "Official",
+        "url": "https://civiceducationkenya.com/join-community?tab=volunteer",
+        "desc": (
+            "CEKA needs a second technical pair of eyes on its civic-tech stack: "
+            "code review, debugging, feature work and calling out technical "
+            "risk in an existing codebase. The listed stack is close to "
+            "ApplyCanary's own — React, TypeScript, Supabase, PostgreSQL, "
+            "Tailwind, Vite and Git — and the role is explicitly remote and "
+            "flexible, which makes it one of the few volunteer engineering "
+            "roles in Kenya that can fit around a job search."
+        ),
+    },
+    {
+        "kind": "Volunteer",
+        "title": "Civic Education Kenya — video & social content volunteer",
+        "org": "Civic Education Kenya (CEKA)",
+        "when": "Remote · flexible, ongoing",
+        "opens": None,
+        "closes": None,
+        "steps": [
+            "Open the CEKA volunteer board and choose the content role",
+            "Send examples of short-form video or social campaigns you have made",
+            "Work with the team on scripts, storyboards and edits for civic explainers",
+            "Publish across Instagram, YouTube and other CEKA channels",
+        ],
+        "city": "Online",
+        "tags": ["Volunteer", "Content", "Video", "Social media", "Remote"],
+        "stipend": "Unpaid volunteer role",
+        "source": "Official",
+        "url": "https://civiceducationkenya.com/join-community?tab=volunteer",
+        "desc": (
+            "Turn bills, rights and civic processes into short, accessible "
+            "video and social posts for a Kenyan civic-education nonprofit. "
+            "The work covers research, scripting, storyboarding, filming or "
+            "editing support, captions and platform-specific cuts. It is "
+            "remote and flexible, and useful for anyone building a content "
+            "portfolio around explainer or public-interest work."
+        ),
+    },
+    {
+        "kind": "Volunteer",
+        "title": "Kujia Kenya — Nairobi chapter leader",
+        "org": "Kujia Kenya",
+        "when": "Hybrid Nairobi · about 3 hrs/week",
+        "opens": None,
+        "closes": None,
+        "steps": [
+            "Open the Idealist listing and fill in the linked chapter-leader form",
+            "Attend the Kujia orientation for new chapter leaders",
+            "Support or start Kujia Clubs in Nairobi institutions and communities",
+            "Commit roughly three hours a week to meetings, outreach and coordination",
+        ],
+        "city": "Nairobi",
+        "tags": ["Volunteer", "Community", "Leadership", "Youth", "Nairobi"],
+        "stipend": (
+            "Unpaid volunteer role; training and orientation provided, no "
+            "stipend published"
+        ),
+        "source": "Idealist",
+        "url": (
+            "https://www.idealist.org/en/volunteer-opportunity/"
+            "d4b5004f1dc746948170f47088a0312e-kujia-chapter-leaders-in-nairobi-"
+            "kujia-kenya-nairobi"
+        ),
+        "desc": (
+            "Kujia is a youth digital-skills and entrepreneurship network with "
+            "clubs across Kenya, and its Nairobi chapter is recruiting leaders "
+            "rather than members. The role is coordination-heavy: support "
+            "clubs, recruit volunteers, run outreach and keep the chapter and "
+            "the national association in sync. It asks for about three hours "
+            "a week, is hybrid around Nairobi, and provides training but no "
+            "pay — a route into community leadership and the Kujia network."
         ),
     },
 ]
@@ -3431,6 +3690,32 @@ def _upcoming_hackathons(today: date | None = None) -> list[dict]:
     return upcoming
 
 
+def _hackathon_state(entry: dict) -> dict:
+    """Deadline state for a card, treating a one-day event's date as its close.
+
+    ``deadline_state`` only understands application windows, so a dated
+    hackathon would otherwise fall through as "rolling". A dated call is open
+    until the day itself, then closed; the undated platform entry really is
+    rolling.
+    """
+    if entry.get("closes"):
+        return deadline_state(entry)
+    raw = str(entry.get("date") or "").strip()[:10]
+    if not raw:
+        return deadline_state(entry)
+    try:
+        event_day = date.fromisoformat(raw)
+    except ValueError:
+        return deadline_state(entry)
+    days = (event_day - datetime.now(UTC).date()).days
+    return {
+        "expired": days < 0,
+        "days_left": days,
+        "status": "closed" if days < 0 else "open",
+        "opens_in": None,
+    }
+
+
 async def get_hackathons() -> dict:
     """The payload for ``GET /api/public/hackathons``.
 
@@ -3439,5 +3724,8 @@ async def get_hackathons() -> dict:
     aggregator guarantees. ``events_live`` stays true so the page does not
     show the event-feed outage notice for a feed it never used.
     """
-    items = sorted(_upcoming_hackathons(), key=_sort_key)
+    items = sorted(
+        ({**entry, **_hackathon_state(entry)} for entry in _upcoming_hackathons()),
+        key=_sort_key,
+    )
     return {"items": items, "events_live": True, "events_updated_at": None}

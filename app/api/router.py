@@ -207,6 +207,9 @@ class OpportunityOut(BaseModel):
     opens: str | None = None  # application window, paid programs only
     closes: str | None = None
     steps: list[str] | None = None
+    # Hackathons only: the cash answer. Travel and a bed reuse the structured
+    # funding fields below (airfare_covered, accommodation).
+    cash_prize: bool = False
     stipend: str | None = None
     # Structured funding. Empty means the organiser did not publish it.
     stipend_amount: int | None = None

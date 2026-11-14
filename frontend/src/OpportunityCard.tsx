@@ -297,6 +297,32 @@ export function OpportunityCard({
         )}
       </div>
 
+      {item.kind === "Hackathon" && (
+        <div className="opp-badges" aria-label="Prize and travel coverage">
+          {item.cash_prize && (
+            <span className="opp-badge opp-badge-cash">💰 Cash prize</span>
+          )}
+          {item.city === "Online" ? (
+            <span className="opp-badge">💻 Online · no travel needed</span>
+          ) : (
+            <>
+              <span
+                className={`opp-badge${item.airfare_covered ? " opp-badge-yes" : ""}`}
+              >
+                ✈️ {item.airfare_covered ? "Travel covered" : "Travel not covered"}
+              </span>
+              <span
+                className={`opp-badge${item.accommodation === "included" ? " opp-badge-yes" : ""}`}
+              >
+                🏨 {item.accommodation === "included"
+                  ? "Accommodation covered"
+                  : "Accommodation not covered"}
+              </span>
+            </>
+          )}
+        </div>
+      )}
+
       <div>
         <h3>{item.title}</h3>
         <p className="opp-meta">{item.org} · {item.city} · {item.when}</p>

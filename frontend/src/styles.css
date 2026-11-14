@@ -3000,6 +3000,21 @@ input[type="range"]::-moz-range-thumb {
 .opp-kind-apprentice { background: var(--ac-secondary-container, #d7e8c8); color: var(--ac-on-secondary-container, #1b3a10); }
 .opp-kind-volunteer { background: var(--ac-tertiary-container); color: var(--ac-on-tertiary-container); }
 .opp-kind-hackathon { background: var(--ac-primary-fixed); color: var(--ac-primary); }
+.opp-badges { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-top: 0.6rem; }
+.opp-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  background: var(--ac-surface-container);
+  color: var(--ac-on-surface-variant);
+  white-space: nowrap;
+}
+.opp-badge-cash { background: var(--ac-canary-fixed); color: var(--ac-on-canary); }
+.opp-badge-yes { background: var(--ac-ok-container); color: var(--ac-on-ok); }
 .opp-source { color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .opp-watch-btn {
   background: none;

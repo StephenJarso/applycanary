@@ -119,16 +119,23 @@ export default function Hackathons({ embedded = false }: { embedded?: boolean })
   };
 
   const openNow = items.filter((o) => status(o) === "Open now").length;
-  const cash = items.filter((o) => o.stipend?.startsWith("Cash prize")).length;
+  const cash = items.filter((o) => o.cash_prize).length;
   const online = items.filter((o) => o.city === "Online").length;
+  const covered = items.filter(
+    (o) => o.airfare_covered && o.accommodation === "included",
+  ).length;
+
+  const coverage =
+    covered > 0
+      ? `${covered} cover both travel and accommodation`
+      : "none of the open calls cover both travel and accommodation";
 
   const blurb = (
     <>
-      Hackathons and build challenges with the prize and the travel cost stated
-      upfront: {cash} carry a cash pool and {online} are fully online, so there
-      is no flight or hotel to fund. Kenyan in-person events appear with their
-      venue. A hackathon abroad is listed only when the organisers cover both
-      travel and accommodation — never assume it, check the card.
+      Hackathons and build challenges with the money and travel answer on the
+      card: {cash} carry a cash prize, {online} are fully online, and {coverage}.
+      Online events need neither; Kenyan in-person events name their venue. A
+      hackathon abroad is listed only when both are covered — never assume it.
     </>
   );
 

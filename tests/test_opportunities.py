@@ -875,6 +875,11 @@ def test_hackathon_entries_carry_everything_the_card_renders():
         # The card prints this line as the money line; it must lead with the
         # truth, not bury it in the description.
         assert entry["stipend"].startswith(("Cash prize", "Non-cash")), entry["stipend"]
+        # The badges read these fields, so they cannot drift from the money line.
+        assert isinstance(entry["cash_prize"], bool)
+        assert entry["cash_prize"] == entry["stipend"].startswith("Cash prize")
+        assert isinstance(entry["airfare_covered"], bool)
+        assert entry["accommodation"] in ("included", "not_included", "not_stated")
 
 
 def test_hackathon_travel_rule_is_stated_on_every_entry():
@@ -883,6 +888,7 @@ def test_hackathon_travel_rule_is_stated_on_every_entry():
         text = f"{entry['stipend']} {entry['desc']}".lower()
         if entry["city"] == "Online":
             assert "no travel or accommodation needed" in text, entry["title"]
+            assert entry["airfare_covered"] is False
         else:
             assert entry.get("date") or entry.get("closes"), entry["title"]
             assert "travel" in text, entry["title"]
@@ -896,6 +902,9 @@ def test_hackathon_feed_covers_cash_online_and_kenya():
         for entry in HACKATHONS
     )
     assert any(entry["city"] == "Nairobi" for entry in HACKATHONS)
+    assert any(entry["city"] == "Mombasa" for entry in HACKATHONS)
+    assert any(entry["cash_prize"] for entry in HACKATHONS)
+    assert any(not entry["cash_prize"] for entry in HACKATHONS)
 
 
 def test_hackathon_dates_are_iso_so_the_card_can_count_down():
@@ -929,3 +938,11 @@ def test_hackathons_endpoint_serves_only_live_hackathons(client):
     assert {item["title"] for item in body["items"]} == {
         h["title"] for h in _upcoming_hackathons()
     }
+    assert all("cash_prize" in item for item in body["items"])
+    assert all("accommodation" in item for item in body["items"])
+
+    # A dated or closing hackathon is open until then; only the undated
+    # platform entry is genuinely rolling.
+    for item in body["items"]:
+        expected = "open" if (item["date"] or item["closes"]) else "rolling"
+        assert item["status"] == expected, item["title"]

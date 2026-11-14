@@ -649,6 +649,8 @@ export interface Opportunity {
   stipend_period?: "month" | "year" | "total" | "";
   accommodation?: "included" | "not_included" | "not_stated";
   airfare_covered?: boolean;
+  /** Hackathons: whether the organisers state a cash prize. */
+  cash_prize?: boolean;
   relocation_support?: boolean;
   remote_friendly?: boolean;
   eligibility?: string[];
