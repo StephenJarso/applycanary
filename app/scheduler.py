@@ -364,6 +364,42 @@ async def job_digest() -> None:
             )
 
 
+async def job_hackathon_reminder() -> None:
+    """Monthly re-check of the curated hackathon list.
+
+    There is no dependable public Kenya hackathon feed to poll, so this job
+    cannot discover new calls by itself. It re-runs the list (which drops
+    anything whose date has passed) and mails the current calls once a month,
+    with the cash and travel answer already on each entry.
+    """
+    from app.notify import email as notify
+    from app.opportunities import get_hackathons
+
+    items = (await get_hackathons()).get("items") or []
+    if not items:
+        log.info("hackathon_reminder: no open calls to send")
+        return
+
+    sent = 0
+    with session_scope() as session:
+        for profile in _active_profiles(session):
+            # Same rule as the digest: never send another user's mail to the
+            # operator's fallback address.
+            has_own_email = bool(
+                (profile.email and profile.email.strip())
+                or (profile.digest_to and profile.digest_to.strip())
+            )
+            if not has_own_email:
+                continue
+            user = session.get(User, profile.user_id)
+            if await notify.send_hackathon_digest(items, profile=profile, user=user):
+                sent += 1
+
+    log.info(
+        "hackathon_reminder: %d email(s) for %d open call(s)", sent, len(items)
+    )
+
+
 async def job_discover_roles() -> None:
     """Fetch postings for users' actual target roles (title/skills/GitHub).
 
@@ -690,6 +726,9 @@ def build_scheduler() -> AsyncIOScheduler:
         # Twenty minutes after the digest: one message about anything whose
         # follow-up date has arrived, before the day's work starts.
         ("follow_ups", CronTrigger(hour=8, minute=23), _send_follow_up_reminders),
+        # Monthly, first of the month: re-filter the curated hackathons and
+        # put the current calls in front of users while the month is fresh.
+        ("hackathon_reminder", CronTrigger(day=1, hour=8, minute=47), job_hackathon_reminder),
         ("expire_stale", CronTrigger(hour=4, minute=23), job_expire_stale),
         ("embed_new", IntervalTrigger(minutes=15, jitter=120), job_embed_new),
         # The public Opportunities page reads a cached TGK event list; keep it

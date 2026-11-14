@@ -866,6 +866,79 @@ async def send_opportunity_reminder(
     return await send(subject, html, text, to=_recipient(profile, user))
 
 
+async def send_hackathon_digest(
+    items: list[dict],
+    *,
+    profile=None,  # noqa: ANN001
+    user=None,  # noqa: ANN001
+) -> bool:
+    """Monthly re-check of the curated hackathon list.
+
+    The list is hand-curated, so this cannot claim to have discovered new
+    calls. What it can do honestly is drop windows that have closed since last
+    month and put the current list back in front of the user, with the cash
+    answer and a link to each official page.
+    """
+    if not items:
+        return False
+    ordered = sorted(
+        items,
+        key=lambda item: (
+            0 if item.get("city") != "Online" else 1,
+            str(item.get("closes") or item.get("date") or "9999"),
+        ),
+    )[:8]
+    subject = "This month's Kenya hackathons"
+    lines = [
+        "ApplyCanary re-checked its curated hackathon list for this month.",
+        "",
+    ]
+    rows: list[str] = []
+    for item in ordered:
+        title = str(item.get("title") or "Hackathon")
+        org = str(item.get("org") or "")
+        when = str(item.get("when") or "")
+        city = str(item.get("city") or "")
+        url = str(item.get("url") or "")
+        cash = "Cash prize. " if item.get("cash_prize") else ""
+        lines += [f"{title} — {org}", f"{when} · {city}. {cash}{url}", ""]
+        badge = (
+            "<span style='display:inline-block;margin-left:6px;padding:1px 7px;"
+            "border-radius:999px;background:#fcd400;color:#221b00;font-size:12px;"
+            "font-weight:600'>Cash prize</span>"
+            if item.get("cash_prize")
+            else ""
+        )
+        rows.append(
+            "<tr><td style='padding:14px 0;border-bottom:1px solid #e5e7eb'>"
+            f"<a href='{escape(url)}' style='color:{_BRAND_ACCENT};"
+            "font-size:15px;font-weight:600;text-decoration:none'>"
+            f"{escape(title)}</a>"
+            f"<p style='margin:4px 0 0;font-size:13px;color:{_BRAND_DIM}'>"
+            f"{escape(org)} · {escape(when)} · {escape(city)}{badge}</p>"
+            "</td></tr>"
+        )
+    lines += [
+        "Dates move; confirm on the official page before you plan around one.",
+        "The curated list is re-checked on the first of each month.",
+    ]
+    body = (
+        f"<h2 style='margin:0 0 6px;font-size:20px;color:{_BRAND_TEXT}'>"
+        "Hackathons to check this month</h2>"
+        f"<p style='margin:0 0 8px;font-size:14px;color:{_BRAND_DIM}'>"
+        "A monthly re-check of ApplyCanary's curated list. Closed windows are "
+        "already filtered out.</p>"
+        "<table role='presentation' width='100%' cellspacing='0' cellpadding='0'>"
+        + "".join(rows)
+        + "</table>"
+        f"<p style='margin:14px 0 0;font-size:13px;color:{_BRAND_DIM}'>"
+        "Dates move; confirm on the official page before you plan around one. "
+        "The list is re-checked on the first of each month.</p>"
+    )
+    html = _wrap(body, preheader=subject)
+    return await send(subject, html, "\n".join(lines), to=_recipient(profile, user))
+
+
 async def send_follow_up_reminder(
     job: Job,
     *,

@@ -149,6 +149,71 @@ def test_digest_is_scoped_to_the_user(monkeypatch):
     assert "Role C" not in captured["text"]
 
 
+def test_hackathon_digest_puts_kenya_first_and_flags_cash(monkeypatch):
+    captured: dict = {}
+
+    async def fake_send(subject: str, html: str, text: str, *, to: str = "") -> bool:
+        captured.update(subject=subject, html=html, text=text, to=to)
+        return True
+
+    monkeypatch.setattr(notify, "send", fake_send)
+    items = [
+        {
+            "title": "Online Build",
+            "org": "Remote Org",
+            "when": "1 Dec 2026",
+            "city": "Online",
+            "cash_prize": True,
+            "url": "https://example.com/online",
+            "date": "2026-12-01",
+            "closes": None,
+        },
+        {
+            "title": "Nairobi Build",
+            "org": "AT",
+            "when": "25 Nov 2026",
+            "city": "Nairobi",
+            "cash_prize": True,
+            "url": "https://example.com/nairobi",
+            "date": "2026-11-25",
+            "closes": None,
+        },
+    ]
+
+    with Session(engine) as session:
+        user = _first_user()
+        profile = session.exec(select(Profile).where(Profile.user_id == user.id)).one()
+        ok = asyncio_run(
+            notify.send_hackathon_digest(items, profile=profile, user=user)
+        )
+
+    assert ok
+    assert captured["to"] == "one@example.com"
+    assert "Nairobi Build" in captured["text"]
+    assert "https://example.com/nairobi" in captured["text"]
+    assert "Cash prize" in captured["text"]
+    # In-person Kenya leads; online is still included after it.
+    assert captured["text"].index("Nairobi Build") < captured["text"].index("Online Build")
+
+
+def test_hackathon_digest_is_silent_without_open_calls(monkeypatch):
+    calls: list[str] = []
+
+    async def fake_send(subject: str, html: str, text: str, *, to: str = "") -> bool:
+        calls.append(subject)
+        return True
+
+    monkeypatch.setattr(notify, "send", fake_send)
+
+    with Session(engine) as session:
+        user = _first_user()
+        profile = session.exec(select(Profile).where(Profile.user_id == user.id)).one()
+        ok = asyncio_run(notify.send_hackathon_digest([], profile=profile, user=user))
+
+    assert ok is False
+    assert calls == []
+
+
 def test_digest_empty_profile_has_no_send(monkeypatch):
     calls: list[str] = []
 
