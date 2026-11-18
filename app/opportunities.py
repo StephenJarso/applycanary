@@ -2702,6 +2702,12 @@ APPRENTICESHIPS += [
             "published, so ask about it during matching."
         ),
     },
+]
+
+# Cash-prize hackathons belong with HACKATHONS, not in the apprenticeship list:
+# `get_hackathons` reads HACKATHONS, and the internships tab only ever shows
+# Internship and Apprenticeship cards.
+HACKATHONS += [
     {
         "kind": "Hackathon",
         "title": "Android Kenya Challenge 2026",
@@ -2751,7 +2757,7 @@ APPRENTICESHIPS += [
         "city": "Online",
         "tags": ["Hackathon", "Cash prize", "Online", "AI", "SDG"],
         "stipend": (
-            r"Cash prize: $25,000 pool — multiple awards; fully online, no travel needed"
+            r"Cash prize: $25,000 pool — multiple awards; fully online, no travel or accommodation needed"
         ),
         "source": "Official",
         "url": "https://ai-for-good.microsoft.com/hackathon",
@@ -3776,7 +3782,7 @@ def _hackathon_state(entry: dict) -> dict:
         event_day = date.fromisoformat(raw)
     except ValueError:
         return deadline_state(entry)
-    days = (event_day - datetime.now(UTC).date()).days
+    days = (event_day - datetime.now(EAT).date()).days
     return {
         "expired": days < 0,
         "days_left": days,

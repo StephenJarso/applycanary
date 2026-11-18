@@ -264,7 +264,7 @@ class TestSeedMerge:
             card["title"]: card for card in curated_cards("Apprenticeship")
         }
 
-        assert "UN Online Volunteering" in volunteers
+        assert "UN Online Volunteering — remote assignments" in volunteers
         assert "Safaricom Graduate Management Trainee" in internships
         assert "CNCF Mentoring" in programmes
         assert "Zone01 Kisumu" in apprenticeships

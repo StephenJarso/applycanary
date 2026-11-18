@@ -941,8 +941,14 @@ def test_hackathons_endpoint_serves_only_live_hackathons(client):
     assert all("cash_prize" in item for item in body["items"])
     assert all("accommodation" in item for item in body["items"])
 
-    # A dated or closing hackathon is open until then; only the undated
-    # platform entry is genuinely rolling.
+    # A dated or closing hackathon is open until then, unless its registration
+    # has a future opens date; only the undated platform entry is rolling.
+    today = datetime.now(timezone(timedelta(hours=3))).date().isoformat()
     for item in body["items"]:
-        expected = "open" if (item["date"] or item["closes"]) else "rolling"
+        if item.get("opens") and item["opens"] > today:
+            expected = "opening_soon"
+        elif item["date"] or item["closes"]:
+            expected = "open"
+        else:
+            expected = "rolling"
         assert item["status"] == expected, item["title"]
