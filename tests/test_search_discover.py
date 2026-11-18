@@ -187,6 +187,17 @@ def test_public_search_is_tokenized_too():
     assert any("Golang" in j["title"] for j in res.json()["jobs"])
 
 
+def test_public_total_counts_the_whole_catalogue_not_the_page():
+    client = TestClient(create_app(), follow_redirects=False)
+    first = client.get("/api/public/jobs", params={"limit": 1}).json()
+    everything = client.get("/api/public/jobs", params={"limit": 200}).json()
+
+    assert len(first["jobs"]) == 1
+    # `limit` is a page size; the client paginates with offset and needs the
+    # filtered total, not the number of rows just returned.
+    assert first["total"] == everything["total"] > 1
+
+
 def test_posted_within_hides_stale_listings():
     with Session(engine) as session:
         stale = session.exec(select(Job).where(Job.title == "Senior Golang Engineer")).one()

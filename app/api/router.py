@@ -838,6 +838,10 @@ def public_jobs(
     )
 
     stmt = stmt.order_by(Job.first_seen_at.desc() if sort == "newest" else Job.first_seen_at.asc())
+    # The total is the whole filtered catalogue, not the page just fetched:
+    # callers paginate with limit/offset and would otherwise think the first
+    # page is all there is.
+    total = session.exec(select(func.count()).select_from(stmt.subquery())).one()
     rows = session.exec(stmt.offset(offset).limit(limit)).all()
     sources = sorted(session.exec(select(Job.source).distinct()).all())
     return {
@@ -849,7 +853,7 @@ def public_jobs(
             "salary_currency": job.salary_currency,
             "salary_is_estimate": job.salary_is_estimate,
             "posted_at": job.posted_at, "first_seen_at": job.first_seen_at,
-        } for job in rows], "total": len(rows), "sources": sources,
+        } for job in rows], "total": total, "sources": sources,
     }
 
 @router.get("/public/opportunities", response_model=OpportunitiesOut)
