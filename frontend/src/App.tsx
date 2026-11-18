@@ -1,25 +1,30 @@
-import { useEffect, useRef, useState } from "react";
+import { Suspense, lazy, useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Navigate, NavLink, Route, Routes, useLocation } from "react-router-dom";
 import { api } from "./api";
-import Jobs from "./pages/Jobs";
-import JobDetail from "./pages/JobDetail";
-import InterviewStudio from "./pages/InterviewStudio";
-import Memory from "./pages/Memory";
-import Review from "./pages/Review";
-import Applications from "./pages/Applications";
-import Sources from "./pages/Sources";
-import ProfilePage from "./pages/Profile";
-import ForgotPassword from "./pages/ForgotPassword";
-import ResetPassword from "./pages/ResetPassword";
-import VerifyEmail from "./pages/VerifyEmail";
-import Landing from "./pages/Landing";
-import Opportunities from "./pages/Opportunities";
-import Internships from "./pages/Internships";
-import KenyaJobs from "./pages/KenyaJobs";
-import Volunteers from "./pages/Volunteers";
-import Hackathons from "./pages/Hackathons";
-import Pipeline from "./pages/Pipeline";
+
+// Pages are split per route. The shell (nav, auth, deadline banner) is all a
+// visitor needs before the first paint; each page and the libraries behind it
+// load with its route instead of shipping in one bundle nobody fully uses.
+const Jobs = lazy(() => import("./pages/Jobs"));
+const JobDetail = lazy(() => import("./pages/JobDetail"));
+const InterviewStudio = lazy(() => import("./pages/InterviewStudio"));
+const Memory = lazy(() => import("./pages/Memory"));
+const Review = lazy(() => import("./pages/Review"));
+const Applications = lazy(() => import("./pages/Applications"));
+const Sources = lazy(() => import("./pages/Sources"));
+const ProfilePage = lazy(() => import("./pages/Profile"));
+const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
+const ResetPassword = lazy(() => import("./pages/ResetPassword"));
+const VerifyEmail = lazy(() => import("./pages/VerifyEmail"));
+const Landing = lazy(() => import("./pages/Landing"));
+const Opportunities = lazy(() => import("./pages/Opportunities"));
+const Internships = lazy(() => import("./pages/Internships"));
+const KenyaJobs = lazy(() => import("./pages/KenyaJobs"));
+const Volunteers = lazy(() => import("./pages/Volunteers"));
+const Hackathons = lazy(() => import("./pages/Hackathons"));
+const Pipeline = lazy(() => import("./pages/Pipeline"));
+
 import { useAuth } from "./context/AuthContext";
 import { FeedbackModal } from "./FeedbackModal";
 import {
@@ -513,31 +518,37 @@ function Dashboard({ page }: { page?: "internships" | "programs" | "kenya-jobs" 
 export default function App() {
   const { user, loading } = useAuth();
   if (loading) return <div className="empty">Loading session…</div>;
-  return <Routes>
-    {/* Signed-out visitors get the marketing page at /, not a login wall.
-        Login and Register are now inline panels of that page (mode chosen via
-        ?mode=); the standalone pages keep their routes as redirects so old
-        links, bookmarks and emailed tokens keep landing on the same spot. */}
-    <Route path="/" element={user ? <Navigate to="/jobs" replace /> : <Landing />} />
-    <Route path="/login" element={<Navigate to="/?mode=login" replace />} />
-    <Route path="/register" element={<Navigate to="/?mode=register" replace />} />
-    {/* Programs stay public; internships and volunteer calls are curated
-        account features now, gated by the auth middleware too. All three open
-        inside the dashboard shell for signed-in users, with the explicit page
-        prop because a descendant Routes would resolve against this path. */}
-    <Route path="/opportunities" element={user ? <Dashboard page="programs" /> : <Opportunities />} />
-    <Route path="/internships" element={user ? <Dashboard page="internships" /> : <Navigate to="/" replace />} />
-    <Route path="/volunteers" element={user ? <Dashboard page="volunteers" /> : <Navigate to="/" replace />} />
-    <Route path="/hackathons" element={user ? <Dashboard page="hackathons" /> : <Navigate to="/" replace />} />
-    <Route path="/kenya-jobs" element={user ? <Dashboard page="kenya-jobs" /> : <KenyaJobs embedded={false} />} />
-    <Route path="/entry-level" element={<Navigate to="/kenya-jobs" replace />} />
-    {/* Public regardless of session: these are opened from an email, and the
-        link must not be swallowed by a redirect to /login. Confirming an
-        address is also something a signed-in user does. */}
-    <Route path="/forgot-password" element={<ForgotPassword />} />
-    <Route path="/reset-password" element={<ResetPassword />} />
-    <Route path="/verify-email" element={<VerifyEmail />} />
-    <Route path="/verify-email-change" element={<VerifyEmail />} />
-    <Route path="/*" element={user ? <Dashboard /> : <Navigate to="/login" replace />} />
-  </Routes>;
+  return (
+    <Suspense fallback={<div className="empty">Loading…</div>}>
+      <Routes>
+        {/* Signed-out visitors get the marketing page at /, not a login wall.
+            Login and Register are now inline panels of that page (mode chosen
+            via ?mode=); the standalone pages keep their routes as redirects
+            so old links, bookmarks and emailed tokens keep landing on the
+            same spot. */}
+        <Route path="/" element={user ? <Navigate to="/jobs" replace /> : <Landing />} />
+        <Route path="/login" element={<Navigate to="/?mode=login" replace />} />
+        <Route path="/register" element={<Navigate to="/?mode=register" replace />} />
+        {/* Programs stay public; internships, volunteer calls and hackathons
+            are curated account features now, gated by the auth middleware too.
+            They open inside the dashboard shell for signed-in users, with the
+            explicit page prop because a descendant Routes would resolve
+            against this path. */}
+        <Route path="/opportunities" element={user ? <Dashboard page="programs" /> : <Opportunities />} />
+        <Route path="/internships" element={user ? <Dashboard page="internships" /> : <Navigate to="/" replace />} />
+        <Route path="/volunteers" element={user ? <Dashboard page="volunteers" /> : <Navigate to="/" replace />} />
+        <Route path="/hackathons" element={user ? <Dashboard page="hackathons" /> : <Navigate to="/" replace />} />
+        <Route path="/kenya-jobs" element={user ? <Dashboard page="kenya-jobs" /> : <KenyaJobs embedded={false} />} />
+        <Route path="/entry-level" element={<Navigate to="/kenya-jobs" replace />} />
+        {/* Public regardless of session: these are opened from an email, and
+            the link must not be swallowed by a redirect to /login. Confirming
+            an address is also something a signed-in user does. */}
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
+        <Route path="/verify-email" element={<VerifyEmail />} />
+        <Route path="/verify-email-change" element={<VerifyEmail />} />
+        <Route path="/*" element={user ? <Dashboard /> : <Navigate to="/login" replace />} />
+      </Routes>
+    </Suspense>
+  );
 }
