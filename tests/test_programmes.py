@@ -6,7 +6,7 @@ a deploy. The constants are now only a seed; the admin API owns the table.
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 
 import pytest
 from fastapi.testclient import TestClient
@@ -324,6 +324,19 @@ class TestDeadlineState:
             today=date(2026, 11, 12),
         )
         assert state["status"] == "open"
+
+    def test_the_default_today_is_the_east_africa_calendar_day(self, monkeypatch):
+        """At 00:30 EAT the deadline day is over, even though UTC says yesterday."""
+
+        class _Clock(datetime):
+            @classmethod
+            def now(cls, tz=None):  # noqa: ARG003 - the real signature takes a tz
+                return datetime(2026, 11, 13, 0, 30, tzinfo=opp.EAT)
+
+        monkeypatch.setattr(opp, "datetime", _Clock)
+        state = deadline_state({"closes": "2026-11-12"})
+        assert state["status"] == "closed"
+        assert state["expired"] is True
 
     def test_a_card_carries_its_own_state(self, db):
         with Session(engine) as session:

@@ -2779,8 +2779,13 @@ def deadline_state(item: dict, *, today: date | None = None) -> dict[str, object
     Computed on the server so the page, the API and any other consumer agree on
     "closed"; a client clock is not allowed to decide whether a deadline has
     passed. Non-ISO values ("Rolling", "TBA") simply carry no deadline.
+
+    ``today`` defaults to the East Africa calendar date, not UTC: deadlines are
+    published as local calendar days (the catalogue is Nairobi-based), and
+    against a UTC date a window would stay "open" until 03:00 EAT the morning
+    after it closed.
     """
-    today = today or datetime.now(UTC).date()
+    today = today or datetime.now(EAT).date()
 
     def parsed(key: str) -> date | None:
         raw = str(item.get(key) or "").strip()[:10]
@@ -3423,6 +3428,10 @@ def _sort_key(item: dict) -> float:
     without a date (rolling cohorts, "updated continuously" calendars) sits at
     the end.
     """
+    if item.get("expired"):
+        # Closed cards go last even though their date is in the past, so a
+        # consumer that trusts the API order does not lead with dead windows.
+        return 9e15
     for key in ("closes", "date"):
         value = item.get(key)
         if value:

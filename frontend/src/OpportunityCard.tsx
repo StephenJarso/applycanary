@@ -11,11 +11,42 @@ const TRACK_LABELS: Record<string, string> = {
   ghosted: "Ghosted",
 };
 
-export const daysUntil = (iso: string) =>
-  Math.ceil((new Date(iso).getTime() - Date.now()) / 86_400_000);
+const DAY_MS = 86_400_000;
+const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * A published calendar date, read in the reader's own day.
+ *
+ * Opportunity dates are days ("2026-12-02"), not instants: `new Date(iso)`
+ * parses a bare date as UTC midnight, so it displays as the previous day for
+ * anyone west of Greenwich. Building it from the parts keeps the publisher's
+ * date intact. Timestamps (work.ke closing times, event starts) stay instants.
+ */
+export const parseOpportunityDate = (iso: string) => {
+  if (DATE_ONLY.test(iso)) {
+    return new Date(Number(iso.slice(0, 4)), Number(iso.slice(5, 7)) - 1, Number(iso.slice(8, 10)));
+  }
+  return new Date(iso);
+};
+
+const startOfLocalDay = (d: Date) =>
+  new Date(d.getFullYear(), d.getMonth(), d.getDate());
+
+/** Whole calendar days left: the deadline day itself is 0, all day long. */
+export const daysUntil = (iso: string) => {
+  const target = parseOpportunityDate(iso);
+  if (Number.isNaN(target.getTime())) return Number.NaN;
+  return Math.round(
+    (startOfLocalDay(target).getTime() - startOfLocalDay(new Date()).getTime()) / DAY_MS,
+  );
+};
 
 export const fmtDate = (iso: string) =>
-  new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+  parseOpportunityDate(iso).toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
 
 /** Status shown in the box at the bottom of each card. */
 export function opportunityStatus(o: Opportunity): string {
@@ -112,7 +143,9 @@ function Timeline({ item }: { item: Opportunity }) {
         {item.date ? (
           <p>
             📅 Register before <b>{fmtDate(item.date)}</b> ·{" "}
-            {daysUntil(item.date) >= 0 ? `in ${daysUntil(item.date)} days` : "passed"}
+            {daysUntil(item.date) >= 0
+              ? `in ${daysUntil(item.date)} day${daysUntil(item.date) === 1 ? "" : "s"}`
+              : "passed"}
           </p>
         ) : (
           <p>📅 Check the calendar for new dates</p>
@@ -141,7 +174,7 @@ function Timeline({ item }: { item: Opportunity }) {
         <p>
           {opening > 0 ? (
             <>
-              ⏳ Opens <b>{fmtDate(opens)}</b> (in {opening} days)
+              ⏳ Opens <b>{fmtDate(opens)}</b> (in {opening} day{opening === 1 ? "" : "s"})
             </>
           ) : left <= 7 && left >= 0 ? (
             <>🚨 <b>Closing soon</b></>
@@ -149,7 +182,9 @@ function Timeline({ item }: { item: Opportunity }) {
             <>🟢 Open now</>
           )}{" "}
           · Deadline <b>{fmtDate(item.closes)}</b>
-          {left >= 0 && <> ({left === 0 ? "closes today!" : `${left} days left`})</>}
+          {left >= 0 && (
+            <> ({left === 0 ? "closes today!" : `${left} day${left === 1 ? "" : "s"} left`})</>
+          )}
         </p>
         <Steps item={item} />
       </>
@@ -165,7 +200,7 @@ function Timeline({ item }: { item: Opportunity }) {
         <p>
           📅 {left >= 0 ? (
             <>
-              Happens <b>{fmtDate(item.date)}</b> · in {left} days
+              Happens <b>{fmtDate(item.date)}</b> · in {left} day{left === 1 ? "" : "s"}
             </>
           ) : (
             <>
