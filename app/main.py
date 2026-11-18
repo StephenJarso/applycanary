@@ -18,6 +18,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from app.config import get_settings
@@ -129,6 +130,13 @@ def create_app() -> FastAPI:
         version="0.3.0",
         lifespan=lifespan,
     )
+    # Compress the SPA bundle and the JSON API on the way out. A CDN or proxy
+    # in front may already do this, but a bare uvicorn deployment does not, and
+    # the dashboard ships a ~500 kB JS bundle plus multi-hundred-kB opportunity
+    # and job payloads. Added first so it wraps the routes (CORS and the auth
+    # gate stay outside it); bodies under 1 kB are cheaper uncompressed.
+    app.add_middleware(GZipMiddleware, minimum_size=1024)
+
     request_windows: dict[tuple[str, str], deque[float]] = defaultdict(deque)
     limits = {"auth": (10, 60.0), "api-write": (30, 60.0), "api-read": (120, 60.0)}
 
