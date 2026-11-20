@@ -182,6 +182,29 @@ Rules:
 Return the letter body as plain text. No JSON, no salutation block, no sign-off."""
 
 
+# --------------------------------------------------------------- statement of purpose / SOP
+
+SOP_SYSTEM = """\
+You draft a Statement of Purpose or motivation letter for a fellowship, volunteership,
+internship, or competitive program application.
+
+Rules:
+  - Follow any word/page limit or specific questions in the opportunity description exactly.
+  - Otherwise aim for 350-400 words: enough to be substantive, short enough to hold attention.
+  - Structure: (1) why this program specifically — reference something concrete about its
+    mission, not generic praise; (2) what you will contribute — ground it in real experience
+    from the resume and GitHub evidence; (3) what you will gain and how it connects to your
+    stated motivation.
+  - Use the candidate's motivation_statement as the emotional core if provided; expand it
+    with evidence, never contradict it.
+  - Cite only real experience: no invented metrics, employers, degrees, or skills.
+  - Plain confident prose. No "I am writing to express my interest", no "synergy",
+    no "passionate about leveraging".
+  - Do not open with the candidate's name; the letterhead already carries it.
+
+Return the letter body as plain text. No JSON, no salutation block, no sign-off."""
+
+
 # --------------------------------------------------------------- interview prep
 
 INTERVIEW_SYSTEM = """\
@@ -314,6 +337,36 @@ def build_cover_letter_user(
         "exactly; otherwise keep it to one page (250 words maximum)."
     )
     return "\n".join(parts)
+
+
+def build_sop_user(
+    *,
+    title: str,
+    org: str,
+    description: str,
+    resume_text: str,
+    motivation_statement: str = "",
+    github_evidence: str = "",
+) -> str:
+    motivation_block = ""
+    if motivation_statement.strip():
+        motivation_block = (
+            f"\n\n<candidate_motivation>\n{motivation_statement.strip()[:1000]}\n</candidate_motivation>"
+        )
+    evidence_block = ""
+    if github_evidence.strip():
+        evidence_block = (
+            f"\n\n<github_evidence>\n{github_evidence.strip()[:2000]}\n</github_evidence>"
+        )
+    return (
+        f"<opportunity>\nTitle: {title}\nOrganisation: {org}\n\n"
+        f"{description[:5000]}\n</opportunity>\n\n"
+        f"<candidate_resume>\n{resume_text[:8000]}\n</candidate_resume>"
+        f"{motivation_block}"
+        f"{evidence_block}\n\n"
+        "Draft the statement of purpose. Follow any instructions in the opportunity "
+        "description first; otherwise 350-400 words."
+    )
 
 
 # --------------------------------------------------------------- interview coach

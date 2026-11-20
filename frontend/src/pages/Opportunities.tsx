@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { api, getWatched, unwatchOpp, watchOpp } from "../api";
+import { api, getDiscoveredOpportunities, getWatched, type Opportunity, unwatchOpp, watchOpp } from "../api";
 import { useAuth } from "../context/AuthContext";
 import PublicNav from "../PublicNav";
 import { ErrorBox, Loading, relTime } from "../components";
@@ -27,6 +27,7 @@ import {
  */
 
 const ALL_TYPES = ["All", "Event", "Paid program"] as const;
+const ALL_TYPES_USER = ["All", "Event", "Paid program", "Discovered"] as const;
 const EVENT_TYPES = ["All", "Event"] as const;
 const STATUSES = ["All", "Open now", "Opening soon", "Rolling", "Upcoming event"] as const;
 /** Cities the design ships with; kept even when the feed has no event there. */
@@ -90,13 +91,46 @@ export default function Opportunities({ embedded = false }: { embedded?: boolean
     refetchOnWindowFocus: false,
   });
 
+  const { data: discoveredData } = useQuery({
+    queryKey: ["discovered-opportunities"],
+    queryFn: getDiscoveredOpportunities,
+    enabled: !!user,
+    staleTime: 30 * 60_000,
+    refetchOnWindowFocus: false,
+  });
+
+  const discoveredItems: Opportunity[] = useMemo(() => {
+    return (discoveredData?.items ?? []).map((d) => ({
+      kind: "Paid program" as const,
+      title: d.title,
+      org: d.org || d.source,
+      when: d.published ? new Date(d.published).toLocaleDateString() : "Recent discovery",
+      city: "Online / Africa",
+      tags: d.tags?.length ? d.tags : [`Match ${Math.round(d.relevance_score * 100)}%`],
+      source: d.source,
+      url: d.url,
+      desc: d.description,
+      date: "",
+      opens: null,
+      closes: null,
+      steps: null,
+      stipend: null,
+    }));
+  }, [discoveredData]);
+
   const allItems = data?.items ?? [];
   // The signed-in Programs tab is the events calendar; paid programs live on
   // the Internships & Opportunities tab. Visitors still get both here.
-  const items = embedded ? allItems.filter((o) => o.kind === "Event") : allItems;
-  const types = embedded ? EVENT_TYPES : ALL_TYPES;
-  const [query, setQuery] = useState("");
   const [type, setType] = useState("All");
+
+  const items = useMemo(() => {
+    if (type === "Discovered") return discoveredItems;
+    const list = embedded ? allItems.filter((o) => o.kind === "Event") : allItems;
+    return list;
+  }, [type, embedded, allItems, discoveredItems]);
+
+  const types = embedded ? EVENT_TYPES : (user ? ALL_TYPES_USER : ALL_TYPES);
+  const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
   const [city, setCity] = useState("All");
   const [source, setSource] = useState("All");

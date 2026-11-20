@@ -285,6 +285,7 @@ export interface Profile {
   resume_words: number;
   base_resume_filename?: string;
   base_resume_text?: string;
+  motivation_statement?: string;
   skills: string[];
   github_synced_at: string | null;
   github_repo_count: number;
@@ -626,7 +627,10 @@ export interface Opportunity {
     | "Internship"
     | "Apprenticeship"
     | "Volunteer"
-    | "Hackathon";
+    | "Hackathon"
+    | "Fellowship"
+    | "Competition"
+    | string;
   title: string;
   org: string;
   /** Human-readable timing: "15 Oct 2026 · 08:00–11:00", "Coding May–Aug". */
@@ -660,6 +664,22 @@ export interface Opportunity {
   days_left?: number | null;
   status?: "open" | "opening_soon" | "closed" | "rolling";
   opens_in?: number | null;
+}
+
+export interface DiscoveredLead {
+  title: string;
+  org: string;
+  url: string;
+  description: string;
+  source: string;
+  published: string | null;
+  tags: string[];
+  relevance_score: number;
+}
+
+export interface DiscoveredOpportunitiesOut {
+  items: DiscoveredLead[];
+  total: number;
 }
 
 export interface Opportunities {
@@ -1112,5 +1132,12 @@ export const setOpportunityStatus = (body: {
 
 export const vapidKey = () =>
   request<{ publicKey: string }>("GET", "/api/push/vapid-public-key");
+
+export const getDiscoveredOpportunities = () =>
+  request<DiscoveredOpportunitiesOut>("GET", "/api/opportunities/discover");
+
+export const generateSop = (data: { title: string; org?: string; description: string }) =>
+  request<{ ok: boolean; text?: string; error?: string }>("POST", "/api/actions/sop", data);
+
 
 

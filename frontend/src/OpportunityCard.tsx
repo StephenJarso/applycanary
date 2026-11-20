@@ -1,4 +1,7 @@
-import type { Opportunity } from "./api";
+import React, { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { api, generateSop, type Opportunity } from "./api";
+import { useAuth } from "./context/AuthContext";
 import { useOpportunityTracking } from "./useOpportunityTracking";
 
 /** Short labels for the tracking control on a card. */
@@ -51,22 +54,16 @@ export const fmtDate = (iso: string) =>
 /** Status shown in the box at the bottom of each card. */
 export function opportunityStatus(o: Opportunity): string {
   if (o.kind === "Event") return o.date && daysUntil(o.date) < 0 ? "Closed" : "Upcoming event";
-  // Prefer the server's verdict when it sent one; the local clock is only a
-  // fallback for cached payloads from before the field existed.
   if (o.status) {
     return o.status === "closed" ? "Closed"
       : o.status === "opening_soon" ? "Opening soon"
       : o.status === "open" ? "Open now"
       : "Rolling";
   }
-  // A published deadline is enough to be open: a volunteer call advertises
-  // when it closes, not when it began, so a missing `opens` means "already
-  // open" rather than "no application window".
   if (o.closes) {
     if (o.expired ?? daysUntil(o.closes) < 0) return "Closed";
     return !o.opens || daysUntil(o.opens) <= 0 ? "Open now" : "Opening soon";
   }
-  // Crew calls lifted from the events calendar carry the event's date.
   if (o.date) return daysUntil(o.date) < 0 ? "Closed" : "Upcoming event";
   return "Rolling";
 }
@@ -95,6 +92,119 @@ const ELIGIBILITY_LABELS: Record<string, string> = {
   global: "Open worldwide",
   open_to_all: "Open to all",
 };
+
+/** Actionable qualification tips and common rejection reasons. */
+function getOpportunityTips(item: Opportunity): { tips: string[]; avoid: string[]; focus: string[] } {
+  const t = `${item.title} ${item.org} ${item.desc}`.toLowerCase();
+
+  if (t.includes("hennge")) {
+    return {
+      tips: [
+        "Pass 100% of the online coding challenge (Python, Go, or TypeScript) — test all boundary cases and invalid inputs before submitting.",
+        "Ensure your GitHub profile showcases at least one functional backend or full-stack project in Go or Python.",
+        "In your application essays, explain specifically why HENNGE Tokyo (cloud security, B2B SaaS) and your interest in working in Japan.",
+        "Prepare for the technical interview by reviewing REST APIs, async concurrency, and Linux server basics.",
+      ],
+      avoid: [
+        "Submitting incomplete solutions on the coding assessment.",
+        "Using generic AI-sounding responses for the motivation questions.",
+      ],
+      focus: ["Go / Python backend development", "API & cloud fundamentals", "Clean code & edge testing"],
+    };
+  }
+
+  if (t.includes("outreachy")) {
+    return {
+      tips: [
+        "Pick ONE participating open-source project immediately on Day 1 of the contribution period.",
+        "Introduce yourself on the project's chat (Zulip, Matrix, Slack, or mailing list) and follow their contributor setup guide.",
+        "Start with beginner-friendly documentation or unit test PRs to get mentor recognition early.",
+        "Crucial: Log EVERY single contribution (PR, issue comment, documentation) on the Outreachy website before the period closes.",
+        "Ensure you meet the 40 hr/week availability requirement during the internship timeline.",
+      ],
+      avoid: [
+        "Waiting until the last week of the contribution period to submit your first PR.",
+        "Jumping between 4 different organizations without substantive merged PRs in any.",
+        "Forgetting to record your contributions on the Outreachy portal.",
+      ],
+      focus: ["Git / GitHub collaboration", "Issue reproduction & testing", "Consistent communication with mentors"],
+    };
+  }
+
+  if (t.includes("summer of code") || t.includes("gsoc")) {
+    return {
+      tips: [
+        "Engage with the organization in February/March before the official application window opens.",
+        "Submit at least 1-2 merged PRs fixing good-first-issues before writing your proposal.",
+        "Draft your project proposal using the organization's official template and share a draft with mentors early for feedback.",
+        "Include a detailed weekly schedule with concrete deliverables and milestones in your proposal.",
+      ],
+      avoid: [
+        "Writing a proposal without discussing it with the community mentors first.",
+        "Submitting at the last minute without mentor review.",
+      ],
+      focus: ["Open-source contributions", "Clear timeline & milestone estimation", "Community chat participation"],
+    };
+  }
+
+  if (t.includes("mest")) {
+    return {
+      tips: [
+        "Demonstrate practical software development experience (full-stack, mobile, or AI projects on GitHub).",
+        "Formulate a clear technology startup idea or problem statement relevant to the African continent.",
+        "Prepare for the behavioral and aptitude interview: show leadership, adaptability, and cross-cultural teamwork.",
+      ],
+      avoid: ["Claiming theoretical knowledge without working GitHub code or live demos."],
+      focus: ["Full-stack / AI engineering", "African tech problem solving", "Entrepreneurial mindset"],
+    };
+  }
+
+  if (t.includes("andela")) {
+    return {
+      tips: [
+        "Prepare for automated algorithmic assessments (data structures, problem solving, code efficiency).",
+        "Highlight your experience with modern frameworks, testing, and continuous integration.",
+        "Emphasize professional communication and remote collaboration readiness.",
+      ],
+      avoid: ["Weak GitHub history or repositories with zero commit documentation."],
+      focus: ["Modern software engineering", "Async remote communication", "Algorithmic problem solving"],
+    };
+  }
+
+  if (item.kind === "Volunteer") {
+    return {
+      tips: [
+        "Express genuine interest in the specific community or event mission in your application.",
+        "Confirm your exact availability for shift days and rehearsals/orientations.",
+        "Highlight practical skills: attendee registration, room moderation, AV support, or workshop mentoring.",
+      ],
+      avoid: ["Ghosting or canceling after being assigned a shift or role."],
+      focus: ["Reliability & punctual attendance", "Community enthusiasm", "Team coordination"],
+    };
+  }
+
+  if (item.kind === "Internship" || item.kind === "Apprenticeship") {
+    return {
+      tips: [
+        "Emphasize your willingness and capacity to learn quickly with concrete project examples.",
+        "Highlight 2-3 personal or open-source projects where you solved real problems.",
+        "Tailor your CV to mention the exact core technologies mentioned in this posting.",
+      ],
+      avoid: ["Inflating experience rank beyond entry/learning level."],
+      focus: ["Fundamental coding & debugging", "Curiosity & fast learning", "Practical personal projects"],
+    };
+  }
+
+  return {
+    tips: [
+      "Review the stated eligibility criteria and application deadlines carefully.",
+      "Submit a tailored statement of purpose connecting your background directly to this program's mission.",
+      "Submit at least 3-5 days before the closing date to avoid portal traffic crashes.",
+    ],
+    avoid: ["Submitting a generic one-size-fits-all cover letter."],
+    focus: ["Relevance to program mission", "Concrete project evidence", "Clear motivation"],
+  };
+}
 
 function Funding({ item }: { item: Opportunity }) {
   const badges: string[] = [];
@@ -191,8 +301,6 @@ function Timeline({ item }: { item: Opportunity }) {
     );
   }
 
-  // A crew call found in the events calendar is tied to the event it belongs
-  // to, so the event's own date is what the card counts down to.
   if (item.date) {
     const left = daysUntil(item.date);
     return (
@@ -235,26 +343,85 @@ interface OpportunityCardProps {
   ) => void;
 }
 
-/** Shared card for the events/programs list and the internships page. */
+/** Shared card for events, programs, internships and volunteerships. Expands on click. */
 export function OpportunityCard({
   item,
   isWatched = false,
   onToggleWatch,
 }: OpportunityCardProps) {
+  const { user } = useAuth();
   const deadline =
     item.closes ??
     (item.kind === "Event" || item.kind === "Hackathon" ? item.date : null) ??
     null;
-  // Tracking is per application, so volunteer, speaking and hackathon slots count too.
+
   const tracking = useOpportunityTracking();
   const stage = tracking.stageFor(item.url);
 
+  const [expanded, setExpanded] = useState(false);
+  const [sopOpen, setSopOpen] = useState(false);
+  const [sopLoading, setSopLoading] = useState(false);
+  const [sopText, setSopText] = useState("");
+  const [sopCopied, setSopCopied] = useState(false);
+  const [sopError, setSopError] = useState("");
+
+  const { data: profile } = useQuery({
+    queryKey: ["profile"],
+    queryFn: api.profile,
+    enabled: !!user,
+    staleTime: 5 * 60_000,
+  });
+
+  const tips = getOpportunityTips(item);
+
+  // Compute matched skills between profile and this opportunity
+  const matchedSkills = (profile?.skills ?? []).filter((skill) => {
+    const hay = `${item.title} ${item.desc} ${item.tags.join(" ")}`.toLowerCase();
+    return hay.includes(skill.toLowerCase());
+  });
+
+  const handleGenerateSop = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (sopText) {
+      setSopOpen((o) => !o);
+      return;
+    }
+    setSopLoading(true);
+    setSopOpen(true);
+    setSopError("");
+    try {
+      const res = await generateSop({
+        title: item.title,
+        org: item.org,
+        description: item.desc || `${item.title} by ${item.org}`,
+      });
+      if (res.ok && res.text) {
+        setSopText(res.text);
+      } else {
+        setSopError(res.error || "Failed to generate SOP.");
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to generate SOP.";
+      setSopError(msg);
+    } finally {
+      setSopLoading(false);
+    }
+  };
+
   return (
-    <a
-      className="opp-card"
-      href={item.url}
-      target="_blank"
-      rel="noreferrer"
+    <div
+      className={`opp-card${expanded ? " opp-card-expanded" : ""}`}
+      onClick={() => setExpanded((prev) => !prev)}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          setExpanded((prev) => !prev);
+        }
+      }}
+      style={{ cursor: "pointer", position: "relative" }}
     >
       <div className="opp-card-top">
         <span
@@ -377,6 +544,253 @@ export function OpportunityCard({
           <span key={tag} className="opp-tag">{tag}</span>
         ))}
       </div>
-    </a>
+
+      {/* Expand/Collapse prompt banner */}
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          padding: "6px 8px",
+          background: "var(--ac-surface-container, rgba(0,0,0,0.03))",
+          borderRadius: "6px",
+          fontSize: "12px",
+          color: "var(--ac-primary, #436436)",
+          fontWeight: 600,
+          marginTop: "4px",
+        }}
+      >
+        <span>
+          {expanded
+            ? "▲ Tap to collapse details"
+            : "▼ Tap for tips, what to do to qualify & tailored resume"}
+        </span>
+        <span style={{ fontSize: "11px", fontWeight: 400, color: "var(--text-dim)" }}>
+          {expanded ? "Details open" : "Expand"}
+        </span>
+      </div>
+
+      {/* Expanded section with qualification tips, resume tailoring, and SOP */}
+      {expanded && (
+        <div
+          className="opp-expanded-details"
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            marginTop: "12px",
+            display: "flex",
+            flexDirection: "column",
+            gap: "12px",
+            borderTop: "1px solid var(--border)",
+            paddingTop: "12px",
+          }}
+        >
+          {/* Action Row */}
+          <div
+            style={{
+              display: "flex",
+              gap: "8px",
+              flexWrap: "wrap",
+              alignItems: "center",
+              justifyContent: "space-between",
+            }}
+          >
+            <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+              {deadline && (
+                <a
+                  href={`/api/opportunities/calendar?url=${encodeURIComponent(item.url)}&title=${encodeURIComponent(item.title)}&org=${encodeURIComponent(item.org)}&deadline=${encodeURIComponent(deadline)}`}
+                  download
+                  className="btn btn-sm btn-ghost"
+                  title="Download .ics to add to your calendar"
+                  onClick={(e) => e.stopPropagation()}
+                  style={{ fontSize: "12px", padding: "4px 10px", textDecoration: "none" }}
+                >
+                  📅 Add to Calendar
+                </a>
+              )}
+              <button
+                type="button"
+                className="btn btn-sm btn-ghost"
+                title="Generate tailored Statement of Purpose / Motivation Letter"
+                onClick={handleGenerateSop}
+                disabled={sopLoading}
+                style={{ fontSize: "12px", padding: "4px 10px" }}
+              >
+                ✍ {sopLoading ? "Generating SOP..." : sopText ? (sopOpen ? "Hide Statement of Purpose" : "Show Statement of Purpose") : "Generate Statement of Purpose"}
+              </button>
+            </div>
+
+            <a
+              href={item.url}
+              target="_blank"
+              rel="noreferrer"
+              className="btn btn-sm btn-primary"
+              style={{
+                fontSize: "12px",
+                padding: "4px 12px",
+                textDecoration: "none",
+                fontWeight: 600,
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              Open Official Advert / Apply ↗
+            </a>
+          </div>
+
+          {/* Section 1: How to Qualify & Get Considered */}
+          <div
+            style={{
+              background: "var(--ac-surface-container, rgba(0,0,0,0.03))",
+              padding: "12px",
+              borderRadius: "8px",
+              border: "1px solid var(--border)",
+            }}
+          >
+            <h4 style={{ margin: "0 0 8px 0", fontSize: "13.5px", fontWeight: 700 }}>
+              🎯 How to Qualify &amp; Get Considered
+            </h4>
+            <ul style={{ margin: 0, paddingLeft: "18px", fontSize: "12.5px", lineHeight: "1.55" }}>
+              {tips.tips.map((tip, idx) => (
+                <li key={idx} style={{ marginBottom: "4px" }}>{tip}</li>
+              ))}
+            </ul>
+            {tips.avoid.length > 0 && (
+              <div
+                style={{
+                  marginTop: "8px",
+                  fontSize: "12px",
+                  color: "var(--bad, #b91c1c)",
+                  fontWeight: 500,
+                }}
+              >
+                ⚠️ <strong>Common pitfalls to avoid:</strong> {tips.avoid.join(" · ")}
+              </div>
+            )}
+            {tips.focus.length > 0 && (
+              <div
+                style={{
+                  marginTop: "6px",
+                  fontSize: "12px",
+                  color: "var(--text-dim)",
+                }}
+              >
+                🔑 <strong>Key technical focus:</strong> {tips.focus.join(" · ")}
+              </div>
+            )}
+          </div>
+
+          {/* Section 2: Resume & Skills Alignment */}
+          <div
+            style={{
+              background: "var(--ac-surface-container, rgba(0,0,0,0.03))",
+              padding: "12px",
+              borderRadius: "8px",
+              border: "1px solid var(--border)",
+            }}
+          >
+            <h4 style={{ margin: "0 0 6px 0", fontSize: "13.5px", fontWeight: 700 }}>
+              📄 Tailored Resume Recommendations
+            </h4>
+            {profile?.has_resume ? (
+              <div style={{ fontSize: "12.5px", lineHeight: "1.5" }}>
+                {matchedSkills.length > 0 ? (
+                  <p style={{ margin: "0 0 6px 0" }}>
+                    ✅ <strong>Matching skills on your profile:</strong>{" "}
+                    <span style={{ color: "var(--ac-primary, #436436)", fontWeight: 600 }}>
+                      {matchedSkills.join(", ")}
+                    </span>
+                  </p>
+                ) : (
+                  <p style={{ margin: "0 0 6px 0", color: "var(--text-dim)" }}>
+                    No exact keyword matches found in your profile skills. Highlight transferable problem-solving and projects.
+                  </p>
+                )}
+                <p style={{ margin: "0", color: "var(--text-dim)" }}>
+                  💡 <strong>CV Action:</strong> Reorder your projects to showcase code relevant to {item.org}. Ensure working GitHub links are at the top of your resume.
+                </p>
+              </div>
+            ) : (
+              <p style={{ margin: 0, fontSize: "12.5px", color: "var(--text-dim)" }}>
+                Upload your base resume in the Profile tab to receive automatic skill-matching and project recommendations for this opportunity.
+              </p>
+            )}
+          </div>
+
+          {/* SOP generation box */}
+          {sopOpen && (
+            <div
+              style={{
+                background: "var(--ac-surface-container, rgba(0,0,0,0.04))",
+                padding: "12px",
+                borderRadius: "8px",
+                border: "1px solid var(--border)",
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  marginBottom: "8px",
+                }}
+              >
+                <span style={{ fontWeight: 700, fontSize: "13px" }}>
+                  Statement of Purpose / Motivation
+                </span>
+                <div style={{ display: "flex", gap: "6px" }}>
+                  {sopText && (
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-ghost"
+                      onClick={() => {
+                        navigator.clipboard.writeText(sopText);
+                        setSopCopied(true);
+                        setTimeout(() => setSopCopied(false), 2000);
+                      }}
+                      style={{ fontSize: "11px", padding: "2px 8px" }}
+                    >
+                      {sopCopied ? "✓ Copied" : "📋 Copy"}
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-ghost"
+                    onClick={() => setSopOpen(false)}
+                    style={{ fontSize: "11px", padding: "2px 8px" }}
+                  >
+                    ✕ Close
+                  </button>
+                </div>
+              </div>
+              {sopLoading && (
+                <p style={{ color: "var(--text-dim)", margin: 0, fontSize: "12.5px" }}>
+                  ⏳ Drafting grounded statement of purpose from your CV &amp; motivation statement...
+                </p>
+              )}
+              {sopError && (
+                <p style={{ color: "var(--bad, #dc2626)", margin: 0, fontSize: "12.5px" }}>
+                  {sopError}
+                </p>
+              )}
+              {sopText && (
+                <div
+                  style={{
+                    whiteSpace: "pre-wrap",
+                    lineHeight: "1.5",
+                    maxHeight: "260px",
+                    overflowY: "auto",
+                    fontSize: "12.5px",
+                    color: "var(--text)",
+                    borderTop: "1px solid var(--border)",
+                    paddingTop: "8px",
+                  }}
+                >
+                  {sopText}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
   );
 }

@@ -147,6 +147,7 @@ class Profile(SQLModel, table=True):
 
     base_resume_path: str = ""
     base_resume_text: str = Field(default="", sa_column=Column(Text))
+    motivation_statement: str = Field(default="", sa_column=Column(Text))
     skills: list[str] = Field(default_factory=list, sa_column=Column(JSON))
 
     # Hard filters applied before any paid API call.
@@ -660,6 +661,9 @@ class WatchedOpportunity(SQLModel, table=True):
     applied_at: datetime | None = None
     response_received: bool = False
     outcome: str = ""  # interview | offer | rejected | ghosted
+    # Tracks which reminder stage has fired: "30d" | "7d" | "48h" | "1d" | None
+    deadline_stage: str | None = None
+    last_reminded_at: datetime | None = None
     created_at: datetime = Field(default_factory=utcnow)
 
 

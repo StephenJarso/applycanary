@@ -482,6 +482,13 @@ async def job_refresh_opportunities() -> None:
     )
 
 
+async def job_discover_opportunities() -> None:
+    """Daily rare opportunity discovery (volunteerships, fellowships, OSS)."""
+    from app.pipeline.discover_opportunities import run_opportunity_discovery
+
+    await run_opportunity_discovery()
+
+
 async def _send_deadline_pushes() -> None:
     """Push watched opportunities whose window closes or opens in 7 days.
 
@@ -737,6 +744,7 @@ def build_scheduler() -> AsyncIOScheduler:
         # daily refreshes keep newly announced cohorts from waiting a full day
         # after the morning they appear.
         ("refresh_opportunities", CronTrigger(hour="3,15", minute=7), job_refresh_opportunities),
+        ("discover_opportunities", CronTrigger(hour=6, minute=42), job_discover_opportunities),
     ]
 
     # DateTrigger, not IntervalTrigger: run once ~20s after startup. `replace`

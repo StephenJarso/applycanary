@@ -97,6 +97,16 @@ companies:
   - platform: ashby
     token: turso
     name: Turso
+  # Africa-focused & developer platforms
+  - platform: ashby
+    token: andela
+    name: Andela
+  - platform: greenhouse
+    token: moniepoint
+    name: Moniepoint
+  - platform: ashby
+    token: replit
+    name: Replit
 
 # Official careers sites that are not on a supported ATS. These are parsed from
 # the page itself (JSON-LD when present, otherwise title/meta/main content).

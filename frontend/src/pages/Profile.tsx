@@ -683,6 +683,13 @@ export default function ProfilePage() {
           <Text label="LinkedIn URL" value={form.linkedin_url ?? ""} onChange={(v) => set("linkedin_url", v)} />
           <Text label="Portfolio URL" value={form.portfolio_url ?? ""} onChange={(v) => set("portfolio_url", v)} />
           <Text label="Work authorisation" value={form.work_authorization ?? ""} onChange={(v) => set("work_authorization", v)} />
+          <TextArea
+            label="Motivation statement (for fellowships & volunteerships)"
+            placeholder="In 2-3 sentences: what drives you and why you want these opportunities. Used as the core motivation when generating Statement of Purpose / motivation letters."
+            value={form.motivation_statement ?? ""}
+            onChange={(v) => set("motivation_statement", v)}
+            rows={3}
+          />
 
           <div className="field">
             <label htmlFor="years">Years of experience</label>
@@ -926,6 +933,31 @@ function Text({
     <div className="field">
       <label htmlFor={id}>{label}</label>
       <input id={id} type={type} value={value} onChange={(e) => onChange(e.target.value)} />
+    </div>
+  );
+}
+
+function TextArea({
+  label, value, onChange, placeholder, rows = 3,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+  rows?: number;
+}) {
+  const id = label.toLowerCase().replace(/\W+/g, "-");
+  return (
+    <div className="field full-width" style={{ gridColumn: "1 / -1" }}>
+      <label htmlFor={id}>{label}</label>
+      <textarea
+        id={id}
+        rows={rows}
+        value={value}
+        placeholder={placeholder}
+        onChange={(e) => onChange(e.target.value)}
+        style={{ width: "100%", padding: "0.5rem", borderRadius: "var(--radius, 6px)", border: "1px solid var(--border)", background: "transparent", color: "inherit" }}
+      />
     </div>
   );
 }

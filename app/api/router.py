@@ -14,12 +14,12 @@ from __future__ import annotations
 import hmac
 import logging
 import re
-from datetime import date, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any, Literal
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request
-from fastapi.responses import FileResponse, RedirectResponse
+from fastapi.responses import FileResponse, RedirectResponse, Response
 from pydantic import BaseModel, Field
 from sqlalchemy import and_, or_
 from sqlmodel import Session, func, select
@@ -298,6 +298,7 @@ class ProfileOut(BaseModel):
     resume_words: int = 0
     base_resume_filename: str = ""
     base_resume_text: str = ""
+    motivation_statement: str = ""
     skills: list[str] = Field(default_factory=list)
     github_synced_at: datetime | None = None
     github_repo_count: int = 0
@@ -347,6 +348,7 @@ class ProfileIn(BaseModel):
     open_to_relocation: bool = False
     # User-confirmed skills supplement skills detected from the uploaded resume.
     skills: list[str] = Field(default_factory=list)
+    motivation_statement: str = ""
     # Email alerts: send immediately when a posting scores at/above this (0 = off).
     alert_min_score: float | None = None
     # Auto-submit preferences
@@ -409,6 +411,18 @@ class FeedbackIn(BaseModel):
 class FeedbackUpdate(BaseModel):
     status: str | None = None
     admin_notes: str | None = None
+
+
+class SopIn(BaseModel):
+    title: str
+    org: str = ""
+    description: str
+
+
+class SopOut(BaseModel):
+    ok: bool
+    text: str = ""
+    error: str = ""
 
 
 
@@ -912,6 +926,34 @@ async def public_hackathons() -> OpportunitiesOut:
     from app.opportunities import get_hackathons
 
     return OpportunitiesOut(**await get_hackathons())
+
+
+@router.get("/opportunities/discover")
+async def discover_opportunities(
+    user: User = Depends(current_user),
+    session: Session = Depends(get_session),
+) -> dict:
+    """Discover rare opportunities (fellowships, volunteerships, OSS roles) for user."""
+    from app.pipeline.discover_opportunities import discover_opportunities_for_profile
+
+    profile = _profile_or_404(session, user)
+    leads = await discover_opportunities_for_profile(profile)
+    return {
+        "items": [
+            {
+                "title": lead.title,
+                "org": lead.org,
+                "url": lead.url,
+                "description": lead.description[:500],
+                "source": lead.source,
+                "published": lead.published.isoformat() if lead.published else None,
+                "tags": lead.tags,
+                "relevance_score": round(lead.relevance_score, 2),
+            }
+            for lead in leads[:30]
+        ],
+        "total": len(leads),
+    }
 
 
 @router.get("/public/kenya-jobs", response_model=EntryLevelFeedOut)
@@ -1461,6 +1503,7 @@ def get_profile(
         resume_words=len((profile.base_resume_text or "").split()),
         base_resume_filename=(profile.resume_meta or {}).get("original_filename") or (Path(profile.base_resume_path).name if profile.base_resume_path else ""),
         base_resume_text=profile.base_resume_text or "",
+        motivation_statement=getattr(profile, "motivation_statement", "") or "",
         skills=list(profile.skills or []),
         github_synced_at=profile.github_synced_at,
         github_repo_count=len(evidence.get("repos") or []),
@@ -2159,6 +2202,31 @@ async def trigger_github(
     )
 
 
+@router.post("/actions/sop", response_model=SopOut)
+async def generate_sop_endpoint(
+    payload: SopIn,
+    user: User = Depends(current_user),
+    session: Session = Depends(get_session),
+) -> SopOut:
+    """Generate a Statement of Purpose for a fellowship, volunteership, or competitive program."""
+    from app.pipeline.sop import SOPError, generate_sop
+
+    profile = _profile_or_404(session, user)
+    try:
+        text = await generate_sop(
+            profile=profile,
+            title=payload.title,
+            org=payload.org,
+            description=payload.description,
+        )
+        return SopOut(ok=True, text=text)
+    except SOPError as exc:
+        return SopOut(ok=False, error=str(exc))
+    except Exception as exc:
+        log.exception("SOP generation failed for %s", payload.title)
+        return SopOut(ok=False, error=f"SOP generation failed: {exc}")
+
+
 # ---------------------------------------------------------------- feedback & admin
 
 
@@ -2625,6 +2693,39 @@ def push_unsubscribe(
     return {"ok": True}
 
 
+def _opportunity_stage(row: WatchedOpportunity) -> str:
+    """Which stage an opportunity application has reached.
+
+    Mirrors the job tracker: an explicit verdict outranks a reply, and a row
+    the user only watches (never applied to) is not part of the pipeline at all.
+    """
+    if row.outcome in _PIPELINE_OUTCOMES:
+        return row.outcome
+    if row.applied_at is None:
+        return "watching"
+    if row.response_received:
+        return "responded"
+    return "applied"
+
+
+def _opportunity_row(row: WatchedOpportunity) -> dict:
+    return {
+        "id": row.id,
+        "opp_url": row.opp_url,
+        "opp_title": row.opp_title,
+        "opp_org": row.opp_org,
+        "opp_kind": row.opp_kind,
+        "deadline": row.deadline,
+        "opens": row.opens,
+        "watched": row.watched,
+        "applied_at": row.applied_at,
+        "response_received": row.response_received,
+        "outcome": row.outcome or "",
+        "stage": _opportunity_stage(row),
+        "created_at": row.created_at.isoformat(),
+    }
+
+
 @router.get("/opportunities/watched")
 def get_watched(
     user: User = Depends(current_user),
@@ -2706,39 +2807,6 @@ def unwatch_opp(
             session.delete(row)
         session.commit()
     return {"ok": True, "watched": False}
-
-
-def _opportunity_stage(row: WatchedOpportunity) -> str:
-    """Which stage an opportunity application has reached.
-
-    Mirrors the job tracker: an explicit verdict outranks a reply, and a row
-    the user only watches (never applied to) is not part of the pipeline at all.
-    """
-    if row.outcome in _PIPELINE_OUTCOMES:
-        return row.outcome
-    if row.applied_at is None:
-        return "watching"
-    if row.response_received:
-        return "responded"
-    return "applied"
-
-
-def _opportunity_row(row: WatchedOpportunity) -> dict:
-    return {
-        "id": row.id,
-        "opp_url": row.opp_url,
-        "opp_title": row.opp_title,
-        "opp_org": row.opp_org,
-        "opp_kind": row.opp_kind,
-        "deadline": row.deadline,
-        "opens": row.opens,
-        "watched": row.watched,
-        "applied_at": row.applied_at,
-        "response_received": row.response_received,
-        "outcome": row.outcome or "",
-        "stage": _opportunity_stage(row),
-        "created_at": row.created_at.isoformat(),
-    }
 
 
 class OpportunityStatusIn(BaseModel):
@@ -2828,6 +2896,73 @@ def track_opportunity(
     session.commit()
     session.refresh(row)
     return _opportunity_row(row)
+
+
+@router.get("/opportunities/calendar")
+def opportunity_ical(
+    url: str = Query(...),
+    title: str = Query(default=""),
+    org: str = Query(default=""),
+    deadline: str = Query(default=""),
+    user: User = Depends(current_user),
+    session: Session = Depends(get_session),
+) -> Response:
+    """Export an opportunity deadline as an iCal (.ics) file."""
+    import re
+    from datetime import date
+
+    watched = session.exec(
+        select(WatchedOpportunity).where(
+            WatchedOpportunity.user_id == user.id,
+            WatchedOpportunity.opp_url == url,
+        )
+    ).first()
+
+    eff_title = (watched.opp_title if watched and watched.opp_title else title) or "Opportunity Deadline"
+    eff_org = (watched.opp_org if watched and watched.opp_org else org) or ""
+    eff_deadline = (watched.deadline if watched and watched.deadline else deadline) or ""
+
+    if not eff_deadline:
+        raise HTTPException(status_code=400, detail="opportunity has no valid deadline")
+
+    try:
+        deadline_date = date.fromisoformat(eff_deadline)
+    except ValueError as err:
+        raise HTTPException(status_code=400, detail="opportunity has invalid deadline format") from err
+
+    dtstart = deadline_date.strftime("%Y%m%d")
+    dtend = deadline_date.strftime("%Y%m%d")
+    now_stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
+    uid = f"deadline-{deadline_date.isoformat()}-{abs(hash(url))}@applycanary"
+    summary = f"DEADLINE: {eff_title}"
+    org_str = f" ({eff_org})" if eff_org else ""
+    description = f"Application deadline for {eff_title}{org_str}. URL: {url}"
+
+    ical = "\r\n".join([
+        "BEGIN:VCALENDAR",
+        "VERSION:2.0",
+        "PRODID:-//ApplyCanary//Personal Job Assistant//EN",
+        "CALSCALE:GREGORIAN",
+        "METHOD:PUBLISH",
+        "BEGIN:VEVENT",
+        f"UID:{uid}",
+        f"DTSTAMP:{now_stamp}",
+        f"DTSTART;VALUE=DATE:{dtstart}",
+        f"DTEND;VALUE=DATE:{dtend}",
+        f"SUMMARY:{summary}",
+        f"DESCRIPTION:{description}",
+        f"URL:{url}",
+        "END:VEVENT",
+        "END:VCALENDAR",
+    ])
+
+    slug = re.sub(r"[^a-zA-Z0-9_-]", "-", eff_title[:30]).strip("-") or "deadline"
+    filename = f"{slug}-deadline.ics"
+    return Response(
+        content=ical,
+        media_type="text/calendar",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 # ---------------------------------------------------------------- admin management

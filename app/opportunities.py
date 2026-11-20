@@ -462,6 +462,52 @@ PAID_PROGRAMS: list[dict] = [
             "with a job or a degree."
         ),
     },
+    {
+        "kind": "Paid program",
+        "title": "Andela Technical Leadership Program",
+        "org": "Andela",
+        "when": "Rolling cohorts",
+        "opens": None,
+        "closes": None,
+        "steps": [
+            "Apply online",
+            "Technical assessment",
+            "Bootcamp (fully paid)",
+            "Placement with global tech companies",
+        ],
+        "city": "Remote",
+        "tags": ["Africa", "Paid", "Software Engineering", "Remote"],
+        "stipend": "Paid placement",
+        "source": "Official",
+        "url": "https://andela.com/",
+        "desc": (
+            "Andela connects African software engineers with global tech companies. "
+            "Developers join through a competitive selection process and work remotely."
+        ),
+    },
+    {
+        "kind": "Paid program",
+        "title": "AfricaHacks Hackathon",
+        "org": "AfricaHacks",
+        "when": "Annual · various tracks",
+        "opens": "2027-01-01",
+        "closes": "2027-03-31",
+        "steps": [
+            "Register team (1-5 members)",
+            "Build during hackathon period",
+            "Submit project",
+            "Demo day and prizes",
+        ],
+        "city": "Online + regional finals",
+        "tags": ["Competition", "Hackathon", "Africa", "Open Source", "Prize"],
+        "stipend": "Cash prizes by track",
+        "source": "Official",
+        "url": "https://africahacks.com/",
+        "desc": (
+            "Africa's largest pan-African hackathon, with tracks for fintech, health, "
+            "agriculture, and infrastructure. Cash prizes and acceleration for top teams."
+        ),
+    },
 ]
 
 # Curated entries can be internships as well as pay-to-learn programs. Keeping
@@ -927,6 +973,31 @@ INTERNSHIPS.extend(
             ),
         },
     ]
+)
+INTERNSHIPS.append(
+    {
+        "kind": "Internship",
+        "title": "Africa's Talking Engineering Internship",
+        "org": "Africa's Talking",
+        "when": "Rolling · 3-6 months",
+        "opens": None,
+        "closes": None,
+        "steps": [
+            "Apply via careers page",
+            "Technical interview",
+            "3-6 month paid internship in Nairobi",
+        ],
+        "city": "Nairobi, Kenya",
+        "tags": ["Kenya", "Paid", "Software Engineering", "Telecom API"],
+        "stipend": "Paid",
+        "source": "Official",
+        "url": "https://africastalking.com/careers",
+        "desc": (
+            "Africa's Talking is Nairobi's leading API platform for SMS, USSD, voice, "
+            "and payments across Africa. Engineering internships work on production systems "
+            "serving millions of users across 18 countries."
+        ),
+    },
 )
 
 # Programs are what remains; the moved entries are now served by INTERNSHIPS.
