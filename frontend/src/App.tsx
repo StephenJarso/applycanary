@@ -20,6 +20,7 @@ const VerifyEmail = lazy(() => import("./pages/VerifyEmail"));
 const Landing = lazy(() => import("./pages/Landing"));
 const Opportunities = lazy(() => import("./pages/Opportunities"));
 const Internships = lazy(() => import("./pages/Internships"));
+const OpportunityDetail = lazy(() => import("./pages/OpportunityDetail"));
 const KenyaJobs = lazy(() => import("./pages/KenyaJobs"));
 const Volunteers = lazy(() => import("./pages/Volunteers"));
 const Hackathons = lazy(() => import("./pages/Hackathons"));
@@ -502,6 +503,7 @@ function Dashboard({ page }: { page?: "internships" | "programs" | "kenya-jobs" 
               <Route path="/applications" element={<Applications />} />
               <Route path="/sources" element={<Sources />} />
               <Route path="/profile" element={<ProfilePage />} />
+              <Route path="/opportunity/detail" element={<OpportunityDetail />} />
               <Route
                 path="*"
                 element={<div className="empty"><div className="empty-title">Not found</div></div>}

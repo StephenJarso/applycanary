@@ -1,6 +1,13 @@
 import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { api, generateSop, type Opportunity } from "./api";
+import {
+  api,
+  generateSop,
+  tailorOpportunityResume,
+  type Opportunity,
+  type TailorOpportunityOut,
+} from "./api";
 import { useAuth } from "./context/AuthContext";
 import { useOpportunityTracking } from "./useOpportunityTracking";
 
@@ -94,40 +101,65 @@ const ELIGIBILITY_LABELS: Record<string, string> = {
 };
 
 /** Actionable qualification tips and common rejection reasons. */
-function getOpportunityTips(item: Opportunity): { tips: string[]; avoid: string[]; focus: string[] } {
+export function getOpportunityTips(item: Opportunity): { tips: string[]; avoid: string[]; focus: string[] } {
   const t = `${item.title} ${item.org} ${item.desc}`.toLowerCase();
 
   if (t.includes("hennge")) {
     return {
       tips: [
-        "Pass 100% of the online coding challenge (Python, Go, or TypeScript) — test all boundary cases and invalid inputs before submitting.",
-        "Ensure your GitHub profile showcases at least one functional backend or full-stack project in Go or Python.",
-        "In your application essays, explain specifically why HENNGE Tokyo (cloud security, B2B SaaS) and your interest in working in Japan.",
-        "Prepare for the technical interview by reviewing REST APIs, async concurrency, and Linux server basics.",
+        "Pass 100% of the online coding challenge: Test empty inputs, maximum boundaries, and malformed data locally before submitting. HENNGE's automated grader disqualifies submissions with any failed hidden test cases.",
+        "Spotlight working backend code: Ensure your GitHub has at least one production-grade Go or Python project with a Dockerfile, automated tests, and clear README architecture diagram.",
+        "Specific Tokyo motivation: In your application essays, explain why HENNGE One cloud security and relocating to Shibuya, Tokyo matches your career trajectory. Avoid generic answers.",
+        "Technical interview readiness: Review asynchronous concurrency (goroutines/channels in Go, asyncio in Python), RESTful HTTP status contracts, and basic Linux systems administration.",
       ],
       avoid: [
-        "Submitting incomplete solutions on the coding assessment.",
-        "Using generic AI-sounding responses for the motivation questions.",
+        "Submitting the coding challenge without local unit testing across edge cases.",
+        "Using generic AI-generated answers for the Japan motivation questions.",
+        "Having an inactive GitHub profile with only tutorial repos.",
       ],
-      focus: ["Go / Python backend development", "API & cloud fundamentals", "Clean code & edge testing"],
+      focus: ["Go / Python backend engineering", "API design & cloud security", "Test coverage & boundary conditions"],
     };
   }
 
   if (t.includes("outreachy")) {
     return {
       tips: [
-        "Pick ONE participating open-source project immediately on Day 1 of the contribution period.",
-        "Introduce yourself on the project's chat (Zulip, Matrix, Slack, or mailing list) and follow their contributor setup guide.",
-        "Start with beginner-friendly documentation or unit test PRs to get mentor recognition early.",
-        "Crucial: Log EVERY single contribution (PR, issue comment, documentation) on the Outreachy website before the period closes.",
-        "Ensure you meet the 40 hr/week availability requirement during the internship timeline.",
+        "Dominate ONE project on Day 1: Do not split contributions across multiple projects. Choose a single organization matching your primary language (Python, Go, or web).",
+        "Engage immediately in community chat: Introduce yourself on Zulip, Matrix, or Slack on Day 1 and follow the developer installation instructions.",
+        "Submit your first PR within Week 1: Start with beginner-friendly documentation or unit test PRs to get mentor trust early.",
+        "CRITICAL — Record every contribution on the Outreachy portal: Mentors and selection committees ONLY evaluate work logged on the Outreachy dashboard. Record every merged PR, reviewed issue, and commit before the period closes.",
+        "Commitment & Authenticity: Confirm 40 hours/week availability. In your initial application essays, write authentic personal stories about obstacles overcome.",
       ],
       avoid: [
+        "Spreading effort across 4 different organizations without substantial merged PRs in any.",
         "Waiting until the last week of the contribution period to submit your first PR.",
-        "Jumping between 4 different organizations without substantive merged PRs in any.",
-        "Forgetting to record your contributions on the Outreachy portal.",
+        "Failing to record your contributions on the Outreachy portal (the #1 reason applicants get rejected).",
       ],
-      focus: ["Git / GitHub collaboration", "Issue reproduction & testing", "Consistent communication with mentors"],
+      focus: ["Git / GitHub workflow", "Daily mentor communication in Zulip/Matrix", "Portal contribution logging"],
+    };
+  }
+
+  if (t.includes("canonical")) {
+    return {
+      tips: [
+        "Highlight Linux and Ubuntu depth: comfort with bash scripting, systemd, package management, and container runtimes.",
+        "Demonstrate clean, idiomatic Go or Python code on GitHub with automated GitHub Actions CI.",
+        "Prepare for Canonical's standardized high-school and university math, logic, and verbal assessment tests.",
+      ],
+      avoid: ["Claiming Linux administration without hands-on terminal and scripting examples."],
+      focus: ["Ubuntu / Linux internals", "Go / Python systems engineering", "Logic & mathematical assessments"],
+    };
+  }
+
+  if (t.includes("chipper") || t.includes("moniepoint") || t.includes("safari") || t.includes("africas talking") || t.includes("africa's talking")) {
+    return {
+      tips: [
+        "Demonstrate hands-on API integration experience: payment webhooks, M-PESA Daraja STK push, or SMS/USSD services.",
+        "Emphasize distributed systems fundamentals: idempotency keys, message queues, and high-availability database queries.",
+        "Prepare for technical aptitude and structured behavioral interviews focusing on customer impact.",
+      ],
+      avoid: ["Treating fintech APIs as black boxes without addressing failure recovery and idempotency."],
+      focus: ["Financial APIs & webhooks", "Relational database performance", "Asynchronous messaging & queues"],
     };
   }
 
@@ -206,7 +238,7 @@ function getOpportunityTips(item: Opportunity): { tips: string[]; avoid: string[
   };
 }
 
-function Funding({ item }: { item: Opportunity }) {
+export function Funding({ item }: { item: Opportunity }) {
   const badges: string[] = [];
   if (item.stipend_amount) {
     const period = item.stipend_period === "month" ? "/month"
@@ -229,7 +261,7 @@ function Funding({ item }: { item: Opportunity }) {
   );
 }
 
-function Eligibility({ item }: { item: Opportunity }) {
+export function Eligibility({ item }: { item: Opportunity }) {
   const labels = (item.eligibility ?? [])
     .map((key) => ELIGIBILITY_LABELS[key])
     .filter(Boolean);
@@ -237,7 +269,7 @@ function Eligibility({ item }: { item: Opportunity }) {
   return <p className="opp-eligibility">Eligibility: {labels.join(" · ")}</p>;
 }
 
-function Steps({ item }: { item: Opportunity }) {
+export function Steps({ item }: { item: Opportunity }) {
   if (!item.steps) return null;
   return (
     <ol className="opp-steps">
@@ -246,7 +278,7 @@ function Steps({ item }: { item: Opportunity }) {
   );
 }
 
-function Timeline({ item }: { item: Opportunity }) {
+export function Timeline({ item }: { item: Opportunity }) {
   if (item.kind === "Event") {
     return (
       <>
@@ -350,6 +382,7 @@ export function OpportunityCard({
   onToggleWatch,
 }: OpportunityCardProps) {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const deadline =
     item.closes ??
     (item.kind === "Event" || item.kind === "Hackathon" ? item.date : null) ??
@@ -358,12 +391,19 @@ export function OpportunityCard({
   const tracking = useOpportunityTracking();
   const stage = tracking.stageFor(item.url);
 
-  const [expanded, setExpanded] = useState(false);
+  // Card click navigates to detail page — expand state kept for compatibility
+  const expanded = false;
   const [sopOpen, setSopOpen] = useState(false);
   const [sopLoading, setSopLoading] = useState(false);
   const [sopText, setSopText] = useState("");
   const [sopCopied, setSopCopied] = useState(false);
   const [sopError, setSopError] = useState("");
+
+  const [tailorOpen, setTailorOpen] = useState(false);
+  const [tailorLoading, setTailorLoading] = useState(false);
+  const [tailorResult, setTailorResult] = useState<TailorOpportunityOut | null>(null);
+  const [tailorCopied, setTailorCopied] = useState(false);
+  const [tailorError, setTailorError] = useState("");
 
   const { data: profile } = useQuery({
     queryKey: ["profile"],
@@ -409,16 +449,47 @@ export function OpportunityCard({
     }
   };
 
+  const handleTailorResume = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (tailorResult) {
+      setTailorOpen((o) => !o);
+      return;
+    }
+    setTailorLoading(true);
+    setTailorOpen(true);
+    setTailorError("");
+    try {
+      const res = await tailorOpportunityResume({
+        title: item.title,
+        org: item.org,
+        kind: item.kind,
+        description: item.desc || `${item.title} by ${item.org}`,
+        tags: item.tags,
+      });
+      if (res.ok && res.tailored_resume) {
+        setTailorResult(res);
+      } else {
+        setTailorError(res.error || "Failed to tailor resume.");
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to tailor resume.";
+      setTailorError(msg);
+    } finally {
+      setTailorLoading(false);
+    }
+  };
+
   return (
     <div
-      className={`opp-card${expanded ? " opp-card-expanded" : ""}`}
-      onClick={() => setExpanded((prev) => !prev)}
+      className="opp-card"
+      onClick={() => navigate("/opportunity/detail", { state: { opportunity: item } })}
       role="button"
       tabIndex={0}
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") {
           e.preventDefault();
-          setExpanded((prev) => !prev);
+          navigate("/opportunity/detail", { state: { opportunity: item } });
         }
       }}
       style={{ cursor: "pointer", position: "relative" }}
@@ -562,8 +633,8 @@ export function OpportunityCard({
       >
         <span>
           {expanded
-            ? "▲ Tap to collapse details"
-            : "▼ Tap for tips, what to do to qualify & tailored resume"}
+            ? ""
+            : "▶ Tap for tips, what to do to qualify & tailored resume"}
         </span>
         <span style={{ fontSize: "11px", fontWeight: 400, color: "var(--text-dim)" }}>
           {expanded ? "Details open" : "Expand"}
@@ -616,6 +687,16 @@ export function OpportunityCard({
                 style={{ fontSize: "12px", padding: "4px 10px" }}
               >
                 ✍ {sopLoading ? "Generating SOP..." : sopText ? (sopOpen ? "Hide Statement of Purpose" : "Show Statement of Purpose") : "Generate Statement of Purpose"}
+              </button>
+              <button
+                type="button"
+                className="btn btn-sm btn-ghost"
+                title="Generate tailored resume and application strategy for this opportunity"
+                onClick={handleTailorResume}
+                disabled={tailorLoading}
+                style={{ fontSize: "12px", padding: "4px 10px" }}
+              >
+                📄 {tailorLoading ? "Tailoring CV..." : tailorResult ? (tailorOpen ? "Hide Tailored CV" : "Show Tailored CV") : "Generate Tailored Resume"}
               </button>
             </div>
 
@@ -687,9 +768,21 @@ export function OpportunityCard({
               border: "1px solid var(--border)",
             }}
           >
-            <h4 style={{ margin: "0 0 6px 0", fontSize: "13.5px", fontWeight: 700 }}>
-              📄 Tailored Resume Recommendations
-            </h4>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px", flexWrap: "wrap", gap: "6px" }}>
+              <h4 style={{ margin: 0, fontSize: "13.5px", fontWeight: 700 }}>
+                📄 Tailored Resume &amp; Role Alignment
+              </h4>
+              <button
+                type="button"
+                className="btn btn-sm btn-outline"
+                onClick={handleTailorResume}
+                disabled={tailorLoading}
+                style={{ fontSize: "11.5px", padding: "3px 10px" }}
+              >
+                {tailorLoading ? "⏳ Generating..." : tailorResult ? (tailorOpen ? "Hide Resume" : "View Tailored Resume") : "✨ Generate Tailored Resume"}
+              </button>
+            </div>
+
             {profile?.has_resume ? (
               <div style={{ fontSize: "12.5px", lineHeight: "1.5" }}>
                 {matchedSkills.length > 0 ? (
@@ -705,13 +798,101 @@ export function OpportunityCard({
                   </p>
                 )}
                 <p style={{ margin: "0", color: "var(--text-dim)" }}>
-                  💡 <strong>CV Action:</strong> Reorder your projects to showcase code relevant to {item.org}. Ensure working GitHub links are at the top of your resume.
+                  💡 <strong>CV Action:</strong> Reorder your projects to showcase code relevant to {item.org}. Ensure working GitHub links with automated tests and clear READMEs are at the top of your resume.
                 </p>
               </div>
             ) : (
               <p style={{ margin: 0, fontSize: "12.5px", color: "var(--text-dim)" }}>
                 Upload your base resume in the Profile tab to receive automatic skill-matching and project recommendations for this opportunity.
               </p>
+            )}
+
+            {/* Tailored Resume Container */}
+            {tailorOpen && (
+              <div
+                style={{
+                  marginTop: "12px",
+                  background: "var(--ac-surface-container, rgba(0,0,0,0.04))",
+                  padding: "12px",
+                  borderRadius: "8px",
+                  border: "1px solid var(--border)",
+                }}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px", flexWrap: "wrap", gap: "6px" }}>
+                  <span style={{ fontWeight: 700, fontSize: "13px" }}>
+                    Tailored Resume &amp; Strategy for {item.org}
+                  </span>
+                  <div style={{ display: "flex", gap: "6px" }}>
+                    {tailorResult?.tailored_resume && (
+                      <>
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-ghost"
+                          onClick={() => {
+                            navigator.clipboard.writeText(tailorResult.tailored_resume || "");
+                            setTailorCopied(true);
+                            setTimeout(() => setTailorCopied(false), 2000);
+                          }}
+                          style={{ fontSize: "11px", padding: "2px 8px" }}
+                        >
+                          {tailorCopied ? "✓ Copied" : "📋 Copy"}
+                        </button>
+                        <a
+                          href={`data:text/markdown;charset=utf-8,${encodeURIComponent(tailorResult.tailored_resume || "")}`}
+                          download={`${item.org.toLowerCase().replace(/[^a-z0-9]/g, "_")}_tailored_cv.md`}
+                          className="btn btn-sm btn-ghost"
+                          style={{ fontSize: "11px", padding: "2px 8px", textDecoration: "none" }}
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          💾 Download .md
+                        </a>
+                      </>
+                    )}
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-ghost"
+                      onClick={() => setTailorOpen(false)}
+                      style={{ fontSize: "11px", padding: "2px 8px" }}
+                    >
+                      ✕ Close
+                    </button>
+                  </div>
+                </div>
+
+                {tailorLoading && (
+                  <p style={{ color: "var(--text-dim)", margin: 0, fontSize: "12.5px" }}>
+                    ⏳ Grounding and tailoring your resume credentials for {item.title}...
+                  </p>
+                )}
+
+                {tailorError && (
+                  <p style={{ color: "var(--bad, #dc2626)", margin: 0, fontSize: "12.5px" }}>
+                    {tailorError}
+                  </p>
+                )}
+
+                {tailorResult?.tailored_resume && (
+                  <div
+                    style={{
+                      whiteSpace: "pre-wrap",
+                      lineHeight: "1.5",
+                      maxHeight: "320px",
+                      overflowY: "auto",
+                      fontSize: "12px",
+                      fontFamily: "monospace",
+                      color: "var(--text)",
+                      borderTop: "1px solid var(--border)",
+                      paddingTop: "8px",
+                      background: "var(--bg, #fff)",
+                      padding: "10px",
+                      borderRadius: "6px",
+                      boxShadow: "inset 0 1px 3px rgba(0,0,0,0.05)",
+                    }}
+                  >
+                    {tailorResult.tailored_resume}
+                  </div>
+                )}
+              </div>
             )}
           </div>
 

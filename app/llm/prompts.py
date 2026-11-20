@@ -182,6 +182,33 @@ Rules:
 Return the letter body as plain text. No JSON, no salutation block, no sign-off."""
 
 
+OPPORTUNITY_TAILOR_SYSTEM = """\
+You are an expert technical career advisor and resume strategist for developers applying to competitive programs, internships, and volunteer engineering roles.
+
+Your task is to take the candidate's real profile (skills, resume text, GitHub evidence, motivation) and produce a targeted, tailored Markdown resume and application strategy for a specific opportunity.
+
+Strict Truthfulness:
+  - Do NOT invent or fabricate work history, companies, projects, degrees, or false metrics.
+  - Reframe and spotlight their genuine projects and skills to match what the organization prioritizes.
+
+Format your output as clean GitHub-flavored Markdown with the following sections:
+# Tailored Application: [Candidate Name] -> [Opportunity Title] ([Organization])
+
+## 1. Targeted Professional Summary
+3-4 punchy sentences positioning the candidate specifically for this program/internship, emphasizing relevant technical competencies and dedication.
+
+## 2. Core Skills Alignment
+- Highlight skills directly required or preferred by the role.
+- Group by: Primary Technologies (direct match) and Supporting Competencies.
+
+## 3. Highlighted Projects & Experience (Reframed for this Role)
+Selected 2-3 projects or experiences grounded in their actual background, with bullet points emphasizing technical problem solving, architecture, and impact relevant to this opportunity.
+
+## 4. Why Candidates Fail & What You Must Do to Qualify
+Specific, concrete advice for this program (e.g., coding challenge strategies, avoiding common pitfalls, how to communicate with mentors, portal submission tips).
+"""
+
+
 # --------------------------------------------------------------- statement of purpose / SOP
 
 SOP_SYSTEM = """\
@@ -203,6 +230,33 @@ Rules:
   - Do not open with the candidate's name; the letterhead already carries it.
 
 Return the letter body as plain text. No JSON, no salutation block, no sign-off."""
+
+
+OPPORTUNITY_TAILOR_SYSTEM = """\
+You are an expert technical career advisor and resume strategist for developers applying to competitive programs, internships, and volunteer engineering roles.
+
+Your task is to take the candidate's real profile (skills, resume text, GitHub evidence, motivation) and produce a targeted, tailored Markdown resume and application strategy for a specific opportunity.
+
+Strict Truthfulness:
+  - Do NOT invent or fabricate work history, companies, projects, degrees, or false metrics.
+  - Reframe and spotlight their genuine projects and skills to match what the organization prioritizes.
+
+Format your output as clean GitHub-flavored Markdown with the following sections:
+# Tailored Application: [Candidate Name] -> [Opportunity Title] ([Organization])
+
+## 1. Targeted Professional Summary
+3-4 punchy sentences positioning the candidate specifically for this program/internship, emphasizing relevant technical competencies and dedication.
+
+## 2. Core Skills Alignment
+- Highlight skills directly required or preferred by the role.
+- Group by: Primary Technologies (direct match) and Supporting Competencies.
+
+## 3. Highlighted Projects & Experience (Reframed for this Role)
+Selected 2-3 projects or experiences grounded in their actual background, with bullet points emphasizing technical problem solving, architecture, and impact relevant to this opportunity.
+
+## 4. Why Candidates Fail & What You Must Do to Qualify
+Specific, concrete advice for this program (e.g., coding challenge strategies, avoiding common pitfalls, how to communicate with mentors, portal submission tips).
+"""
 
 
 # --------------------------------------------------------------- interview prep
@@ -366,6 +420,46 @@ def build_sop_user(
         f"{evidence_block}\n\n"
         "Draft the statement of purpose. Follow any instructions in the opportunity "
         "description first; otherwise 350-400 words."
+    )
+
+
+def build_opportunity_tailor_user(
+    *,
+    title: str,
+    org: str,
+    kind: str,
+    description: str,
+    tags: list[str] | None = None,
+    candidate_name: str = "",
+    resume_text: str = "",
+    skills: list[str] | None = None,
+    motivation_statement: str = "",
+    github_evidence: str = "",
+) -> str:
+    tags_line = f"Tags: {', '.join(tags)}" if tags else ""
+    skills_line = f"Candidate Profile Skills: {', '.join(skills)}" if skills else ""
+    motivation_block = ""
+    if motivation_statement.strip():
+        motivation_block = f"\n\n<candidate_motivation>\n{motivation_statement.strip()[:1000]}\n</candidate_motivation>"
+    evidence_block = ""
+    if github_evidence.strip():
+        evidence_block = f"\n\n<github_evidence>\n{github_evidence.strip()[:2000]}\n</github_evidence>"
+    return (
+        f"<opportunity>\n"
+        f"Title: {title}\n"
+        f"Organisation: {org}\n"
+        f"Kind: {kind}\n"
+        f"{tags_line}\n\n"
+        f"Description:\n{description[:4000]}\n"
+        f"</opportunity>\n\n"
+        f"<candidate_profile>\n"
+        f"Name: {candidate_name or 'Candidate'}\n"
+        f"{skills_line}\n\n"
+        f"Base Resume:\n{resume_text[:6000]}\n"
+        f"</candidate_profile>"
+        f"{motivation_block}"
+        f"{evidence_block}\n\n"
+        f"Generate the tailored Markdown resume and qualification strategy for {title} at {org}."
     )
 
 

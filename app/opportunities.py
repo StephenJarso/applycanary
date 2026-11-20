@@ -2333,6 +2333,237 @@ INTERNSHIPS += [
             "site as they open."
         ),
     },
+    {
+        "kind": "Internship",
+        "title": "Canonical Early Career Engineering & Apprenticeship",
+        "org": "Canonical (Ubuntu)",
+        "when": "Rolling intake 2027 · full-time remote",
+        "opens": None,
+        "closes": None,
+        "steps": [
+            "Submit CV and complete the standard Canonical logic/math assessment",
+            "Technical interview on Linux systems, Go or Python architecture",
+            "Written design assessment and discussion with engineering leads",
+        ],
+        "city": "Online",
+        "tags": ["Paid", "Remote", "Linux", "Python", "Go", "Cloud", "Distributed Systems"],
+        "stipend": "Paid monthly stipend ($2,500/mo) · remote allowance and hardware provided",
+        "stipend_amount": 2500,
+        "stipend_currency": "USD",
+        "stipend_period": "month",
+        "remote_friendly": True,
+        "paid_to_learn": True,
+        "eligibility": ["open_to_all", "self_taught_ok", "global"],
+        "source": "Official",
+        "url": "https://canonical.com/careers/early-career",
+        "desc": (
+            "Work directly on Ubuntu, cloud infrastructure, container runtimes, "
+            "and distributed backend services in Python and Go. Canonical hires "
+            "globally and remote throughout Africa with competitive USD compensation."
+        ),
+    },
+    {
+        "kind": "Internship",
+        "title": "GitLab Contributor Residency & Engineering Trainee",
+        "org": "GitLab",
+        "when": "Cohort intakes 2027 · remote worldwide",
+        "opens": None,
+        "closes": None,
+        "steps": [
+            "Contribute at least 1-2 merged PRs to GitLab open-source repos",
+            "Submit application on GitLab Contributor Program portal",
+            "Technical pair-programming session with core maintainers",
+        ],
+        "city": "Online",
+        "tags": ["Paid", "Remote", "DevOps", "Ruby", "Go", "Vue.js", "Open Source"],
+        "stipend": "Paid monthly stipend ($3,000/mo) · home office allowance",
+        "stipend_amount": 3000,
+        "stipend_currency": "USD",
+        "stipend_period": "month",
+        "remote_friendly": True,
+        "paid_to_learn": True,
+        "eligibility": ["global", "open_to_all", "self_taught_ok"],
+        "source": "Official",
+        "url": "https://about.gitlab.com/handbook/marketing/community-relations/contributor-program/",
+        "desc": (
+            "Learn scalable open-source DevOps, CI/CD pipelines, and cloud-native "
+            "backend services with direct code reviews from GitLab core maintainers."
+        ),
+    },
+    {
+        "kind": "Internship",
+        "title": "LINE Global Engineering Internship (Tokyo/Fukuoka)",
+        "org": "LINE Corporation",
+        "when": "Summer 2027 · 6–8 weeks in Japan",
+        "opens": "2027-02-01",
+        "closes": "2027-04-15",
+        "steps": [
+            "Online coding test (algorithmic problem solving in Python, Go or Java)",
+            "Technical interview on concurrency, HTTP protocols, and databases",
+            "Visa processing, round-trip flights and housing arrangements funded by LINE",
+        ],
+        "city": "Tokyo",
+        "tags": ["Japan", "Visa sponsored", "Flights covered", "Backend", "Go", "Python", "Tokyo"],
+        "stipend": "¥250,000/month stipend + round-trip flights and Tokyo housing fully paid",
+        "stipend_amount": 250000,
+        "stipend_currency": "JPY",
+        "stipend_period": "month",
+        "airfare_covered": True,
+        "accommodation": "included",
+        "relocation_support": True,
+        "remote_friendly": False,
+        "paid_to_learn": True,
+        "eligibility": ["global", "students", "recent_grads", "self_taught_ok"],
+        "source": "Official",
+        "url": "https://linecorp.com/en/career/newgrads/internship/",
+        "desc": (
+            "High-concurrency messaging and fintech infrastructure engineering in Japan. "
+            "Round-trip airfare from Nairobi to Tokyo, private housing, and monthly stipend provided."
+        ),
+    },
+    {
+        "kind": "Internship",
+        "title": "Rakuten Global Software Engineering Internship",
+        "org": "Rakuten Group",
+        "when": "Summer 2027 · Tokyo, Japan",
+        "opens": "2027-01-15",
+        "closes": "2027-04-30",
+        "steps": [
+            "Submit English resume and GitHub project profile",
+            "Online algorithmic coding challenge (LeetCode medium level)",
+            "Video interview with Rakuten Tokyo cloud engineering team",
+        ],
+        "city": "Tokyo",
+        "tags": ["Japan", "Tokyo", "E-Commerce", "Go", "Java", "Python", "Visa sponsored"],
+        "stipend": "¥260,000/month + flights and Tokyo apartment provided",
+        "stipend_amount": 260000,
+        "stipend_currency": "JPY",
+        "stipend_period": "month",
+        "airfare_covered": True,
+        "accommodation": "included",
+        "remote_friendly": False,
+        "paid_to_learn": True,
+        "eligibility": ["global", "graduates", "recent_grads", "open_to_all"],
+        "source": "Official",
+        "url": "https://rakuten.careers/internships/",
+        "desc": (
+            "Join Rakuten's English-speaking engineering division in Tokyo. Build distributed "
+            "cloud platforms, high-throughput microservices, and AI recommendation engines."
+        ),
+    },
+    {
+        "kind": "Internship",
+        "title": "Chipper Cash Graduate Engineering Trainee",
+        "org": "Chipper Cash",
+        "when": "Rolling 2027 intake · Nairobi & remote",
+        "opens": None,
+        "closes": None,
+        "steps": [
+            "Apply online with CV and GitHub portfolio",
+            "Take-home technical assessment on REST APIs and payment logic",
+            "System architecture and values interview with engineering leads",
+        ],
+        "city": "Nairobi",
+        "tags": ["Fintech", "Kenya", "Python", "TypeScript", "Node.js", "Payments"],
+        "stipend": "KES 140,000/month + comprehensive health cover",
+        "stipend_amount": 140000,
+        "stipend_currency": "KES",
+        "stipend_period": "month",
+        "remote_friendly": True,
+        "paid_to_learn": True,
+        "eligibility": ["kenya_resident", "africa_only", "recent_grads", "self_taught_ok"],
+        "source": "Official",
+        "url": "https://chippercash.com/careers",
+        "desc": (
+            "Cross-border payments infrastructure across Africa. Build fast payment corridors, "
+            "fraud detection algorithms, and developer APIs using TypeScript, Python, and AWS."
+        ),
+    },
+    {
+        "kind": "Internship",
+        "title": "Moniepoint Graduate Engineering Trainee",
+        "org": "Moniepoint",
+        "when": "Cohort 2027 intake · Nairobi & hybrid",
+        "opens": "2027-01-10",
+        "closes": "2027-03-31",
+        "steps": [
+            "Online technical screening in algorithms and system logic",
+            "Technical interview on databases, concurrency, and API contracts",
+            "Offer and placement into core banking or merchant acquiring teams",
+        ],
+        "city": "Nairobi",
+        "tags": ["Fintech", "Go", "Java", "Distributed Systems", "Nairobi", "Payments"],
+        "stipend": "KES 160,000/month + performance bonuses",
+        "stipend_amount": 160000,
+        "stipend_currency": "KES",
+        "stipend_period": "month",
+        "remote_friendly": True,
+        "paid_to_learn": True,
+        "eligibility": ["kenya_resident", "africa_only", "recent_grads", "self_taught_ok"],
+        "source": "Official",
+        "url": "https://moniepoint.com/careers",
+        "desc": (
+            "Core banking and financial switch engineering. Learn high-throughput transaction "
+            "processing, event-driven microservices in Go, and fault-tolerant distributed architecture."
+        ),
+    },
+    {
+        "kind": "Internship",
+        "title": "Wikimedia Foundation Software Engineering Internship",
+        "org": "Wikimedia Foundation",
+        "when": "Summer 2027 · 12 weeks remote",
+        "opens": "2027-02-15",
+        "closes": "2027-05-15",
+        "steps": [
+            "Pick a Wikimedia technical project on MediaWiki Phabricator",
+            "Submit a merged micro-contribution (bug fix or test) to verify setup",
+            "Write and submit project proposal with weekly milestones",
+        ],
+        "city": "Online",
+        "tags": ["Python", "PHP", "JavaScript", "Open Source", "Global", "Remote"],
+        "stipend": "$4,000 total stipend + laptop hardware grant",
+        "stipend_amount": 4000,
+        "stipend_currency": "USD",
+        "stipend_period": "total",
+        "remote_friendly": True,
+        "paid_to_learn": True,
+        "eligibility": ["global", "open_to_all", "self_taught_ok"],
+        "source": "Official",
+        "url": "https://www.mediawiki.org/wiki/Outreach_programs",
+        "desc": (
+            "Develop features, automated bots, and performance monitoring tools for Wikipedia "
+            "and Wikidata using Python, MediaWiki, and modern web frameworks. Global and remote."
+        ),
+    },
+    {
+        "kind": "Internship",
+        "title": "CERN openlab Summer Student Internship",
+        "org": "CERN",
+        "when": "Summer 2027 (9 weeks) · Geneva, Switzerland",
+        "opens": "2026-11-15",
+        "closes": "2027-01-31",
+        "steps": [
+            "Submit CV, academic transcript, and recommendation letter on CERN portal",
+            "Selection by CERN computing team leads based on technical projects",
+            "Onboarding in Geneva with full travel and daily living allowance covered",
+        ],
+        "city": "Geneva",
+        "tags": ["High Performance Computing", "AI", "Cloud", "C++", "Python", "Paid", "Travel covered"],
+        "stipend": "CHF 90/day living allowance + travel refund and health coverage",
+        "stipend_amount": 2700,
+        "stipend_currency": "CHF",
+        "stipend_period": "month",
+        "airfare_covered": True,
+        "accommodation": "included",
+        "paid_to_learn": True,
+        "eligibility": ["students", "graduates", "global"],
+        "source": "Official",
+        "url": "https://openlab.cern/education",
+        "desc": (
+            "Work on cutting-edge distributed computing, machine learning, and high-energy physics "
+            "data pipelines at CERN in Geneva. Open to computer science and engineering students worldwide."
+        ),
+    },
 ]
 
 VOLUNTEER += [
@@ -2647,6 +2878,138 @@ VOLUNTEER += [
             "pay — a route into community leadership and the Kujia network."
         ),
     },
+    {
+        "kind": "Volunteer",
+        "title": "HOT Tech Volunteer — Open Source Developer & GIS Tooling",
+        "org": "Humanitarian OpenStreetMap Team",
+        "when": "Continuous 2027 intake · remote worldwide",
+        "opens": None,
+        "closes": None,
+        "steps": [
+            "Join HOT Slack and introduce yourself in #geospatial-tech channel",
+            "Pick good-first-issues on Tasking Manager (Python/Flask & React) or MapRoulette",
+            "Submit PRs and collaborate with community GIS validators",
+        ],
+        "city": "Online",
+        "tags": ["Volunteer", "GIS", "Python", "React", "Open Source", "Humanitarian"],
+        "stipend": "Unpaid volunteer role — certificate of contribution & verified GitHub activity",
+        "source": "Official",
+        "url": "https://www.hotosm.org/get-involved/",
+        "desc": (
+            "Contribute code to open-source humanitarian mapping tools used in disaster response. "
+            "Work with Python backend microservices, React frontends, and spatial OpenStreetMap APIs."
+        ),
+    },
+    {
+        "kind": "Volunteer",
+        "title": "AI Saturdays Nairobi — Volunteer TA & Python Mentor",
+        "org": "AI Saturdays (AI6) Nairobi",
+        "when": "Cohort 2027 · Saturdays at iHub / Nairobi tech hubs",
+        "opens": "2027-01-05",
+        "closes": "2027-02-15",
+        "steps": [
+            "Apply via AI Saturdays Nairobi mentor call form",
+            "Short technical interview on Python, NumPy, Pandas and ML libraries",
+            "Lead weekend lab walkthroughs and mentor student capstone teams",
+        ],
+        "city": "Nairobi",
+        "tags": ["Volunteer", "Python", "Machine Learning", "Mentorship", "Nairobi", "Community"],
+        "stipend": "Unpaid volunteer role (transport stipend & lunch on workshop days)",
+        "source": "Official",
+        "url": "https://aisaturdaysnairobi.org",
+        "desc": (
+            "Mentor Kenyan developers learning practical machine learning and Python engineering. "
+            "Help participants debug code, run hands-on lab sessions, and review project architectures."
+        ),
+    },
+    {
+        "kind": "Volunteer",
+        "title": "ISOC Kenya — Technical Infrastructure & Community Volunteer",
+        "org": "Internet Society Kenya Chapter",
+        "when": "Annual 2027 engagement · Nairobi & hybrid",
+        "opens": None,
+        "closes": None,
+        "steps": [
+            "Join ISOC Kenya chapter as a technical working group member",
+            "Participate in community network deployment and IPv6 advocacy",
+            "Deliver technical workshops for local universities and network operators",
+        ],
+        "city": "Nairobi",
+        "tags": ["Volunteer", "Networking", "IPv6", "IXP", "Kenya", "Community"],
+        "stipend": "Unpaid volunteer role (sponsored event passes, networking with telco leads, certificates)",
+        "source": "Official",
+        "url": "https://isoc.ke",
+        "desc": (
+            "Volunteer with the technical committee supporting community networks, IXP routing "
+            "workshops, and open internet standards across Kenya."
+        ),
+    },
+    {
+        "kind": "Volunteer",
+        "title": "PSF Community Reviewer & African PyCon Volunteer",
+        "org": "Python Software Foundation",
+        "when": "Annual cycle 2027 · remote worldwide",
+        "opens": None,
+        "closes": None,
+        "steps": [
+            "Register as a PSF contributing member and join African Python working groups",
+            "Review grant applications and community workshop proposals",
+            "Assist regional PyCon organizers with proposal reviews and tech support",
+        ],
+        "city": "Online",
+        "tags": ["Volunteer", "Python", "Open Source", "Global", "Community", "Remote"],
+        "stipend": "Unpaid volunteer role (PSF voting membership eligibility & conference recognition)",
+        "source": "Official",
+        "url": "https://www.python.org/psf/committees/",
+        "desc": (
+            "Review proposals, grants, and community initiatives supporting Python developers "
+            "across Africa and globally. Fully remote and flexible volunteering."
+        ),
+    },
+    {
+        "kind": "Volunteer",
+        "title": "OSCA Nairobi — Chapter Volunteer & Technical Speaker",
+        "org": "Open Source Community Africa (OSCA)",
+        "when": "Meetups 2027 · Nairobi",
+        "opens": None,
+        "closes": None,
+        "steps": [
+            "Join OSCA Nairobi Discord/WhatsApp community",
+            "Sign up to host hands-on open-source workshops or manage event logistics",
+            "Mentor attendees on submitting their first GitHub pull request",
+        ],
+        "city": "Nairobi",
+        "tags": ["Volunteer", "Nairobi", "Open Source", "Git", "Community", "Mentoring"],
+        "stipend": "Unpaid volunteer role (exclusive OSCA swag, speaker profile, networking with founders)",
+        "source": "Official",
+        "url": "https://oscafrica.org",
+        "desc": (
+            "Help run monthly Nairobi open-source meetups, guide first-time contributors with "
+            "GitHub pull requests, and organize regional technical panels."
+        ),
+    },
+    {
+        "kind": "Volunteer",
+        "title": "DevFest Nairobi 2027 — Volunteer Crew & AV/Stage Coordinator",
+        "org": "Google Developer Groups (GDG) Nairobi",
+        "when": "October–November 2027 · Nairobi, Kenya",
+        "opens": "2027-08-01",
+        "closes": "2027-10-15",
+        "steps": [
+            "Apply via the annual GDG Nairobi DevFest crew form",
+            "Attend volunteer orientation and AV technical rehearsal",
+            "Coordinate speaker tech checks, workshop tracks, and attendee hack zones",
+        ],
+        "city": "Nairobi",
+        "tags": ["Volunteer", "Nairobi", "GDG", "DevFest", "Conference", "Google"],
+        "stipend": "Unpaid volunteer role (full access conference pass, speaker dinner, VIP swag, certificate)",
+        "source": "Official",
+        "url": "https://gdg.community.dev/gdg-nairobi/",
+        "desc": (
+            "Volunteer behind the scenes at East Africa's largest developer conference. "
+            "Coordinate workshops, speaker tech checks, and attendee hack zones with 1,500+ attendees."
+        ),
+    },
 ]
 
 # "Earn while you learn": tuition-free or stipended software training that
@@ -2688,6 +3051,91 @@ PAID_PROGRAMS += [
             "practical catch is housing: applicants must already live in "
             "Nairobi or arrange their own accommodation, which the "
             "scholarship does not provide."
+        ),
+    },
+    {
+        "kind": "Paid program",
+        "title": "OpenSSF Security Mentorship Program",
+        "org": "Linux Foundation",
+        "when": "Summer Term 2027 · remote worldwide",
+        "opens": "2027-01-25",
+        "closes": "2027-03-20",
+        "steps": [
+            "Apply via the Linux Foundation LFX Mentorship portal",
+            "Select an OpenSSF security project (Sigstore, Scorecard, SLSA, or OpenVEX)",
+            "Submit an open-source contribution plan and resume for mentor evaluation",
+        ],
+        "city": "Online",
+        "tags": ["Security", "Linux", "Go", "Python", "Open Source", "Stipend", "Remote"],
+        "stipend": "$3,000–$6,000 stipend based on regional purchasing power parity",
+        "stipend_amount": 3000,
+        "stipend_currency": "USD",
+        "stipend_period": "total",
+        "remote_friendly": True,
+        "paid_to_learn": True,
+        "eligibility": ["global", "open_to_all", "self_taught_ok"],
+        "source": "Official",
+        "url": "https://openssf.org/community/mentorship/",
+        "desc": (
+            "Develop software supply chain security tooling (Sigstore, Scorecard, SLSA) "
+            "in Go and Python under the direct mentorship of senior security engineers."
+        ),
+    },
+    {
+        "kind": "Paid program",
+        "title": "Ethereum Foundation Next Billion Fellowship",
+        "org": "Ethereum Foundation",
+        "when": "Cohort 2027 (6 months) · remote worldwide",
+        "opens": "2026-12-01",
+        "closes": "2027-02-28",
+        "steps": [
+            "Submit project vision for public goods or digital identity in emerging markets",
+            "Interview with Ethereum Foundation social impact leads",
+            "Six months of dedicated build time with direct technical and grant support",
+        ],
+        "city": "Online",
+        "tags": ["Web3", "Decentralized", "Open Source", "Africa", "Grant", "Stipend", "Remote"],
+        "stipend": "$25,000 non-dilutive stipend grant + full Devcon conference travel funding",
+        "stipend_amount": 25000,
+        "stipend_currency": "USD",
+        "stipend_period": "total",
+        "airfare_covered": True,
+        "remote_friendly": True,
+        "paid_to_learn": True,
+        "eligibility": ["africa_only", "global", "open_to_all"],
+        "source": "Official",
+        "url": "https://fellowship.ethereum.foundation/",
+        "desc": (
+            "Six-month fellowship supporting developers building public-goods technology, "
+            "offline-first digital identity, and financial access infrastructure for emerging economies."
+        ),
+    },
+    {
+        "kind": "Paid program",
+        "title": "Mozilla Builders Open Source Grant",
+        "org": "Mozilla",
+        "when": "Rolling cohort 2027 · remote worldwide",
+        "opens": None,
+        "closes": None,
+        "steps": [
+            "Submit proposal detailing an open-source tool for decentralized AI or privacy",
+            "Technical review by Mozilla engineering and policy fellows",
+            "Receive milestone-based project grant and mentorship",
+        ],
+        "city": "Online",
+        "tags": ["AI", "Open Source", "Privacy", "Web Standards", "Python", "TypeScript", "Grant"],
+        "stipend": "$10,000–$50,000 project grant + mentorship and cloud credits",
+        "stipend_amount": 10000,
+        "stipend_currency": "USD",
+        "stipend_period": "total",
+        "remote_friendly": True,
+        "paid_to_learn": True,
+        "eligibility": ["global", "open_to_all", "self_taught_ok"],
+        "source": "Official",
+        "url": "https://builders.mozilla.org/",
+        "desc": (
+            "Funding and technical mentorship for builders creating decentralized, private, "
+            "or AI-driven open source tools on the open web."
         ),
     },
 ]

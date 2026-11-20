@@ -425,6 +425,22 @@ class SopOut(BaseModel):
     error: str = ""
 
 
+class OpportunityTailorIn(BaseModel):
+    title: str = Field(min_length=1, max_length=200)
+    org: str = ""
+    kind: str = "Internship"
+    description: str = ""
+    tags: list[str] = Field(default_factory=list)
+
+
+class OpportunityTailorOut(BaseModel):
+    ok: bool
+    tailored_resume: str = ""
+    strategy: str = ""
+    matched_skills: list[str] = Field(default_factory=list)
+    error: str = ""
+
+
 
 # ---------------------------------------------------------------- helpers
 
@@ -2225,6 +2241,86 @@ async def generate_sop_endpoint(
     except Exception as exc:
         log.exception("SOP generation failed for %s", payload.title)
         return SopOut(ok=False, error=f"SOP generation failed: {exc}")
+
+
+@router.post("/actions/tailor-opportunity", response_model=OpportunityTailorOut)
+async def tailor_opportunity_endpoint(
+    payload: OpportunityTailorIn,
+    user: User = Depends(current_user),
+    session: Session = Depends(get_session),
+) -> OpportunityTailorOut:
+    """Tailor a candidate's resume and application strategy for an opportunity or internship."""
+    from app.pipeline.opportunity_tailor import OpportunityTailorError, tailor_opportunity_resume
+
+    profile = _profile_or_404(session, user)
+    try:
+        res = await tailor_opportunity_resume(
+            profile=profile,
+            title=payload.title,
+            org=payload.org,
+            kind=payload.kind,
+            description=payload.description,
+            tags=payload.tags,
+        )
+        return OpportunityTailorOut(
+            ok=res.get("ok", True),
+            tailored_resume=res.get("tailored_resume", ""),
+            strategy=res.get("strategy", ""),
+            matched_skills=res.get("matched_skills", []),
+        )
+    except OpportunityTailorError as exc:
+        return OpportunityTailorOut(ok=False, error=str(exc))
+    except Exception as exc:
+        log.exception("Opportunity resume tailoring failed for %s", payload.title)
+        return OpportunityTailorOut(ok=False, error=f"Tailoring failed: {exc}")
+
+
+@router.post("/actions/tailor-opportunity-pdf")
+async def tailor_opportunity_pdf_endpoint(
+    payload: OpportunityTailorIn,
+    user: User = Depends(current_user),
+    session: Session = Depends(get_session),
+) -> FileResponse:
+    """Return a tailored resume PDF for an opportunity."""
+    import tempfile
+    from pathlib import Path
+
+    from fastapi.responses import FileResponse
+    from starlette.background import BackgroundTask
+
+    from app.pipeline.opportunity_tailor import OpportunityTailorError, tailor_opportunity_resume
+    from app.resume.render import write_pdf
+
+    profile = _profile_or_404(session, user)
+    try:
+        res = await tailor_opportunity_resume(
+            profile=profile,
+            title=payload.title,
+            org=payload.org,
+            kind=payload.kind,
+            description=payload.description,
+            tags=payload.tags,
+        )
+        text = res.get("tailored_resume", "")
+        if not text:
+            raise HTTPException(400, "No resume content generated")
+        tmp = Path(tempfile.mktemp(suffix=".pdf"))
+        write_pdf(text, tmp)
+        safe_org = "".join(c for c in (payload.org or "opportunity") if c.isalnum() or c in "-_")
+        fname = f"{safe_org}_tailored_resume.pdf"
+        return FileResponse(
+            path=str(tmp),
+            media_type="application/pdf",
+            filename=fname,
+            background=BackgroundTask(lambda: tmp.unlink(missing_ok=True)),
+        )
+    except HTTPException:
+        raise
+    except OpportunityTailorError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    except Exception as exc:
+        log.exception("Opportunity PDF tailoring failed for %s", payload.title)
+        raise HTTPException(500, f"PDF generation failed: {exc}") from exc
 
 
 # ---------------------------------------------------------------- feedback & admin

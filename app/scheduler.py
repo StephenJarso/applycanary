@@ -489,6 +489,24 @@ async def job_discover_opportunities() -> None:
     await run_opportunity_discovery()
 
 
+async def job_scrape_programmes() -> None:
+    """Daily live scrape of public programme sources into ProgrammeEntry table.
+
+    Fetches Outreachy, GSoC, MLH Fellowship, Idealist volunteer listings,
+    HOT jobs, and a DuckDuckGo fallback, then upserts any new entries.
+    Runs synchronously inside a thread so the event loop stays unblocked.
+    """
+    import asyncio
+
+    from app.scraper.opportunity_scraper import scrape_and_upsert_opportunities
+
+    with session_scope() as session:
+        count = await asyncio.get_event_loop().run_in_executor(
+            None, scrape_and_upsert_opportunities, session
+        )
+    log.info("scrape_programmes: %d new programme entries added", count)
+
+
 async def _send_deadline_pushes() -> None:
     """Push watched opportunities whose window closes or opens in 7 days.
 
@@ -745,6 +763,9 @@ def build_scheduler() -> AsyncIOScheduler:
         # after the morning they appear.
         ("refresh_opportunities", CronTrigger(hour="3,15", minute=7), job_refresh_opportunities),
         ("discover_opportunities", CronTrigger(hour=6, minute=42), job_discover_opportunities),
+        # Scrape live programme sources (Outreachy, GSoC, MLH, Idealist, HOT)
+        # at 06:10 EAT daily — just before the discover_opportunities pass.
+        ("scrape_programmes", CronTrigger(hour=6, minute=10), job_scrape_programmes),
     ]
 
     # DateTrigger, not IntervalTrigger: run once ~20s after startup. `replace`

@@ -1139,5 +1139,39 @@ export const getDiscoveredOpportunities = () =>
 export const generateSop = (data: { title: string; org?: string; description: string }) =>
   request<{ ok: boolean; text?: string; error?: string }>("POST", "/api/actions/sop", data);
 
+export interface TailorOpportunityIn {
+  title: string;
+  org?: string;
+  kind?: string;
+  description?: string;
+  tags?: string[];
+}
+
+export interface TailorOpportunityOut {
+  ok: boolean;
+  tailored_resume?: string;
+  strategy?: string;
+  matched_skills?: string[];
+  error?: string;
+}
+
+export const tailorOpportunityResume = (data: TailorOpportunityIn) =>
+  request<TailorOpportunityOut>("POST", "/api/actions/tailor-opportunity", data);
+
+export async function tailorOpportunityResumePdf(data: TailorOpportunityIn): Promise<Blob> {
+  const crossOrigin = API_BASE !== "" && !API_BASE.includes(window.location.host);
+  const resp = await fetch(`${API_BASE}/api/actions/tailor-opportunity-pdf`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: crossOrigin ? "include" : undefined,
+    body: JSON.stringify(data),
+  });
+  if (!resp.ok) {
+    const text = await resp.text().catch(() => "");
+    throw new Error(text || `PDF generation failed (${resp.status})`);
+  }
+  return resp.blob();
+}
+
 
 
