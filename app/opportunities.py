@@ -3601,6 +3601,181 @@ HACKATHONS += [
     },
 ]
 
+# Hackathons confirmed open on the organiser's own page. Online-first, so the
+# travel question does not decide whether it is worth entering — except where
+# the prize itself is the trip.
+HACKATHONS += [
+    {
+        "kind": "Hackathon",
+        "title": "Cloud9 × JetBrains Global Hackathon 2027",
+        "cash_prize": True,
+        "airfare_covered": False,
+        "accommodation": "not_included",
+        "org": "Cloud9 & JetBrains",
+        "when": "Online · 17 Nov 2026–12 Jan 2027",
+        "opens": "2026-11-17",
+        "closes": "2027-01-12",
+        "steps": [
+            "Register on the hackathon page and redeem the free JetBrains All Products Pack and AI Ultimate codes",
+            "Pick one category: VALORANT scouting, League of Legends draft tooling, or an event minigame",
+            "Build with at least one eligible JetBrains tool; GRID esports data is optional",
+            "Submit the project and demo before 12 Jan 2027",
+        ],
+        "city": "Online",
+        "tags": ["Hackathon", "Cash prize", "Online", "Gaming", "AI"],
+        "stipend": (
+            "Cash prize: USD 25,000 pool — USD 6,000 per category winner plus "
+            "runner-up awards; category winners also get GDC tickets, round-trip "
+            "flights and hotel · fully online, so no travel or accommodation "
+            "needed to take part"
+        ),
+        "source": "Official",
+        "url": "https://blog.jetbrains.com/blog/2026/11/17/sky-s-the-limit-the-cloud9-jetbrains-global-hackathon-is-back/",
+        "desc": (
+            "Cloud9 and JetBrains run this one every year, and it is built for "
+            "people who write code for fun: scouting tools for esports coaches, "
+            "draft organisers for League of Legends, or a short minigame for a "
+            "booth. Every participant gets two months of JetBrains tools and AI "
+            "credits, and there is an optional bonus award for the best "
+            "AI-assisted workflow write-up. Building happens remotely, so the "
+            "only travel involved is the trip to GDC that the winners get."
+        ),
+    },
+    {
+        "kind": "Hackathon",
+        "title": "United Hacks V8",
+        "cash_prize": True,
+        "airfare_covered": False,
+        "accommodation": "not_included",
+        "org": "Hack United",
+        "when": "Online · 8–10 Jan 2027",
+        "opens": None,
+        "closes": "2027-01-10",
+        "steps": [
+            "Register on the Devpost page — free, ages 13+, open worldwide",
+            "Form a team or go solo, then build during the 8–10 January weekend",
+            "Submit a demo video, a public GitHub repo and a short project description in English",
+            "Submit by 10 Jan 2027, 12:00 EST",
+        ],
+        "city": "Online",
+        "tags": ["Hackathon", "Cash prize", "Online", "Beginners", "Students"],
+        "stipend": (
+            "Cash prize: USD 18,700 pool across the overall and category "
+            "awards · fully online, so no travel or accommodation needed"
+        ),
+        "source": "Official",
+        "url": "https://unitedhacksv8.devpost.com/",
+        "desc": (
+            "A free weekend hackathon run by Hack United, open to anyone aged 13 "
+            "and over anywhere in the world. Projects must be built during the "
+            "event itself, so it rewards a finished idea over an old repo, and "
+            "the judging leans on the demo and the pitch as much as the code. "
+            "Entirely remote, so there is no travel budget to worry about."
+        ),
+    },
+    {
+        "kind": "Hackathon",
+        "title": "Learn AR with SPECS — Round 2",
+        "cash_prize": True,
+        "airfare_covered": False,
+        "accommodation": "not_included",
+        "org": "Snap (SPECS) & Devpost",
+        "when": "Online · submissions close 7 Dec 2026",
+        "opens": None,
+        "closes": "2026-12-07",
+        "steps": [
+            "Register on Devpost and install the Learn skill pack in your coding agent",
+            "Design an AR concept for glasses — no hardware needed, Lens Studio previews run on a laptop",
+            "Let Snap's CLAD agents build the Lens from your design brief",
+            "Submit the working Lens, the brief and a short demo before 7 Dec 2026",
+        ],
+        "city": "Online",
+        "tags": ["Hackathon", "Cash prize", "Online", "AR", "Design", "AI"],
+        "stipend": (
+            "Cash prize: USD 2,500 each round — USD 1,250 for first place plus "
+            "Devpost features · fully online, no travel or accommodation needed"
+        ),
+        "source": "Official",
+        "url": "https://learn-specs.devpost.com/",
+        "desc": (
+            "A learning-first hackathon: you design an augmented-reality app for "
+            "Snap's SPECS glasses, and an AI coding agent writes the Lens from "
+            "your brief. You do not need the glasses — Lens Studio previews run "
+            "on the laptop — so the work is the design judgement, not hardware. "
+            "Round 2 closes on 7 December 2026 and every eligible submitter "
+            "gets a Learn badge."
+        ),
+    },
+    {
+        "kind": "Hackathon",
+        "title": "GenHacks 2026 — student virtual hackathon",
+        "cash_prize": True,
+        "airfare_covered": False,
+        "accommodation": "not_included",
+        "org": "GenHacks",
+        "when": "Online · submissions close 26 Dec 2026",
+        "opens": None,
+        "closes": "2026-12-26",
+        "steps": [
+            "Join the hackathon on Devpost (students only, ages 13+)",
+            "Pick one of the four tracks and find a team or work solo",
+            "Build a new software or hardware project during the submission window",
+            "Submit a repo, a demo video under three minutes and your track by 26 Dec 2026",
+        ],
+        "city": "Online",
+        "tags": ["Hackathon", "Cash prize", "Online", "Students", "Beginners"],
+        "stipend": (
+            "Cash prize: CAD 1,050 pool — CAD 500 first, 200 second, 150 third, "
+            "plus 50 per track winner and sponsor credits · fully online, so no "
+            "travel or accommodation needed"
+        ),
+        "source": "Official",
+        "url": "https://genhacks-open.devpost.com/",
+        "desc": (
+            "A beginner-friendly student hackathon with a deliberately small "
+            "cash pool and a lot of sponsor credits attached to it. Open to "
+            "students from 13 up in most countries, teams of any size, and the "
+            "organisers say first-timers are the point. Remote, so nothing is "
+            "lost to travel costs."
+        ),
+    },
+    {
+        "kind": "Hackathon",
+        "title": "Kaggle competitions — rolling cash prizes",
+        "cash_prize": True,
+        "airfare_covered": False,
+        "accommodation": "not_included",
+        "org": "Kaggle (Google)",
+        "when": "Rolling · new competitions posted year-round",
+        "opens": None,
+        "closes": None,
+        "steps": [
+            "Create a Kaggle account and open the competitions list",
+            "Filter by prize type — many pay USD cash, others award medals and rating points",
+            "Read each competition's rules, timeline and eligibility before entering",
+            "Submit predictions or a notebook before the competition deadline",
+        ],
+        "city": "Online",
+        "tags": ["Hackathon", "Cash prize", "Online", "Machine learning", "Data"],
+        "stipend": (
+            "Cash prize: varies by competition — many pay USD prize pools, "
+            "others award medals and points · fully online, so no travel or "
+            "accommodation needed"
+        ),
+        "source": "Official",
+        "url": "https://www.kaggle.com/competitions",
+        "desc": (
+            "Not one hackathon but a standing board of machine-learning "
+            "competitions, several with five- and six-figure prize pools, plus "
+            "permanent playgrounds that carry ranking points rather than money. "
+            "Because entries are notebooks or predictions, a Kenyan competitor "
+            "needs no visa, no team and no travel — the scoreboard is the whole "
+            "competition. Check each listing's rules: some restrict eligibility "
+            "by country."
+        ),
+    },
+]
+
 _BUILTIN_CARDS: dict[str, list[dict]] = {
     "Paid program": PAID_PROGRAMS,
     "Internship": INTERNSHIPS,
