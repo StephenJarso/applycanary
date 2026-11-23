@@ -62,11 +62,48 @@ INDEX_URL = "https://events.techgroupkenya.co.ke/events/"
 GDG_API = "https://gdg.community.dev/api/event_slim/for_chapter/{chapter}/"
 # Chapter ids are stable in Bevy URLs; city is used when the slim payload has
 # no venue. Add a chapter here to widen the feed.
+#
+# The community chapters keep the calendar broad (DevFest, I/O Extended,
+# meetups); the GDG on Campus chapters are where most Kenyan events are
+# actually held, so leaving them out hid dozens of workshops at JKUAT, UoN,
+# Moi, TUM and the rest. Adding a chapter costs one small JSON request per
+# refresh, and a chapter that stops posting simply contributes nothing.
 GDG_CHAPTERS: dict[int, tuple[str, str]] = {
-    841: ("GDG Kisumu", "Kisumu"),
+    # Community chapters
     826: ("GDG Nairobi", "Nairobi"),
+    841: ("GDG Kisumu", "Kisumu"),
     816: ("GDG Eldoret", "Eldoret"),
     554: ("GDG Kisii", "Kisii"),
+    1378: ("GDG Pwani", "Mombasa"),
+    3009: ("GDG for Earth Engine Nairobi", "Nairobi"),
+    # GDG on Campus chapters
+    2287: ("GDG on Campus University of Nairobi", "Nairobi"),
+    2308: ("GDG on Campus Kenyatta University", "Nairobi"),
+    2335: ("GDG on Campus KCA University", "Nairobi"),
+    2295: ("GDG on Campus Multimedia University", "Nairobi"),
+    3441: ("GDG on Campus Technical University of Kenya", "Nairobi"),
+    2312: ("GDG on Campus Catholic University of Eastern Africa", "Nairobi"),
+    2341: ("GDG on Campus Co-operative University", "Nairobi"),
+    2337: ("GDG on Campus JKUAT", "Juja"),
+    2285: ("GDG on Campus Technical University of Mombasa", "Mombasa"),
+    2280: ("GDG on Campus Moi University", "Eldoret"),
+    2338: ("GDG on Campus University of Eldoret", "Eldoret"),
+    2369: ("GDG on Campus University of Eastern Africa Baraton", "Eldoret"),
+    2279: ("GDG on Campus Kabarak University", "Nakuru"),
+    2302: ("GDG on Campus Dedan Kimathi University", "Nyeri"),
+    2357: ("GDG on Campus Machakos University", "Machakos"),
+    2281: ("GDG on Campus Mount Kenya University", "Thika"),
+    2276: ("GDG on Campus Masinde Muliro University", "Webuye"),
+    2324: ("GDG on Campus Maseno University", "Kisumu"),
+    2320: ("GDG on Campus Daystar University", "Athi River"),
+    2277: ("GDG on Campus Chuka University", "Chuka"),
+    2366: ("GDG on Campus University of Embu", "Embu"),
+    2292: ("GDG on Campus Meru University", "Meru"),
+    3528: ("GDG on Campus Tharaka University", "Marimanti"),
+    2297: ("GDG on Campus Taita Taveta University", "Voi"),
+    2299: ("GDG on Campus Zetech University", "Ruiru"),
+    2332: ("GDG on Campus Kisii University", "Kisii"),
+    3465: ("GDG on Campus Mama Ngina University", "Kiambu"),
 }
 GDG_FIELDS = (
     "title,start_date,end_date,url,description,description_short,"
@@ -84,10 +121,11 @@ DETAIL_TTL = 6 * 3600.0      # an event's own page rarely changes once published
 DETAIL_MISS_TTL = 600.0      # a failing detail page is retried within 10 minutes
 STALE_TTL = 7 * 24 * 3600.0  # keep last-known events through a multi-day outage
 ENRICH_CONCURRENCY = 4       # parallel detail requests; be a polite guest
+GDG_CONCURRENCY = 8          # parallel chapter requests; one call each
 REQUEST_TIMEOUT = 20.0
-MAX_EVENTS = 40
+MAX_EVENTS = 80
 # Worst case for one cold fetch: a 20 s index timeout + ceil(MAX_EVENTS/4)
-# waves of 20 s detail timeouts ≈ 3.5 min. No visitor waits inside that — a
+# waves of 20 s detail timeouts ≈ 7 min. No visitor waits inside that — a
 # first page load verifies the cache cold for at most COLD_WAIT and then
 # serves the programs with a degraded banner while the fetch completes in
 # the background (boot warm-up + the 15-min scheduler job). Render's edge
@@ -1980,13 +2018,15 @@ HACKATHONS: list[dict] = [
 # "speaker" on its own matches the line-up of every conference in Africa, so
 # only an actual call-to-arms counts.
 _VOLUNTEER_CALL_RE = re.compile(
-    r"volunteer|call for speakers?|call for (papers|proposals)|"
-    r"speaker (applications?|submissions?|slots)|apply to speak|submit a talk|\bcfp\b",
+    r"volunteer|call for speakers?|call for (papers|proposals|mentors?)|"
+    r"speaker (applications?|submissions?|slots)|speakers? (wanted|needed)|"
+    r"mentors? (wanted|needed)|apply to speak|submit a talk|\bcfp\b",
     re.I,
 )
 _SPEAKER_CALL_RE = re.compile(
     r"call for speakers?|call for (papers|proposals)|"
-    r"speaker (applications?|submissions?|slots)|apply to speak|submit a talk|\bcfp\b",
+    r"speaker (applications?|submissions?|slots)|speakers? (wanted|needed)|"
+    r"apply to speak|submit a talk|\bcfp\b",
     re.I,
 )
 
@@ -3012,6 +3052,180 @@ VOLUNTEER += [
     },
 ]
 
+# Open-source and community volunteer routes that are open continuously rather
+# than announced with a conference date: the work is real, the organiser states
+# plainly that it is unpaid, and the application is a sign-up on the project's
+# own page. Nothing here carries a deadline because none of them publish one.
+VOLUNTEER += [
+    {
+        "kind": "Volunteer",
+        "title": "Google Developer Groups — chapter volunteer & organiser",
+        "org": "Google Developer Groups (GDG)",
+        "when": "Rolling · chapters recruit through the year",
+        "opens": None,
+        "closes": None,
+        "steps": [
+            "Find your nearest chapter (Nairobi, Kisumu, Eldoret, Kisii, Pwani and the GDG on Campus groups)",
+            "Attend a meetup and tell the organisers you want to help",
+            "Apply when the chapter posts a call for organisers or volunteers",
+            "Take a track: events, logistics, social media, design or speaker wrangling",
+        ],
+        "city": "Various",
+        "tags": ["Volunteer", "Community", "Leadership", "Events", "Nairobi"],
+        "stipend": (
+            "Unpaid volunteer role (event access, chapter swag and mentorship "
+            "from Google Developer Experts)"
+        ),
+        "source": "Official",
+        "url": "https://developers.google.com/community/gdg",
+        "desc": (
+            "GDG chapters are run entirely by volunteers, and every DevFest, "
+            "I/O Extended and study jam in Kenya is put on by one. Helping a "
+            "local chapter is the shortest route into running tech events: you "
+            "start on a crew, and organisers are recruited from the people who "
+            "keep showing up. It is unpaid, but the chapter pays for itself in "
+            "speaking slots, a network and something concrete to put on a CV."
+        ),
+    },
+    {
+        "kind": "Volunteer",
+        "title": "Mozilla contributors — coding, localization & support",
+        "org": "Mozilla",
+        "when": "Rolling · join any time",
+        "opens": None,
+        "closes": None,
+        "steps": [
+            "Create a Mozilla account on the contribute page",
+            "Pick an area that matches you: coding, localization, support, QA or add-ons",
+            "Introduce yourself in the area's onboarding channel or forum",
+            "Start with a labelled newcomer task and work up from there",
+        ],
+        "city": "Online",
+        "tags": ["Volunteer", "Open source", "Remote", "Localization", "Web"],
+        "stipend": "Unpaid volunteering (mentorship and recognition)",
+        "source": "Official",
+        "url": "https://www.mozilla.org/en-US/contribute/",
+        "desc": (
+            "Mozilla's contributor programme is open to anyone, with or without "
+            "a degree, and it is one of the few that has a real use for a "
+            "Kenyan contributor: Swahili localization, support articles and "
+            "community QA all need people who actually use the product locally. "
+            "Work is asynchronous and remote, so it fits around a job; there "
+            "is no pay, but Mozilla's contributor recognition and the code "
+            "review you get along the way are the point."
+        ),
+    },
+    {
+        "kind": "Volunteer",
+        "title": "GNOME Newcomers — mentored open-source contribution",
+        "org": "GNOME Foundation",
+        "when": "Rolling · newcomer guides and mentorship",
+        "opens": None,
+        "closes": None,
+        "steps": [
+            "Open welcome.gnome.org and read the newcomer guide",
+            "Join the community chat and say what you want to work on",
+            "Pick a project and a beginner issue, or apply for a mentorship round",
+            "Send your first merge request and work through review with a mentor",
+        ],
+        "city": "Online",
+        "tags": ["Volunteer", "Open source", "Linux", "Remote", "Mentoring"],
+        "stipend": "Unpaid open-source volunteering (mentored review)",
+        "source": "Official",
+        "url": "https://welcome.gnome.org/",
+        "desc": (
+            "GNOME runs one of the more welcoming on-ramps in open source: a "
+            "newcomer guide that explains the tooling, beginner-labelled issues "
+            "and mentors who review a first merge request in public. Desktop "
+            "work spans C, Rust, Python, GTK, design, documentation and "
+            "translation, so there is a route in that does not require "
+            "systems programming experience. Unpaid, but the review history "
+            "is visible to any employer who looks at the project."
+        ),
+    },
+    {
+        "kind": "Volunteer",
+        "title": "KDE Get Involved — contribution pathways",
+        "org": "KDE Community",
+        "when": "Rolling · join any project",
+        "opens": None,
+        "closes": None,
+        "steps": [
+            "Read the Get Involved pages on community.kde.org",
+            "Choose a pathway: development, translation, documentation, promo or testing",
+            "Join the project's mailing list or Matrix room and introduce yourself",
+            "Claim a junior job and submit a merge request for review",
+        ],
+        "city": "Online",
+        "tags": ["Volunteer", "Open source", "Linux", "Remote", "C++", "Python"],
+        "stipend": "Unpaid open-source volunteering",
+        "source": "Official",
+        "url": "https://community.kde.org/Get_Involved/",
+        "desc": (
+            "KDE publishes a menu of contribution pathways — code, translation, "
+            "documentation, promotion and testing — with junior jobs kept "
+            "labelled so a newcomer can find something finishable. The "
+            "codebases are C++ and Qt on the desktop side and Python on the "
+            "tooling side, and review happens in public. No pay; the "
+            "contribution record is the return."
+        ),
+    },
+    {
+        "kind": "Volunteer",
+        "title": "Django Girls — workshop coach & organiser",
+        "org": "Django Girls",
+        "when": "Rolling · workshops run worldwide through the year",
+        "opens": None,
+        "closes": None,
+        "steps": [
+            "Check djangogirls.org for an upcoming workshop near you, or ask a Nairobi organiser",
+            "Apply as a coach — you need working knowledge of Python, not mastery",
+            "Attend the coach briefing before the workshop day",
+            "Guide a small group through the official tutorial on the day",
+        ],
+        "city": "Various",
+        "tags": ["Volunteer", "Mentoring", "Python", "Django", "Women in tech", "Nairobi"],
+        "stipend": "Unpaid volunteering (workshop meals and coach swag)",
+        "source": "Official",
+        "url": "https://djangogirls.org/en/",
+        "desc": (
+            "Django Girls one-day workshops teach beginners to build and deploy "
+            "a Django site, and they run on volunteer coaches and organisers. "
+            "Coaching is a genuinely useful way to sharpen your own Python: "
+            "you explain the tutorial to people who have never programmed, "
+            "and you learn the framework properly by debugging someone else's "
+            "first project. Unpaid, local and usually on a weekend."
+        ),
+    },
+    {
+        "kind": "Volunteer",
+        "title": "Wikimedia Community User Group Kenya — editors & trainers",
+        "org": "Wikimedia Community User Group Kenya",
+        "when": "Rolling · edit-a-thons and training events",
+        "opens": None,
+        "closes": None,
+        "steps": [
+            "Read the user group page on Meta and join the mailing list",
+            "Create a Wikimedia account and make a first edit to Wikipedia or Wikidata",
+            "Attend an edit-a-thon or training session, in Nairobi or online",
+            "Volunteer to train newcomers at the next event",
+        ],
+        "city": "Nairobi",
+        "tags": ["Volunteer", "Open source", "Data", "Kenya", "Nairobi", "Training"],
+        "stipend": "Unpaid volunteering",
+        "source": "Official",
+        "url": "https://meta.wikimedia.org/wiki/Wikimedia_Community_User_Group_Kenya",
+        "desc": (
+            "The Kenyan Wikimedia user group runs edit-a-thons and training "
+            "sessions that improve coverage of Kenyan topics on Wikipedia and "
+            "Wikidata, and it depends on volunteers to run them. The technical "
+            "side is real work: Wikidata queries, templates, bots, and fixing "
+            "the references that make an article survive review. Unpaid, with "
+            "a community that meets in Nairobi and online."
+        ),
+    },
+]
+
 # "Earn while you learn": tuition-free or stipended software training that
 # comes with housing, a flight or a living allowance. Seeded in its own block
 # further down; the list exists here so the kind is registered with the API and
@@ -3823,15 +4037,17 @@ def _gdg_item(event: dict, chapter: str, city: str) -> dict | None:
 async def _fetch_gdg(client: httpx.AsyncClient) -> list[dict]:
     """Upcoming events from the curated GDG chapters' public Bevy API."""
     now = datetime.now(UTC)
+    semaphore = asyncio.Semaphore(GDG_CONCURRENCY)
 
     async def one(chapter_id: int, chapter: str, city: str) -> list[dict]:
         try:
-            resp = await client.get(
-                GDG_API.format(chapter=chapter_id),
-                params={"status": "Published", "fields": GDG_FIELDS},
-                headers={"Accept": "application/json"},
-                timeout=REQUEST_TIMEOUT,
-            )
+            async with semaphore:
+                resp = await client.get(
+                    GDG_API.format(chapter=chapter_id),
+                    params={"status": "Published", "fields": GDG_FIELDS},
+                    headers={"Accept": "application/json"},
+                    timeout=REQUEST_TIMEOUT,
+                )
             resp.raise_for_status()
             payload = resp.json()
         except Exception as exc:  # noqa: BLE001 - one chapter must not sink the feed
