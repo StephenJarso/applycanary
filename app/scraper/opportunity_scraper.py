@@ -19,8 +19,9 @@ from __future__ import annotations
 import logging
 import re
 import xml.etree.ElementTree as ET
-from datetime import date
+from datetime import date, timedelta
 from typing import Any
+from urllib.parse import unquote, urlparse
 
 import requests
 from sqlmodel import Session, select
@@ -67,7 +68,12 @@ def _parse_rss(xml_text: str, *, max_entries: int = 20) -> list[dict]:
         url = (item.findtext("link") or "").strip()
         desc = (item.findtext("description") or "").strip()
         if title and url:
-            entries.append({"title": title, "url": url, "description": desc})
+            entries.append({
+                "title": title,
+                "url": url,
+                "description": desc,
+                "published": (item.findtext("pubDate") or "").strip(),
+            })
 
     if not entries:
         for entry in root.findall(".//atom:entry", ns)[:max_entries]:
@@ -76,7 +82,12 @@ def _parse_rss(xml_text: str, *, max_entries: int = 20) -> list[dict]:
             url = (link_el.get("href") if link_el is not None else "") or ""
             summary = (entry.findtext("atom:summary", namespaces=ns) or "").strip()
             if title and url:
-                entries.append({"title": title, "url": url, "description": summary})
+                entries.append({
+                    "title": title,
+                    "url": url,
+                    "description": summary,
+                    "published": (entry.findtext("atom:published", namespaces=ns) or "").strip(),
+                })
 
     return entries
 
@@ -88,6 +99,96 @@ def _strip_tags(html: str) -> str:
 
 def _current_year() -> int:
     return date.today().year
+
+
+def _host_label(url: str) -> str:
+    """A readable organiser name from a URL ("kyiv.dev" → "Kyiv.dev")."""
+    try:
+        host = urlparse(url).netloc.lower().removeprefix("www.") or ""
+    except (ValueError, TypeError):
+        return ""
+    return host[:1].upper() + host[1:] if host else ""
+
+
+# DuckDuckGo Lite wraps every external result in a `uddg=` redirect. The old
+# fallback looked for `class="result-link"`, which the endpoint no longer
+# renders, so it silently returned nothing on every run.
+_DDG_RESULT_RE = re.compile(
+    r'<a[^>]*href="[^"]*?uddg=([^&"]+)[^"]*"[^>]*>(.*?)</a>',
+    re.IGNORECASE | re.DOTALL,
+)
+
+
+def _parse_ddg_lite(html: str, *, limit: int) -> list[tuple[str, str]]:
+    """(url, title) pairs from a DuckDuckGo lite SERP, deduplicated by URL.
+
+    The anchor text carries the page title; `uddg=` carries the real target,
+    so the destination is taken from the parameter rather than the href.
+    """
+    seen: set[str] = set()
+    out: list[tuple[str, str]] = []
+    for match in _DDG_RESULT_RE.finditer(html):
+        url = unquote(match.group(1))
+        if not url.startswith("http"):
+            continue
+        title = _strip_tags(match.group(2))
+        title = re.sub(r"\s+", " ", title).strip()
+        if not title or url in seen:
+            continue
+        seen.add(url)
+        out.append((url, title))
+        if len(out) >= limit:
+            break
+    return out
+
+
+# The tech check keeps medical and sales conference crew calls out of a
+# developer's volunteer tab; the title gate lives with the scraper below.
+_TECH_RE = re.compile(
+    r"tech|software|developer|coding|programm|python|django|javascript|typescript|"
+    r"\bweb\b|cloud|\bdata\b|\bai\b|machine learning|open[- ]source|hackathon|"
+    r"devops|android|flutter|wordpress|\bgdg\b|devfest|pycon|conference|summit|"
+    r"cyber|security|blockchain|linux|kubernetes|docker|\bui[- /]?ux\b|design|"
+    r"engineer|comput|\bict\b|geek|developers?",
+    re.I,
+)
+
+# The volunteer term has to be in the headline, not merely somewhere in the
+# body: a fellowship post that says "volunteer" once is not a crew call, and
+# the card would be lying about what it is.
+_VOLUNTEER_TITLE_RE = re.compile(
+    r"volunteer|crew|call for speakers?|looking for (speakers|volunteers)|"
+    r"speakers? (wanted|needed)|call for (papers|proposals)|\bcfp\b",
+    re.I,
+)
+_MAX_AGE_DAYS = 365
+
+_VOLUNTEER_QUERIES = (
+    f"call for volunteers tech conference {_current_year()}",
+    "call for volunteers developer conference Africa",
+    f"DevFest volunteer {_current_year()}",
+)
+
+# Site-search feeds, not home feeds: each returns only posts matching the
+# term, which is the whole feed this source exists for. WordPress accepts
+# `feed=rss2` on a search URL, so no page scraping is needed.
+_VOLUNTEER_FEEDS = (
+    ("WordCamp Central", "https://central.wordcamp.org/?s=call+for+volunteers&feed=rss2"),
+    ("Opportunities for Africans", "https://opportunitiesforafricans.com/feed/?s=volunteer"),
+)
+
+
+def _recently_published(published: str) -> bool:
+    """False only when the feed states a date older than the cut-off."""
+    from email.utils import parsedate_to_datetime
+
+    if not published:
+        return True  # a feed that omits dates must not be discarded wholesale
+    try:
+        posted = parsedate_to_datetime(published)
+    except (TypeError, ValueError):
+        return True
+    return date.today() - posted.date() <= timedelta(days=_MAX_AGE_DAYS)
 
 
 # ---------------------------------------------------------------------------
@@ -175,35 +276,112 @@ def _scrape_mlh_fellowship() -> list[dict]:
     }]
 
 
-def _scrape_idealist_volunteers() -> list[dict]:
-    """Idealist.org volunteer RSS feed."""
-    # Try a few region variants — Idealist's feed URLs vary
-    feed_urls = [
-        "https://www.idealist.org/en/jobs/feed?type=VOLUNTEER&country=KE",
-        "https://www.idealist.org/en/jobs/feed?type=VOLUNTEER",
-    ]
-    for url in feed_urls:
-        resp = _get(url)
+def _volunteer_entry(
+    *, title: str, org: str, url: str, description: str, extra_tags: list[str] | None = None
+) -> dict:
+    """A scraped volunteer call in the card's shape.
+
+    Compensation is stated as unknown rather than guessed: a conference crew
+    may waive the ticket or cover board, and the listing is the only place
+    that says which. The card prints this line verbatim.
+    """
+    tags = ["volunteer", "tech events", *(extra_tags or [])]
+    return {
+        "title": title.strip()[:200],
+        "org": org,
+        "url": url,
+        "stipend": "Unpaid volunteer role (benefits not stated — check the listing)",
+        "closes": None,
+        "when": "Rolling — check the listing for crew dates",
+        "city": "Various",
+        "steps": [
+            "Open the volunteer page linked above",
+            "Check the crew dates, whether travel or the ticket is covered, and any language requirement",
+            "Apply through the form on that page before the call closes",
+        ],
+        "tags": tags,
+        "kind": "Volunteer",
+        "region": "Global",
+        "description": description[:800],
+    }
+
+
+def _is_tech_volunteer(title: str, body: str = "") -> bool:
+    """A headline that asks for crew/speakers on a tech event.
+
+    The title gate is what keeps unrelated posts out: an opportunity blog
+    mentions "volunteer" in passing all the time, but a real crew call says
+    it in the headline, and only tech events pass the second check.
+    """
+    return bool(
+        _VOLUNTEER_TITLE_RE.search(title) and _TECH_RE.search(f"{title} {body}")
+    )
+
+
+def _scrape_tech_volunteers() -> list[dict]:
+    """Tech-event volunteer calls from feeds and a search-engine fallback.
+
+    Conference crews are announced on the event's own page, not on a job
+    board, so nothing indexes them. WordPress site-search feeds carry the
+    calls that do get published (WordCamp Central, African opportunity
+    blogs); DuckDuckGo then reaches conference sites that never enter a feed.
+    Only the SERP is read — no detail crawl — and the search half is skipped
+    the moment the engine serves a challenge page, so a blocked search adds
+    no noise and no retries.
+    """
+    results: list[dict] = []
+    seen_urls: set[str] = set()
+
+    for feed_name, feed_url in _VOLUNTEER_FEEDS:
+        resp = _get(feed_url, allow_redirects=True)
         if resp is None:
             continue
-        raw = _parse_rss(resp.text, max_entries=15)
-        if not raw:
+        for entry in _parse_rss(resp.text, max_entries=20):
+            if not _recently_published(entry.get("published", "")):
+                continue
+            description = _strip_tags(entry["description"])
+            if entry["url"] in seen_urls or not _is_tech_volunteer(
+                entry["title"], description
+            ):
+                continue
+            seen_urls.add(entry["url"])
+            results.append(
+                _volunteer_entry(
+                    title=entry["title"],
+                    org=feed_name,
+                    url=entry["url"],
+                    description=description,
+                    extra_tags=["from feed"],
+                )
+            )
+
+    for query in _VOLUNTEER_QUERIES:
+        resp = _get("https://lite.duckduckgo.com/lite/", params={"q": query})
+        if resp is None:
             continue
-        results = []
-        for entry in raw:
-            results.append({
-                "title": entry["title"][:200],
-                "org": "Idealist.org",
-                "url": entry["url"],
-                "stipend": "Unpaid volunteer role",
-                "closes": None,
-                "tags": ["volunteer", "ngo", "remote"],
-                "kind": "Volunteer",
-                "region": "Global",
-                "description": _strip_tags(entry["description"])[:800],
-            })
-        return results
-    return []
+        if resp.status_code != 200 or "uddg=" not in resp.text:
+            # A 202 is DuckDuckGo's bot challenge; every further query would
+            # hit the same wall, so stop rather than retry the whole list.
+            log.info("scraper: volunteer search blocked (%s); using feeds only", resp.status_code)
+            break
+        for url, title in _parse_ddg_lite(resp.text, limit=8):
+            if url in seen_urls or not _is_tech_volunteer(title, url):
+                continue
+            seen_urls.add(url)
+            results.append(
+                _volunteer_entry(
+                    title=title,
+                    org=_host_label(url) or "Event organiser",
+                    url=url,
+                    description=(
+                        f"Volunteer call discovered by searching for \"{query}\". "
+                        "Open the page for the crew dates and what the organiser covers."
+                    ),
+                    extra_tags=["from web search"],
+                )
+            )
+
+    return results[:25]
 
 
 def _scrape_hotosm() -> list[dict]:
@@ -263,22 +441,8 @@ def _scrape_ddg_fallback() -> list[dict]:
         resp = _get(DDG_LITE, params={"q": query})
         if resp is None:
             continue
-        html = resp.text
-        # DuckDuckGo Lite result links are inside <a class="result-link">
-        for m in re.finditer(
-            r'<a[^>]+class="result-link"[^>]*href="([^"]+)"[^>]*>([^<]+)</a>',
-            html,
-        ):
-            url, title = m.group(1), m.group(2).strip()
-            # Redirect URLs from DDG Lite look like //duckduckgo.com/l/?uddg=...
-            if url.startswith("//"):
-                url = "https:" + url
-            # Extract actual destination from uddg= param
-            uddg = re.search(r"uddg=([^&]+)", url)
-            if uddg:
-                from urllib.parse import unquote
-                url = unquote(uddg.group(1))
-            if url in seen_urls or not url.startswith("http"):
+        for url, title in _parse_ddg_lite(resp.text, limit=10):
+            if url in seen_urls:
                 continue
             seen_urls.add(url)
             # Classify by keywords
@@ -291,7 +455,7 @@ def _scrape_ddg_fallback() -> list[dict]:
                 tags = ["fellowship", "internship", "remote"]
             results.append({
                 "title": title[:200],
-                "org": "Various",
+                "org": _host_label(url) or "Various",
                 "url": url,
                 "stipend": stipend,
                 "closes": None,
@@ -327,7 +491,7 @@ def scrape_and_upsert_opportunities(session: Session) -> int:
         ("outreachy", _scrape_outreachy),
         ("gsoc", _scrape_gsoc),
         ("mlh", _scrape_mlh_fellowship),
-        ("idealist", _scrape_idealist_volunteers),
+        ("Web search", _scrape_tech_volunteers),
         ("hotosm", _scrape_hotosm),
         ("ddg_fallback", _scrape_ddg_fallback),
     ]
@@ -356,17 +520,26 @@ def scrape_and_upsert_opportunities(session: Session) -> int:
                 tags = [tags]
 
             try:
+                # Cards render when/city/steps, and a scraped volunteer call
+                # without them shows an empty meta line and no timeline.
+                raw_steps = entry.get("steps") or []
+                if isinstance(raw_steps, str):
+                    raw_steps = [raw_steps]
                 row = ProgrammeEntry(
                     kind=kind,
                     title=title,
                     org=str(entry.get("org") or ""),
+                    when=str(entry.get("when") or ""),
                     closes=entry.get("closes"),
+                    date=entry.get("date"),
+                    steps=[str(step) for step in raw_steps if str(step).strip()],
+                    city=str(entry.get("city") or ""),
                     tags=list(tags),
                     stipend=entry.get("stipend"),
                     source=source_name,
                     url=str(entry.get("url") or ""),
                     desc=str(entry.get("description") or "")[:2000],
-                    remote_friendly=True,
+                    remote_friendly=entry.get("remote_friendly", True),
                 )
                 session.add(row)
                 added += 1

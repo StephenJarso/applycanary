@@ -136,7 +136,8 @@ export default function Volunteers({ embedded = false }: { embedded?: boolean })
       Volunteer crew, mentoring and speaking slots at tech events — registration
       desks, session rooms, campus mentoring and call-for-speakers openings.
       These are the ones no job board carries, so they are collected here from
-      the organisers' own pages and from the event calendars.{" "}
+      the organisers' own pages, from the event calendars, and from a daily scan
+      of published volunteer calls.{" "}
       {fromFeed > 0
         ? `${fromFeed} of them came straight off a live event listing.`
         : null}{" "}

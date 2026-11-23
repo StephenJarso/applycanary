@@ -3226,6 +3226,104 @@ VOLUNTEER += [
     },
 ]
 
+# Crew calls confirmed on the organiser's own page for the 2027 season. Each
+# was open (or opening) when read, so they are dated rather than rolling.
+VOLUNTEER += [
+    {
+        "kind": "Volunteer",
+        "title": "FOSDEM 2027 — volunteer crew",
+        "org": "FOSDEM",
+        "when": "30–31 Jan 2027 · ULB Solbosch, Brussels",
+        "opens": None,
+        "closes": None,
+        "date": "2027-01-30",
+        "steps": [
+            "Read the role list on doc.volunteers.fosdem.org — infodesk, heralding, video, cloakroom, runner, setup",
+            "Sign up on volunteers.fosdem.org when registration opens in mid-December 2026",
+            "Create a volunteer profile, add your Matrix ID and register for shifts",
+            "Watch for the January task releases and online training sessions",
+        ],
+        "city": "Brussels",
+        "tags": ["Volunteer", "Crew", "Open source", "Linux", "Europe", "On-site"],
+        "stipend": (
+            "Unpaid + benefits: volunteer T-shirt to keep, food during shifts "
+            "and free access to the conference"
+        ),
+        "source": "Official",
+        "url": "https://volunteers.fosdem.org/",
+        "desc": (
+            "Europe's largest free and open-source conference is staffed entirely "
+            "by volunteers, and the crew is open to anyone who signs up — you do "
+            "not need to be a maintainer or a speaker. Sign-ups run from mid-"
+            "December 2026 through January 2027, with shifts for heralding, the "
+            "infodesk, the video team, cloakroom, runners and setup/teardown. "
+            "Travel to Brussels and accommodation are on you; the T-shirt and "
+            "the access are not."
+        ),
+    },
+    {
+        "kind": "Volunteer",
+        "title": "DjangoCon Europe 2027 — volunteer team",
+        "org": "DjangoCon Europe / Django Software Foundation",
+        "when": "17–21 Feb 2027 · Innsbruck",
+        "opens": None,
+        "closes": None,
+        "date": "2027-02-17",
+        "steps": [
+            "Read the volunteer areas on the conference site: comms, hospitality, programme, sponsors, financial aid, Code of Conduct",
+            "Fill in the volunteer form and say which areas fit your interests",
+            "The team matches you with a role that fits your availability",
+            "Join the organiser channels before the conference for the briefing",
+        ],
+        "city": "Innsbruck",
+        "tags": ["Volunteer", "Crew", "Django", "Python", "Europe", "On-site"],
+        "stipend": "Unpaid volunteer role (benefits not stated on the page)",
+        "source": "Official",
+        "url": "https://2027.djangocon.eu/about/volunteers/",
+        "desc": (
+            "DjangoCon Europe is run by volunteers, and the 2027 team is "
+            "recruiting through an open form — no prior conference experience "
+            "required, the page says so explicitly. Roles span communications, "
+            "hospitality and attendee support, programme and session chairing, "
+            "sponsor logistics, financial aid and the Code of Conduct team, "
+            "so there is remote work before the event as well as on-site shifts "
+            "in Innsbruck. Unpaid; travel and accommodation are not stated as "
+            "covered."
+        ),
+    },
+    {
+        "kind": "Volunteer",
+        "title": "PyCon Angola 2027 — call for speakers",
+        "org": "Python Angola",
+        "when": "20–25 May 2027 · Namibe, Angola",
+        "opens": "2026-11-01",
+        "closes": "2026-11-30",
+        "date": "2027-05-20",
+        "steps": [
+            "Read the call on ao.pycon.org",
+            "Submit a talk between 1 and 30 November 2026",
+            "Wait for review — this is the country's first PyCon, so first-time speakers are expected",
+            "Travel to Namibe for the main conference in May 2027",
+        ],
+        "city": "Namibe",
+        "tags": ["Speaker", "Volunteer", "Python", "Africa", "On-site"],
+        "stipend": (
+            "Unpaid speaking slot (travel and accommodation are not stated as "
+            "covered — confirm with the organisers before committing)"
+        ),
+        "source": "Official",
+        "url": "https://ao.pycon.org/",
+        "desc": (
+            "Angola's first international Python conference, running 20–25 May "
+            "2027 in Namibe, has an open call for speakers that closes on 30 "
+            "November 2026. The organisers are explicitly looking for first-"
+            "time speakers, so a concrete project talk is a realistic entry "
+            "point. A speaking slot is the volunteer route here: no fee, but "
+            "no published travel or accommodation support either."
+        ),
+    },
+]
+
 # "Earn while you learn": tuition-free or stipended software training that
 # comes with housing, a flight or a living allowance. Seeded in its own block
 # further down; the list exists here so the kind is registered with the API and
