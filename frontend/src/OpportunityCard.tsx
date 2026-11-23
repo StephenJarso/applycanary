@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import {
   api,
@@ -382,6 +382,7 @@ export function OpportunityCard({
   onToggleWatch,
 }: OpportunityCardProps) {
   const { user } = useAuth();
+  const { pathname } = useLocation();
   const navigate = useNavigate();
   const deadline =
     item.closes ??
@@ -483,13 +484,15 @@ export function OpportunityCard({
   return (
     <div
       className="opp-card"
-      onClick={() => navigate("/opportunity/detail", { state: { opportunity: item } })}
+      onClick={() =>
+        navigate("/opportunity/detail", { state: { opportunity: item, from: pathname } })
+      }
       role="button"
       tabIndex={0}
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") {
           e.preventDefault();
-          navigate("/opportunity/detail", { state: { opportunity: item } });
+          navigate("/opportunity/detail", { state: { opportunity: item, from: pathname } });
         }
       }}
       style={{ cursor: "pointer", position: "relative" }}

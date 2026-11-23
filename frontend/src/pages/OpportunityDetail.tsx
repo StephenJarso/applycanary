@@ -12,6 +12,29 @@ export default function OpportunityDetail() {
   const location = useLocation();
   const navigate = useNavigate();
   const item = location.state?.opportunity as Opportunity | undefined;
+  const from = (location.state as { from?: string } | null)?.from;
+
+  // The cards open this page from four tabs, so "back" has to remember which
+  // one sent the reader here. The kind is the fallback for a direct link or a
+  // reload, where the router state is gone.
+  const BACK_LABELS: Record<string, string> = {
+    "/opportunities": "Events & Programs",
+    "/internships": "Internships",
+    "/volunteers": "Volunteer",
+    "/hackathons": "Hackathons",
+  };
+  const KIND_ROUTES: Record<string, string> = {
+    Event: "/opportunities",
+    "Paid program": "/opportunities",
+    Internship: "/internships",
+    Volunteer: "/volunteers",
+    Hackathon: "/hackathons",
+  };
+  const backTo =
+    from && BACK_LABELS[from]
+      ? from
+      : (item && KIND_ROUTES[item.kind]) || "/opportunities";
+  const backLabel = BACK_LABELS[backTo] ?? "Events & Programs";
 
   const [sopLoading, setSopLoading] = useState(false);
   const [sopText, setSopText] = useState("");
@@ -100,12 +123,13 @@ export default function OpportunityDetail() {
     <>
       {/* Back link */}
       <Link
-        to="/internships"
+        to={backTo}
         className="btn-ghost btn-sm"
+        aria-label={`Back to ${backLabel}`}
         style={{ marginBottom: 14, display: "inline-flex", alignItems: "center", gap: 4 }}
       >
-        <span className="material-symbols-rounded" aria-hidden="true" style={{ fontSize: 18 }}>arrow_back</span>
-        Back to Internships
+        <span className="material-symbols-outlined" aria-hidden="true" style={{ fontSize: 18 }}>arrow_back</span>
+        Back to {backLabel}
       </Link>
 
       {/* Header */}
@@ -148,7 +172,7 @@ export default function OpportunityDetail() {
               className="btn btn-sm btn-ghost"
               title="Download .ics to add to your calendar"
             >
-              <span className="material-symbols-rounded" aria-hidden="true" style={{ fontSize: 16 }}>calendar_month</span>
+              <span className="material-symbols-outlined" aria-hidden="true" style={{ fontSize: 16 }}>calendar_month</span>
               Add to Calendar
             </a>
           )}
@@ -167,7 +191,7 @@ export default function OpportunityDetail() {
       {(item.stipend_amount || item.accommodation === "included" || item.airfare_covered || item.relocation_support || item.remote_friendly) && (
         <div className="card">
           <h3 className="card-title">
-            <span className="material-symbols-rounded" aria-hidden="true">payments</span>
+            <span className="material-symbols-outlined" aria-hidden="true">payments</span>
             Funding &amp; Benefits
           </h3>
           <Funding item={item} />
@@ -178,7 +202,7 @@ export default function OpportunityDetail() {
       {/* Full details card */}
       <div className="card">
         <h3 className="card-title">
-          <span className="material-symbols-rounded" aria-hidden="true">badge</span>
+          <span className="material-symbols-outlined" aria-hidden="true">badge</span>
           Opportunity Details
         </h3>
         <div className="grid2">
@@ -247,7 +271,7 @@ export default function OpportunityDetail() {
       {/* How to Qualify */}
       <div className="card">
         <h3 className="card-title">
-          <span className="material-symbols-rounded" aria-hidden="true">target</span>
+          <span className="material-symbols-outlined" aria-hidden="true">target</span>
           How to Qualify &amp; Get Considered
         </h3>
 
@@ -273,7 +297,7 @@ export default function OpportunityDetail() {
       {/* Resume & Skills */}
       <div className="card">
         <h3 className="card-title">
-          <span className="material-symbols-rounded" aria-hidden="true">description</span>
+          <span className="material-symbols-outlined" aria-hidden="true">description</span>
           Resume &amp; Skills Alignment
         </h3>
 
@@ -309,7 +333,7 @@ export default function OpportunityDetail() {
             disabled={pdfLoading}
             title="Tailor your resume for this opportunity and download as PDF"
           >
-            <span className="material-symbols-rounded" aria-hidden="true" style={{ fontSize: 16 }}>download</span>
+            <span className="material-symbols-outlined" aria-hidden="true" style={{ fontSize: 16 }}>download</span>
             {pdfLoading ? "Generating PDF…" : "Download Tailored Resume (PDF)"}
           </button>
         </div>
@@ -321,7 +345,7 @@ export default function OpportunityDetail() {
       {/* Statement of Purpose */}
       <div className="card">
         <h3 className="card-title">
-          <span className="material-symbols-rounded" aria-hidden="true">edit_note</span>
+          <span className="material-symbols-outlined" aria-hidden="true">edit_note</span>
           Statement of Purpose
         </h3>
 
@@ -336,7 +360,7 @@ export default function OpportunityDetail() {
               onClick={handleGenerateSop}
               disabled={sopLoading}
             >
-              <span className="material-symbols-rounded" aria-hidden="true" style={{ fontSize: 16 }}>auto_fix_high</span>
+              <span className="material-symbols-outlined" aria-hidden="true" style={{ fontSize: 16 }}>auto_fix_high</span>
               {sopLoading ? "Generating SOP…" : "Generate Statement of Purpose"}
             </button>
           </>
@@ -389,7 +413,7 @@ export default function OpportunityDetail() {
           className="btn btn-primary"
           style={{ padding: "10px 28px", fontSize: "15px", fontWeight: 600 }}
         >
-          <span className="material-symbols-rounded" aria-hidden="true" style={{ fontSize: 18 }}>open_in_new</span>
+          <span className="material-symbols-outlined" aria-hidden="true" style={{ fontSize: 18 }}>open_in_new</span>
           Open Official Advert / Apply ↗
         </a>
       </div>
