@@ -1,6 +1,6 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { api, getWatched, unwatchOpp, watchOpp } from "../api";
+import { api, getWatched, unwatchOpp, watchOpp, type Opportunities } from "../api";
 import { useAuth } from "../context/AuthContext";
 import PublicNav from "../PublicNav";
 import { ErrorBox, Loading } from "../components";
@@ -16,21 +16,101 @@ import {
 } from "../pushSubscription";
 
 /**
- * Public Volunteer screen. Same card and filter vocabulary as the events and
- * internships pages, but the feed is volunteer crew, mentoring and speaking
- * slots only — the things no job board carries, and the ones that go stale
- * fastest if you miss the announcement.
+ * The community screens: volunteer crew, speaker calls, open-source entry
+ * points and mentorship. They share one layout, card and filter vocabulary —
+ * only the kind, the endpoint and the copy differ — so they are one component
+ * with four configurations rather than four near-copies that drift apart.
  *
- * Two kinds of entry arrive here: curated programmes whose crew call and
- * compensation were read off the organiser's own site, and calls the live
- * event calendars were already advertising in an event description, tagged
- * "From event feed".
+ * Two kinds of entry can arrive: curated programmes whose crew call,
+ * compensation or deadline was read off the organiser's own page, and — for
+ * volunteer and speaker tabs — calls the live event calendars were already
+ * advertising in an event description, tagged "From event feed".
  */
 
 const STATUSES = ["All", "Open now", "Opening soon", "Upcoming event", "Rolling"] as const;
 const BASE_LOCATIONS = ["Online", "Nairobi", "Kenya"];
 
-export default function Volunteers({ embedded = false }: { embedded?: boolean }) {
+type FeedConfig = {
+  queryKey: string;
+  load: () => Promise<Opportunities>;
+  title: string;
+  noun: string;
+  placeholder: string;
+  /** Only the volunteer and speaker tabs read the live event calendars. */
+  live: boolean;
+  intro: ReactNode;
+};
+
+const VOLUNTEER_FEED: FeedConfig = {
+  queryKey: "volunteers",
+  load: api.volunteers,
+  title: "Volunteer",
+  noun: "roles",
+  placeholder: "Search volunteer roles…",
+  live: true,
+  intro: (
+    <>
+      Event crew and community roles at tech events — registration desks,
+      session rooms, chapter organising and campus support. These are the ones
+      no job board carries, so they are collected here from the organisers&apos;
+      own pages, from the event calendars, and from a daily scan of published
+      volunteer calls.
+    </>
+  ),
+};
+
+const SPEAKER_FEED: FeedConfig = {
+  queryKey: "speakers",
+  load: api.speakers,
+  title: "Speakers",
+  noun: "calls",
+  placeholder: "Search calls for speakers…",
+  live: true,
+  intro: (
+    <>
+      Calls for papers and talks at conferences, meetups and DevFests. Each
+      card carries the submission deadline, the talk format and — where the
+      organisers publish it — whether travel is covered. Missing a CFP is
+      usually a missed year, so these sort by the soonest deadline.
+    </>
+  ),
+};
+
+const OPEN_SOURCE_FEED: FeedConfig = {
+  queryKey: "open-source",
+  load: api.openSource,
+  title: "Open source",
+  noun: "projects",
+  placeholder: "Search open-source entry points…",
+  live: false,
+  intro: (
+    <>
+      Contribution routes into open-source projects: mentored newcomer
+      programmes, Kenyan and African projects with issues labelled for
+      first-timers, and standing communities that review contributions. No
+      visa, no travel, and the merged pull request is the artefact you keep.
+    </>
+  ),
+};
+
+const MENTORSHIP_FEED: FeedConfig = {
+  queryKey: "mentorship",
+  load: api.mentorship,
+  title: "Mentorship",
+  noun: "programmes",
+  placeholder: "Search mentorship programmes…",
+  live: false,
+  intro: (
+    <>
+      Mentee intakes and calls for mentors. The first list is for getting a
+      mentor on a structured programme; the second is the other direction —
+      coaching a workshop or a newcomer, which is the cheapest way to build a
+      public teaching record.
+    </>
+  ),
+};
+
+function CommunityFeed({ config, embedded = false }: { config: FeedConfig; embedded?: boolean }) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
@@ -72,9 +152,9 @@ export default function Volunteers({ embedded = false }: { embedded?: boolean })
   });
 
   const { data, isPending, error } = useQuery({
-    queryKey: ["volunteers"],
-    queryFn: api.volunteers,
-    // Crew calls change rarely, and the backend caches the event half for a
+    queryKey: [config.queryKey],
+    queryFn: config.load,
+    // Curated calls change rarely, and the backend caches the event half for a
     // day; do not refetch on every mount.
     staleTime: 12 * 60 * 60_000,
     refetchOnWindowFocus: false,
@@ -128,17 +208,12 @@ export default function Volunteers({ embedded = false }: { embedded?: boolean })
   };
 
   const openNow = items.filter((o) => status(o) === "Open now").length;
-  const speaking = items.filter((o) => o.tags.includes("Speaker")).length;
   const fromFeed = items.filter((o) => o.tags.includes("From event feed")).length;
 
   const blurb = (
     <>
-      Volunteer crew, mentoring and speaking slots at tech events — registration
-      desks, session rooms, campus mentoring and call-for-speakers openings.
-      These are the ones no job board carries, so they are collected here from
-      the organisers' own pages, from the event calendars, and from a daily scan
-      of published volunteer calls.{" "}
-      {fromFeed > 0
+      {config.intro}{" "}
+      {config.live && fromFeed > 0
         ? `${fromFeed} of them came straight off a live event listing.`
         : null}{" "}
       Deadlines taken from a previous cycle are estimates — always confirm on the
@@ -150,7 +225,7 @@ export default function Volunteers({ embedded = false }: { embedded?: boolean })
     <div className={`opp-page${embedded ? " opp-embedded" : ""}`}>
       {embedded ? (
         <div className="page-intro">
-          <h2 className="page-title">Volunteer</h2>
+          <h2 className="page-title">{config.title}</h2>
           <p className="page-sub">{blurb}</p>
         </div>
       ) : (
@@ -159,7 +234,7 @@ export default function Volunteers({ embedded = false }: { embedded?: boolean })
           <a className="skip-link" href="#main">Skip to content</a>
           <header className="opp-header">
             <div className="opp-header-inner">
-              <h1>Volunteer</h1>
+              <h1>{config.title}</h1>
               <p>{blurb}</p>
             </div>
           </header>
@@ -172,13 +247,13 @@ export default function Volunteers({ embedded = false }: { embedded?: boolean })
             type="search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search volunteer roles…"
-            aria-label="Search volunteer roles"
+            placeholder={config.placeholder}
+            aria-label={config.placeholder.replace("…", "")}
           />
 
           <div className="opp-filter-group">
-            <p className="opp-filter-label" id="vol-status">Application status</p>
-            <div className="opp-chips" role="group" aria-labelledby="vol-status">
+            <p className="opp-filter-label" id="community-status">Application status</p>
+            <div className="opp-chips" role="group" aria-labelledby="community-status">
               {STATUSES.map((s) => (
                 <button
                   key={s}
@@ -194,8 +269,8 @@ export default function Volunteers({ embedded = false }: { embedded?: boolean })
           </div>
 
           <div className="opp-filter-group">
-            <p className="opp-filter-label" id="vol-location">Location</p>
-            <div className="opp-chips" role="group" aria-labelledby="vol-location">
+            <p className="opp-filter-label" id="community-location">Location</p>
+            <div className="opp-chips" role="group" aria-labelledby="community-location">
               {locations.map((l) => (
                 <button
                   key={l}
@@ -211,8 +286,8 @@ export default function Volunteers({ embedded = false }: { embedded?: boolean })
           </div>
 
           <div className="opp-filter-group">
-            <p className="opp-filter-label" id="vol-source">Source</p>
-            <div className="opp-chips" role="group" aria-labelledby="vol-source">
+            <p className="opp-filter-label" id="community-source">Source</p>
+            <div className="opp-chips" role="group" aria-labelledby="community-source">
               {sources.map((s) => (
                 <button
                   key={s}
@@ -228,8 +303,8 @@ export default function Volunteers({ embedded = false }: { embedded?: boolean })
           </div>
 
           <div className="opp-filter-group">
-            <p className="opp-filter-label" id="vol-roles">Roles</p>
-            <div className="opp-chips" role="group" aria-labelledby="vol-roles">
+            <p className="opp-filter-label" id="community-roles">Roles</p>
+            <div className="opp-chips" role="group" aria-labelledby="community-roles">
               {interests.map((t) => (
                 <button
                   key={t}
@@ -250,21 +325,22 @@ export default function Volunteers({ embedded = false }: { embedded?: boolean })
         </aside>
 
         <section className="opp-results" aria-live="polite">
-          {isPending && <Loading label="Loading volunteer roles" />}
+          {isPending && <Loading label={`Loading ${config.title.toLowerCase()}`} />}
           {error && <ErrorBox error={error} />}
 
           {data && !isPending && (
             <>
-              {data.events_live === false && (
+              {config.live && data.events_live === false && (
                 <p className="opp-count">
-                  The live event calendar could not be reached, so any crew calls
-                  we picked up from it are missing. The curated roles below are
+                  The live event calendar could not be reached, so any calls we
+                  picked up from it are missing. The curated roles below are
                   unaffected.
                 </p>
               )}
 
               <p className="opp-count">
-                {results.length} roles · {openNow} open now · {speaking} speaker slots
+                {results.length} {config.noun} · {openNow} open now
+                {config.live ? ` · ${fromFeed} from the event feed` : ""}
               </p>
 
               {results.length === 0 && (
@@ -300,4 +376,20 @@ export default function Volunteers({ embedded = false }: { embedded?: boolean })
       </main>
     </div>
   );
+}
+
+export default function Volunteers({ embedded = false }: { embedded?: boolean }) {
+  return <CommunityFeed config={VOLUNTEER_FEED} embedded={embedded} />;
+}
+
+export function Speakers({ embedded = false }: { embedded?: boolean }) {
+  return <CommunityFeed config={SPEAKER_FEED} embedded={embedded} />;
+}
+
+export function OpenSource({ embedded = false }: { embedded?: boolean }) {
+  return <CommunityFeed config={OPEN_SOURCE_FEED} embedded={embedded} />;
+}
+
+export function Mentorship({ embedded = false }: { embedded?: boolean }) {
+  return <CommunityFeed config={MENTORSHIP_FEED} embedded={embedded} />;
 }

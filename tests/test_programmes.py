@@ -258,6 +258,9 @@ class TestSeedMerge:
             seed_programmes(session)
 
         volunteers = {card["title"] for card in curated_cards("Volunteer")}
+        speakers = {card["title"] for card in curated_cards("Speaker / CFP")}
+        open_source = {card["title"] for card in curated_cards("Open source")}
+        mentorship = {card["title"] for card in curated_cards("Mentorship")}
         internships = {card["title"] for card in curated_cards("Internship")}
         programmes = {card["title"] for card in curated_cards("Paid program")}
         apprenticeships = {
@@ -265,6 +268,11 @@ class TestSeedMerge:
         }
 
         assert "UN Online Volunteering — remote assignments" in volunteers
+        # The four community kinds are seeded apart, not all as "Volunteer".
+        assert "GopherCon South Africa 2027 — call for speakers" in speakers
+        assert "freeCodeCamp — open-source contributor" in open_source
+        assert "Learning Lions — remote mentor" in mentorship
+        assert not (speakers | open_source | mentorship) & volunteers
         assert "Safaricom Graduate Management Trainee" in internships
         assert "CNCF Mentoring" in programmes
         assert "Zone01 Kisumu" in apprenticeships
@@ -272,6 +280,35 @@ class TestSeedMerge:
         assert zone01["paid_to_learn"] is True
         assert zone01["accommodation"] == "not_stated"
         assert zone01["stipend_amount"] is None, "an unpublished stipend is not guessed"
+
+    def test_an_old_volunteer_row_moves_to_its_new_kind(self, db):
+        """A deployment seeded before the split keeps its row, not a duplicate.
+
+        Speaker and open-source calls used to be seeded as "Volunteer". On the
+        next boot the existing row has to move kind in place; inserting a
+        second copy would put the same call on two tabs.
+        """
+        title = "GopherCon South Africa 2027 — call for speakers"
+        with Session(engine) as session:
+            for row in session.exec(
+                select(ProgrammeEntry).where(ProgrammeEntry.title == title)
+            ).all():
+                session.delete(row)
+            session.commit()
+            session.add(
+                ProgrammeEntry(kind="Volunteer", title=title, url="https://example.test/")
+            )
+            session.commit()
+
+        with Session(engine) as session:
+            seed_programmes(session)
+
+        with Session(engine) as session:
+            rows = session.exec(
+                select(ProgrammeEntry).where(ProgrammeEntry.title == title)
+            ).all()
+
+        assert [row.kind for row in rows if not row.retired] == ["Speaker / CFP"]
 
     def test_structured_funding_reaches_the_public_shape(self, db):
         with Session(engine) as session:

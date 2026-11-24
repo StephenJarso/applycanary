@@ -3776,11 +3776,108 @@ HACKATHONS += [
     },
 ]
 
+# ------------------------------------------------ community role taxonomy
+#
+# Event crew, speaker calls, open-source entry points and mentorship all used
+# to sit in one "Volunteer" kind, so a call for papers and a registration-desk
+# shift rendered identically and could not be filtered apart. Each is its own
+# kind now. VOLUNTEER stays the record of every entry and where it was found;
+# the split happens once at import, on the headline first and the tags only as
+# a fallback, so an entry's kind is stable across boots.
+
+KIND_VOLUNTEER = "Volunteer"
+KIND_SPEAKER = "Speaker / CFP"
+KIND_OPEN_SOURCE = "Open source"
+KIND_MENTORSHIP = "Mentorship"
+COMMUNITY_KINDS = (KIND_VOLUNTEER, KIND_SPEAKER, KIND_OPEN_SOURCE, KIND_MENTORSHIP)
+
+# A speaker call says so in the headline ("call for speakers", "speak or crew",
+# "CFP"); "Speaker support" as a tag is crew work, not a talk, which is why the
+# tags are not consulted for this one.
+_SPEAKER_TITLE_RE = re.compile(r"\bspeakers?\b|\bspeak\b|\bcfp\b|call for papers", re.I)
+# Open-source entry points name the project or the act of contributing. Kept
+# ahead of mentorship so "mentored open-source contribution" files as the
+# contribution route it is.
+_OPEN_SOURCE_TITLE_RE = re.compile(
+    r"open[\s-]?source|contributors?|common voice|ushahidi|\bgnome\b|\bkde\b|freecodecamp",
+    re.I,
+)
+_MENTOR_TITLE_RE = re.compile(r"mentor|coach|\btas?\b", re.I)
+
+
+def classify_community_role(entry: dict) -> str:
+    """Which of the four community kinds one curator entry belongs to.
+
+    Title first: a crew call that lists speakers among the crew is still crew.
+    Mentoring tags only decide when the title itself is neutral ("volunteer").
+    """
+    title = str(entry.get("title") or "")
+    tags = {str(tag).strip().lower() for tag in entry.get("tags") or []}
+    if _OPEN_SOURCE_TITLE_RE.search(title):
+        return KIND_OPEN_SOURCE
+    if _SPEAKER_TITLE_RE.search(title):
+        return KIND_SPEAKER
+    if _MENTOR_TITLE_RE.search(title) or tags & {"mentoring", "mentorship"}:
+        return KIND_MENTORSHIP
+    return KIND_VOLUNTEER
+
+
+def _split_community_roles(entries: list[dict]) -> dict[str, list[dict]]:
+    """Bucket the curated volunteer list into the four kinds, tagging each.
+
+    The kind tag is added because the card filters read tags, and the original
+    role tags are left in place: a speaker call that also needs crew keeps
+    both signals in view.
+    """
+    buckets: dict[str, list[dict]] = {kind: [] for kind in COMMUNITY_KINDS}
+    for entry in entries:
+        kind = classify_community_role(entry)
+        tags = list(entry.get("tags") or [])
+        if kind not in tags:
+            tags.insert(0, kind)
+        buckets[kind].append({**entry, "kind": kind, "tags": tags})
+    return buckets
+
+
+_COMMUNITY = _split_community_roles(VOLUNTEER)
+SPEAKERS: list[dict] = _COMMUNITY[KIND_SPEAKER]
+OPEN_SOURCE: list[dict] = _COMMUNITY[KIND_OPEN_SOURCE]
+MENTORSHIP: list[dict] = _COMMUNITY[KIND_MENTORSHIP]
+
+# One curation pass over every built-in card. Cards added by hand later carry
+# their own date; a live item from a calendar has no curator behind it and gets
+# the date its feed was read, which the event payload already carries.
+CURATED_VERIFIED_ON = "2026-11-24"
+
+
+def _stamp_last_verified(cards: list[dict]) -> list[dict]:
+    for card in cards:
+        card.setdefault("last_verified", CURATED_VERIFIED_ON)
+    return cards
+
+
+for _cards in (
+    CURATED_EVENTS,
+    PAID_PROGRAMS,
+    INTERNSHIPS,
+    APPRENTICESHIPS,
+    VOLUNTEER,
+    _COMMUNITY[KIND_VOLUNTEER],
+    SPEAKERS,
+    OPEN_SOURCE,
+    MENTORSHIP,
+    HACKATHONS,
+):
+    _stamp_last_verified(_cards)
+
 _BUILTIN_CARDS: dict[str, list[dict]] = {
     "Paid program": PAID_PROGRAMS,
     "Internship": INTERNSHIPS,
     "Apprenticeship": APPRENTICESHIPS,
-    "Volunteer": VOLUNTEER,
+    KIND_VOLUNTEER: _COMMUNITY[KIND_VOLUNTEER],
+    KIND_SPEAKER: SPEAKERS,
+    KIND_OPEN_SOURCE: OPEN_SOURCE,
+    KIND_MENTORSHIP: MENTORSHIP,
 }
 PROGRAMME_KINDS = tuple(_BUILTIN_CARDS)
 
@@ -3862,6 +3959,7 @@ def programme_item(entry: ProgrammeEntry) -> dict:
         "remote_friendly": entry.remote_friendly,
         "eligibility": list(entry.eligibility or []),
         "paid_to_learn": entry.paid_to_learn,
+        "last_verified": entry.last_verified,
         "source": entry.source,
         "url": entry.url,
         "desc": entry.desc,
@@ -3923,6 +4021,7 @@ def programme_fields(payload: dict) -> dict:
         "remote_friendly": flag("remote_friendly"),
         "eligibility": strings("eligibility"),
         "paid_to_learn": flag("paid_to_learn"),
+        "last_verified": optional("last_verified"),
         "source": text("source"),
         "url": text("url"),
         "desc": text("desc"),
@@ -3937,9 +4036,35 @@ def seed_programmes(session: Session) -> int:
     from the constant is an admin edit and is left untouched; a retired row
     still counts as existing, so deleting a built-in card sticks.
     """
-    existing = {
-        (row.kind, row.title) for row in session.exec(select(ProgrammeEntry)).all()
+    rows = session.exec(select(ProgrammeEntry)).all()
+    existing = {(row.kind, row.title) for row in rows}
+    # Taxonomy migration: crew, speaker, open-source and mentorship entries all
+    # used to be seeded as "Volunteer". The constants now file them under their
+    # own kinds, so an existing row is moved in place instead of seeding a
+    # second copy onto another tab. Only the kind changes; admin edits to the
+    # rest of the row survive, and a row whose target kind already exists is
+    # retired as the duplicate it is.
+    builtin_kind_by_title = {
+        str(card.get("title") or "").strip().lower(): kind
+        for kind, cards in _BUILTIN_CARDS.items()
+        if kind in COMMUNITY_KINDS
+        for card in cards
     }
+    for row in rows:
+        if row.kind not in COMMUNITY_KINDS:
+            continue
+        target = builtin_kind_by_title.get(row.title.strip().lower())
+        if not target or target == row.kind:
+            continue
+        if (target, row.title) in existing:
+            if not row.retired:
+                row.retired = True
+                session.add(row)
+            continue
+        existing.discard((row.kind, row.title))
+        row.kind = target
+        existing.add((target, row.title))
+        session.add(row)
     inserted = 0
     for cards in _BUILTIN_CARDS.values():
         for card in cards:
@@ -3969,8 +4094,15 @@ def curated_cards(kind: str) -> list[dict]:
             # Build the dicts while the rows are still attached: the JSON
             # columns are lazy and the session is gone after this block.
             return [
-        programme_item(row) for row in rows if row.kind == kind and not row.retired
-    ]
+                {
+                    **programme_item(row),
+                    # A row seeded before the field existed has no date of its
+                    # own; the curation pass is the honest floor for it.
+                    "last_verified": row.last_verified or CURATED_VERIFIED_ON,
+                }
+                for row in rows
+                if row.kind == kind and not row.retired
+            ]
     except Exception as exc:  # noqa: BLE001 - a public page must still render
         log.warning("programme table unavailable (%s); serving built-ins", exc)
         return list(_BUILTIN_CARDS.get(kind, []))
@@ -4691,55 +4823,55 @@ async def get_internships() -> dict:
     }
 
 
-def _volunteer_roles(item: dict) -> list[str]:
-    """Tags for an event whose description reads as a call for help."""
+def _event_call_kind(item: dict) -> str:
+    """Whether an event's description is a crew call or a call for speakers.
+
+    A description that asks for both is filed as a speaker call: missing a
+    submission deadline costs more than missing a crew sign-up, and the crew
+    tag stays on the card either way.
+    """
     text = f"{item.get('title', '')} {item.get('desc', '')}"
-    roles = ["From event feed", "Volunteer"]
-    if _SPEAKER_CALL_RE.search(text):
-        roles.insert(0, "Speaker")
-    return roles
+    return KIND_SPEAKER if _SPEAKER_CALL_RE.search(text) else KIND_VOLUNTEER
 
 
-def _from_event_feed(events: list[dict]) -> list[dict]:
-    """Upcoming events that are really an ask for volunteers or speakers.
+def _from_event_feed(events: list[dict], *, kind: str) -> list[dict]:
+    """Upcoming events that are really an ask for crew or for speakers.
 
     Re-tagged rather than copied, so a card reads the same as a curated entry
     and the reader can still see which calendar it came from. The event's own
-    date is kept as ``date``: a crew call inherits the event it belongs to.
+    date is kept as ``date``: a call inherits the event it belongs to.
     """
     calls: list[dict] = []
     for item in events:
         text = f"{item.get('title', '')} {item.get('desc', '')}"
         if not _VOLUNTEER_CALL_RE.search(text):
             continue
-        calls.append(
-            {
-                **item,
-                "kind": "Volunteer",
-                "tags": [*_volunteer_roles(item), *item.get("tags", [])],
-            }
-        )
+        if _event_call_kind(item) != kind:
+            continue
+        tags = ["From event feed", kind]
+        if kind == KIND_SPEAKER:
+            tags.append("Speaker")
+        calls.append({**item, "kind": kind, "tags": [*tags, *item.get("tags", [])]})
     return calls
 
 
-async def get_volunteers() -> dict:
-    """The payload for ``GET /api/public/volunteers``.
+async def _community_feed(kind: str) -> dict:
+    """Curated cards of one community kind plus live calls the calendars carry.
 
-    Curated crew and speaking slots, plus whatever the live calendars are
-    advertising. The live half reuses the event feed's cache, so this costs no
-    extra traffic; when that feed is down the curated entries still serve and
-    ``events_live`` says the calendar half is missing.
+    The live half reuses the event feed's cache, so it costs no extra traffic;
+    when that feed is down the curated entries still serve and ``events_live``
+    says the calendar half is missing.
     """
     try:
         feed = await asyncio.wait_for(refresh_events(), timeout=COLD_WAIT)
     except TimeoutError:
         feed = _feed
 
-    curated = curated_cards("Volunteer")
+    curated = curated_cards(kind)
     curated_titles = {str(item.get("title") or "").strip().lower() for item in curated}
     live = [
         item
-        for item in _from_event_feed(feed.items)
+        for item in _from_event_feed(feed.items, kind=kind)
         if str(item.get("title") or "").strip().lower() not in curated_titles
     ]
     return {
@@ -4747,6 +4879,47 @@ async def get_volunteers() -> dict:
         "events_live": feed.ok,
         "events_updated_at": feed.fetched_at_wall,
     }
+
+
+async def get_volunteers() -> dict:
+    """The payload for ``GET /api/public/volunteers``.
+
+    Event crew only. Speaker calls used to share this list and now have their
+    own tab, so a registration-desk shift is not mixed in with a CFP.
+    """
+    return await _community_feed(KIND_VOLUNTEER)
+
+
+async def get_speakers() -> dict:
+    """The payload for ``GET /api/public/speakers``.
+
+    Conference and meetup calls for papers, plus live events whose description
+    asks for speakers. Curated entries carry the deadline, the talk length and
+    whether travel is covered, which is the part a CFP listing usually omits.
+    """
+    return await _community_feed(KIND_SPEAKER)
+
+
+async def get_open_source() -> dict:
+    """The payload for ``GET /api/public/open-source``.
+
+    Contribution programmes, mentored newcomer routes and standing project
+    communities. No calendar advertises these, so there is no live half and
+    ``events_live`` stays true rather than showing an outage for a feed this
+    page never used.
+    """
+    items = sorted(curated_cards(KIND_OPEN_SOURCE), key=_sort_key)
+    return {"items": items, "events_live": True, "events_updated_at": None}
+
+
+async def get_mentorship() -> dict:
+    """The payload for ``GET /api/public/mentorship``.
+
+    Mentee intakes and calls for mentors, curated only for the same reason as
+    open source: these are programme pages, not calendar events.
+    """
+    items = sorted(curated_cards(KIND_MENTORSHIP), key=_sort_key)
+    return {"items": items, "events_live": True, "events_updated_at": None}
 
 
 def _upcoming_hackathons(today: date | None = None) -> list[dict]:

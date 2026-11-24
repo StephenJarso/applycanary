@@ -21,11 +21,21 @@ from fastapi.testclient import TestClient
 
 from app.main import create_app
 from app.opportunities import (
+    _BUILTIN_CARDS,
     APPRENTICESHIPS,
+    COMMUNITY_KINDS,
     CURATED_EVENTS,
+    CURATED_VERIFIED_ON,
     HACKATHONS,
     INTERNSHIPS,
+    KIND_MENTORSHIP,
+    KIND_OPEN_SOURCE,
+    KIND_SPEAKER,
+    KIND_VOLUNTEER,
+    MENTORSHIP,
+    OPEN_SOURCE,
     PAID_PROGRAMS,
+    SPEAKERS,
     VOLUNTEER,
     CardEvent,
     Feed,
@@ -40,6 +50,7 @@ from app.opportunities import (
     _upcoming_curated_events,
     _upcoming_hackathons,
     _workke_item,
+    classify_community_role,
     parse_card_date,
     parse_event_cards,
     parse_event_detail,
@@ -724,6 +735,51 @@ def test_volunteer_calls_are_not_served_under_another_tab():
     assert all(v["kind"] == "Volunteer" for v in VOLUNTEER)
 
 
+def test_community_roles_are_split_once_into_four_kinds():
+    """Every curated call lands on exactly one tab, and the kind matches."""
+    buckets = {
+        KIND_VOLUNTEER: _BUILTIN_CARDS[KIND_VOLUNTEER],
+        KIND_SPEAKER: SPEAKERS,
+        KIND_OPEN_SOURCE: OPEN_SOURCE,
+        KIND_MENTORSHIP: MENTORSHIP,
+    }
+    assert set(buckets) == set(COMMUNITY_KINDS)
+    assert sum(len(bucket) for bucket in buckets.values()) == len(VOLUNTEER)
+    seen: set[str] = set()
+    for kind, cards in buckets.items():
+        assert cards, f"{kind} has no curated entries"
+        for card in cards:
+            assert card["kind"] == kind
+            assert kind in card["tags"], f"{card['title']} is missing its kind tag"
+            assert card["title"] not in seen, "a role cannot sit on two tabs"
+            seen.add(card["title"])
+
+    # The headline decides: "speaker support" crew stays crew, a CFP is a CFP.
+    assert any("call for speakers" in c["title"].lower() for c in SPEAKERS)
+    assert any("mentor" in c["title"].lower() for c in MENTORSHIP)
+    assert any("open" in c["title"].lower() for c in OPEN_SOURCE)
+    assert not any("speakers" in c["title"].lower() for c in buckets[KIND_VOLUNTEER])
+
+
+def test_every_curated_card_carries_a_verification_date():
+    cards = [
+        *PAID_PROGRAMS,
+        *INTERNSHIPS,
+        *APPRENTICESHIPS,
+        *VOLUNTEER,
+        *SPEAKERS,
+        *OPEN_SOURCE,
+        *MENTORSHIP,
+        *HACKATHONS,
+        *CURATED_EVENTS,
+    ]
+    for card in cards:
+        assert card.get("last_verified"), f"{card['title']} has never been checked"
+        datetime.fromisoformat(str(card["last_verified"]))
+        assert card["last_verified"] <= date.today().isoformat()
+    assert CURATED_VERIFIED_ON in {c["last_verified"] for c in cards}
+
+
 def test_volunteer_entries_carry_everything_the_card_renders():
     for entry in VOLUNTEER:
         assert entry["url"].startswith("https://")
@@ -782,16 +838,27 @@ def test_a_crew_call_can_carry_the_event_it_belongs_to():
         assert entry["steps"], f"{entry['title']} never says how to get in"
 
 
-def test_event_feed_calls_are_retagged_as_volunteer_slots():
-    items = _from_event_feed([_volunteer_event()])
+def test_event_feed_calls_are_retagged_as_speaker_calls():
+    """A description asking for crew *and* talks is filed as the talk call."""
+    items = _from_event_feed([_volunteer_event()], kind=KIND_SPEAKER)
     assert len(items) == 1
     item = items[0]
-    assert item["kind"] == "Volunteer"
-    assert "From event feed" in item["tags"] and "Volunteer" in item["tags"]
-    assert "Speaker" in item["tags"]  # the same description carries the CFP
+    assert item["kind"] == KIND_SPEAKER
+    assert "From event feed" in item["tags"] and "Speaker" in item["tags"]
     # The event's own date is kept, so the card still counts down to something.
     assert item["date"] == "2026-11-21"
     assert item["source"] == "GDG Community"
+
+
+def test_event_feed_crew_calls_do_not_leak_into_the_speaker_tab():
+    crew = {
+        **_volunteer_event(),
+        "title": "DevFest Kisumu 2026",
+        "desc": "We need volunteers for the registration desk and the AV crew.",
+    }
+    assert _from_event_feed([crew], kind=KIND_SPEAKER) == []
+    items = _from_event_feed([crew], kind=KIND_VOLUNTEER)
+    assert [item["kind"] for item in items] == [KIND_VOLUNTEER]
 
 
 def test_event_feed_ignores_an_event_that_merely_lists_speakers():
@@ -801,12 +868,14 @@ def test_event_feed_ignores_an_event_that_merely_lists_speakers():
         "title": "Africa Tech Festival 2026",
         "desc": "Join 50+ industry-leading speakers and 300 exhibitors in Cape Town.",
     }
-    assert _from_event_feed([lineup]) == []
+    assert _from_event_feed([lineup], kind=KIND_VOLUNTEER) == []
+    assert _from_event_feed([lineup], kind=KIND_SPEAKER) == []
 
 
 def test_event_feed_ignores_an_event_with_no_call_in_it():
     quiet = {**_volunteer_event(), "title": "Monthly meetup", "desc": "Talks and pizza."}
-    assert _from_event_feed([quiet]) == []
+    assert _from_event_feed([quiet], kind=KIND_VOLUNTEER) == []
+    assert _from_event_feed([quiet], kind=KIND_SPEAKER) == []
 
 
 def test_volunteers_endpoint_is_public_and_serves_only_volunteer_roles(client, monkeypatch):
@@ -820,12 +889,47 @@ def test_volunteers_endpoint_is_public_and_serves_only_volunteer_roles(client, m
     body = res.json()
 
     assert body["events_live"] is True
-    assert {item["kind"] for item in body["items"]} == {"Volunteer"}
+    assert {item["kind"] for item in body["items"]} == {KIND_VOLUNTEER}
     titles = [item["title"] for item in body["items"]]
-    # The curated crew calls ride along...
-    assert {v["title"] for v in VOLUNTEER} <= set(titles)
-    # ...and so does the live event that asked for help.
+    # The curated crew calls ride along; the speaker calls do not.
+    curated_crew = [v for v in VOLUNTEER if classify_community_role(v) == KIND_VOLUNTEER]
+    assert {v["title"] for v in curated_crew} <= set(titles)
+    assert not {v["title"] for v in SPEAKERS} & set(titles)
+
+
+def test_speakers_endpoint_serves_the_cfp_and_the_live_speaker_call(client, monkeypatch):
+    async def fake_refresh(force: bool = False) -> Feed:  # noqa: ARG001
+        return Feed(items=[_volunteer_event()], fetched_at=1.0, ok=True)
+
+    monkeypatch.setattr("app.opportunities.refresh_events", fake_refresh)
+
+    res = client.get("/api/public/speakers")
+    assert res.status_code == 200
+    body = res.json()
+
+    assert {item["kind"] for item in body["items"]} == {KIND_SPEAKER}
+    titles = {item["title"] for item in body["items"]}
+    assert {card["title"] for card in SPEAKERS} <= titles
     assert "DevFest Kisumu 2026" in titles
+    # Curated calls carry the date they were checked; the live calendar entry
+    # is checked by its feed, not by a curator.
+    curated = [item for item in body["items"] if item["title"] in {c["title"] for c in SPEAKERS}]
+    assert all(item["last_verified"] for item in curated)
+
+
+def test_open_source_and_mentorship_endpoints_are_curated_only(client):
+    for path, expected in (
+        ("/api/public/open-source", OPEN_SOURCE),
+        ("/api/public/mentorship", MENTORSHIP),
+    ):
+        res = client.get(path)
+        assert res.status_code == 200
+        body = res.json()
+        assert body["events_live"] is True
+        assert {item["title"] for item in body["items"]} == {
+            card["title"] for card in expected
+        }
+        assert all(item["last_verified"] for item in body["items"])
 
 
 def test_volunteers_endpoint_does_not_double_a_curated_entry(client, monkeypatch):
@@ -857,8 +961,9 @@ def test_volunteers_endpoint_keeps_curated_roles_when_the_calendar_is_down(clien
     body = res.json()
 
     assert body["events_live"] is False
-    assert {item["title"] for item in body["items"]} == {v["title"] for v in VOLUNTEER}
-    assert {item["kind"] for item in body["items"]} == {"Volunteer"}
+    curated_crew = [v for v in VOLUNTEER if classify_community_role(v) == KIND_VOLUNTEER]
+    assert {item["title"] for item in body["items"]} == {v["title"] for v in curated_crew}
+    assert {item["kind"] for item in body["items"]} == {KIND_VOLUNTEER}
 
 
 # ------------------------------------------------------------------ hackathons

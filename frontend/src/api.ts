@@ -627,6 +627,9 @@ export interface Opportunity {
     | "Internship"
     | "Apprenticeship"
     | "Volunteer"
+    | "Speaker / CFP"
+    | "Open source"
+    | "Mentorship"
     | "Hackathon"
     | "Fellowship"
     | "Competition"
@@ -659,6 +662,8 @@ export interface Opportunity {
   remote_friendly?: boolean;
   eligibility?: string[];
   paid_to_learn?: boolean;
+  /** ISO date a human last checked this card against the organiser's page. */
+  last_verified?: string | null;
   /** Server-side verdict on `closes`, so the browser clock is not the judge. */
   expired?: boolean;
   days_left?: number | null;
@@ -730,6 +735,9 @@ export const api = {
   opportunities: () => request<Opportunities>("/public/opportunities"),
   internships: () => request<Opportunities>("/public/internships"),
   volunteers: () => request<Opportunities>("/public/volunteers"),
+  speakers: () => request<Opportunities>("/public/speakers"),
+  openSource: () => request<Opportunities>("/public/open-source"),
+  mentorship: () => request<Opportunities>("/public/mentorship"),
   hackathons: () => request<Opportunities>("/public/hackathons"),
   kenyaJobs: (refresh = false) =>
     request<EntryLevelFeed>(`/public/kenya-jobs${refresh ? "?refresh=true" : ""}`),

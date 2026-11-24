@@ -193,6 +193,9 @@ class OpportunityOut(BaseModel):
         "Internship",
         "Apprenticeship",
         "Volunteer",
+        "Speaker / CFP",
+        "Open source",
+        "Mentorship",
         "Hackathon",
     ]
     title: str
@@ -201,6 +204,8 @@ class OpportunityOut(BaseModel):
     city: str
     tags: list[str] = Field(default_factory=list)
     source: str
+    # ISO date a curator last checked the card against the organiser's page.
+    last_verified: str | None = None
     url: str
     desc: str = ""
     date: str = ""  # ISO event date; "" when only a printed date was available
@@ -927,6 +932,40 @@ async def public_volunteers() -> OpportunitiesOut:
     from app.opportunities import get_volunteers
 
     return OpportunitiesOut(**await get_volunteers())
+
+
+@router.get("/public/speakers", response_model=OpportunitiesOut)
+async def public_speakers() -> OpportunitiesOut:
+    """Calls for papers at conferences and meetups, public like the crew list.
+
+    Speaker calls used to be filed under volunteers; they are a separate tab
+    now because the decision is different (a talk proposal with a deadline,
+    not a shift), and the live calendar half only contributes events whose
+    description actually asks for speakers.
+    """
+    from app.opportunities import get_speakers
+
+    return OpportunitiesOut(**await get_speakers())
+
+
+@router.get("/public/open-source", response_model=OpportunitiesOut)
+async def public_open_source() -> OpportunitiesOut:
+    """Contribution programmes and newcomer routes into open-source projects.
+
+    Curated only: no calendar carries these, and each entry is a standing
+    contribution path rather than an event with a date.
+    """
+    from app.opportunities import get_open_source
+
+    return OpportunitiesOut(**await get_open_source())
+
+
+@router.get("/public/mentorship", response_model=OpportunitiesOut)
+async def public_mentorship() -> OpportunitiesOut:
+    """Mentee intakes and calls for mentors, curated from the programme pages."""
+    from app.opportunities import get_mentorship
+
+    return OpportunitiesOut(**await get_mentorship())
 
 
 @router.get("/public/hackathons", response_model=OpportunitiesOut)
@@ -3407,7 +3446,15 @@ def delete_board(
 class ProgrammeIn(BaseModel):
     """One curated card as an admin submits it, mirroring the public shape."""
 
-    kind: Literal["Paid program", "Internship", "Apprenticeship", "Volunteer"]
+    kind: Literal[
+        "Paid program",
+        "Internship",
+        "Apprenticeship",
+        "Volunteer",
+        "Speaker / CFP",
+        "Open source",
+        "Mentorship",
+    ]
     title: str = Field(min_length=1, max_length=200)
     org: str = ""
     when: str = ""

@@ -2999,6 +2999,9 @@ input[type="range"]::-moz-range-thumb {
 .opp-kind-intern { background: var(--ac-primary); color: var(--ac-on-primary); }
 .opp-kind-apprentice { background: var(--ac-secondary-container, #d7e8c8); color: var(--ac-on-secondary-container, #1b3a10); }
 .opp-kind-volunteer { background: var(--ac-tertiary-container); color: var(--ac-on-tertiary-container); }
+.opp-kind-speaker { background: var(--ac-secondary-container); color: var(--ac-on-secondary-container); }
+.opp-kind-opensource { background: var(--ac-surface-variant); color: var(--ac-on-surface-variant); }
+.opp-kind-mentorship { background: var(--ac-error-container); color: var(--ac-on-error-container); }
 .opp-kind-hackathon { background: var(--ac-primary-fixed); color: var(--ac-primary); }
 .opp-badges { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-top: 0.6rem; }
 .opp-badge {

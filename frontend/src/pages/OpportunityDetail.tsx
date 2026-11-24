@@ -21,13 +21,20 @@ export default function OpportunityDetail() {
     "/opportunities": "Events & Programs",
     "/internships": "Internships",
     "/volunteers": "Volunteer",
+    "/speakers": "Speakers",
+    "/open-source": "Open source",
+    "/mentorship": "Mentorship",
     "/hackathons": "Hackathons",
   };
   const KIND_ROUTES: Record<string, string> = {
     Event: "/opportunities",
     "Paid program": "/opportunities",
     Internship: "/internships",
+    Apprenticeship: "/internships",
     Volunteer: "/volunteers",
+    "Speaker / CFP": "/speakers",
+    "Open source": "/open-source",
+    Mentorship: "/mentorship",
     Hackathon: "/hackathons",
   };
   const backTo =

@@ -23,6 +23,15 @@ const Internships = lazy(() => import("./pages/Internships"));
 const OpportunityDetail = lazy(() => import("./pages/OpportunityDetail"));
 const KenyaJobs = lazy(() => import("./pages/KenyaJobs"));
 const Volunteers = lazy(() => import("./pages/Volunteers"));
+const Speakers = lazy(() =>
+  import("./pages/Volunteers").then((m) => ({ default: m.Speakers })),
+);
+const OpenSource = lazy(() =>
+  import("./pages/Volunteers").then((m) => ({ default: m.OpenSource })),
+);
+const Mentorship = lazy(() =>
+  import("./pages/Volunteers").then((m) => ({ default: m.Mentorship })),
+);
 const Hackathons = lazy(() => import("./pages/Hackathons"));
 const Pipeline = lazy(() => import("./pages/Pipeline"));
 
@@ -51,8 +60,12 @@ const NAV = [
   { to: "/kenya-jobs", label: "Kenya Jobs", icon: "work", mobile: true },
   { to: "/internships", label: "Internships & Opportunities", short: "Internships", icon: "school", end: true },
   { to: "/opportunities", label: "Programs", icon: "event", end: true },
-  // Crew, mentoring and speaking slots at tech events — rare, and never on a job board
+  // Community roles split by what is being asked for: a shift, a talk, a PR or
+  // a mentoring relationship. Rare roles, and never on a job board.
   { to: "/volunteers", label: "Volunteer", icon: "volunteer_activism", end: true },
+  { to: "/speakers", label: "Speakers", icon: "campaign", end: true },
+  { to: "/open-source", label: "Open source", icon: "code", end: true },
+  { to: "/mentorship", label: "Mentorship", icon: "diversity_3", end: true },
   // Cash-prize builds: online, or Kenyan in-person with the venue named
   { to: "/hackathons", label: "Hackathons", icon: "emoji_events", end: true },
   // What came back after applying: outcomes, replies and follow-ups due.
@@ -65,6 +78,9 @@ const MOBILE_DRAWER_PAGES = [
   { to: "/internships", label: "Internships & Opportunities", icon: "school", end: true },
   { to: "/opportunities", label: "Programs", icon: "event", end: true },
   { to: "/volunteers", label: "Volunteer", icon: "volunteer_activism", end: true },
+  { to: "/speakers", label: "Speakers", icon: "campaign", end: true },
+  { to: "/open-source", label: "Open source", icon: "code", end: true },
+  { to: "/mentorship", label: "Mentorship", icon: "diversity_3", end: true },
   { to: "/hackathons", label: "Hackathons", icon: "emoji_events", end: true },
   { to: "/pipeline", label: "Pipeline", icon: "view_kanban", end: true },
   { to: "/applications", label: "Applications", icon: "work_history", end: true },
@@ -78,7 +94,17 @@ const MOBILE_MORE_PATHS = [
   "/sources",
 ];
 
-function Dashboard({ page }: { page?: "internships" | "programs" | "kenya-jobs" | "volunteers" | "hackathons" }) {
+type DashboardPage =
+  | "internships"
+  | "programs"
+  | "kenya-jobs"
+  | "volunteers"
+  | "speakers"
+  | "open-source"
+  | "mentorship"
+  | "hackathons";
+
+function Dashboard({ page }: { page?: DashboardPage }) {
   const { user, logout } = useAuth();
   const location = useLocation();
   const [moreOpen, setMoreOpen] = useState(false);
@@ -144,6 +170,24 @@ function Dashboard({ page }: { page?: "internships" | "programs" | "kenya-jobs" 
     staleTime: 12 * 60 * 60_000,
     refetchOnWindowFocus: false,
   });
+  const speakers = useQuery({
+    queryKey: ["speakers"],
+    queryFn: api.speakers,
+    staleTime: 12 * 60 * 60_000,
+    refetchOnWindowFocus: false,
+  });
+  const openSource = useQuery({
+    queryKey: ["open-source"],
+    queryFn: api.openSource,
+    staleTime: 12 * 60 * 60_000,
+    refetchOnWindowFocus: false,
+  });
+  const mentorship = useQuery({
+    queryKey: ["mentorship"],
+    queryFn: api.mentorship,
+    staleTime: 12 * 60 * 60_000,
+    refetchOnWindowFocus: false,
+  });
   const hackathons = useQuery({
     queryKey: ["hackathons"],
     queryFn: api.hackathons,
@@ -157,6 +201,9 @@ function Dashboard({ page }: { page?: "internships" | "programs" | "kenya-jobs" 
     ...(internships.data?.items ?? []),
     ...(opportunities.data?.items ?? []),
     ...(volunteers.data?.items ?? []),
+    ...(speakers.data?.items ?? []),
+    ...(openSource.data?.items ?? []),
+    ...(mentorship.data?.items ?? []),
     ...(hackathons.data?.items ?? []),
   ];
 
@@ -425,6 +472,9 @@ function Dashboard({ page }: { page?: "internships" | "programs" | "kenya-jobs" 
                     to={
                       nearest.kind === "Internship" ? "/internships"
                       : nearest.kind === "Volunteer" ? "/volunteers"
+                      : nearest.kind === "Speaker / CFP" ? "/speakers"
+                      : nearest.kind === "Open source" ? "/open-source"
+                      : nearest.kind === "Mentorship" ? "/mentorship"
                       : nearest.kind === "Hackathon" ? "/hackathons"
                       : "/opportunities"
                     }
@@ -486,6 +536,12 @@ function Dashboard({ page }: { page?: "internships" | "programs" | "kenya-jobs" 
             <Opportunities embedded />
           ) : page === "volunteers" ? (
             <Volunteers embedded />
+          ) : page === "speakers" ? (
+            <Speakers embedded />
+          ) : page === "open-source" ? (
+            <OpenSource embedded />
+          ) : page === "mentorship" ? (
+            <Mentorship embedded />
           ) : page === "hackathons" ? (
             <Hackathons embedded />
           ) : page === "kenya-jobs" ? (
@@ -539,6 +595,9 @@ export default function App() {
         <Route path="/opportunities" element={user ? <Dashboard page="programs" /> : <Opportunities />} />
         <Route path="/internships" element={user ? <Dashboard page="internships" /> : <Navigate to="/" replace />} />
         <Route path="/volunteers" element={user ? <Dashboard page="volunteers" /> : <Navigate to="/" replace />} />
+        <Route path="/speakers" element={user ? <Dashboard page="speakers" /> : <Navigate to="/" replace />} />
+        <Route path="/open-source" element={user ? <Dashboard page="open-source" /> : <Navigate to="/" replace />} />
+        <Route path="/mentorship" element={user ? <Dashboard page="mentorship" /> : <Navigate to="/" replace />} />
         <Route path="/hackathons" element={user ? <Dashboard page="hackathons" /> : <Navigate to="/" replace />} />
         <Route path="/kenya-jobs" element={user ? <Dashboard page="kenya-jobs" /> : <KenyaJobs embedded={false} />} />
         <Route path="/entry-level" element={<Navigate to="/kenya-jobs" replace />} />

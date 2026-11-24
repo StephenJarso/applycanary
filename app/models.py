@@ -682,8 +682,9 @@ class ProgrammeEntry(SQLModel, table=True):
     )
 
     id: int | None = Field(default=None, primary_key=True)
-    # Paid program | Internship | Apprenticeship | Volunteer. Apprenticeship
-    # is the "earn while you learn" shape: Zone01 Kisumu, HENNGE, Igalia.
+    # Paid program | Internship | Apprenticeship | Volunteer | Speaker / CFP |
+    # Open source | Mentorship. Apprenticeship is the "earn while you learn"
+    # shape: Zone01 Kisumu, HENNGE, Igalia.
     kind: str = Field(index=True)
     title: str
     org: str = ""
@@ -715,6 +716,11 @@ class ProgrammeEntry(SQLModel, table=True):
     # they are filed as an apprenticeship, internship or paid program.
     paid_to_learn: bool = False
     source: str = ""
+    # Last date a human checked this card against the organiser's own page.
+    # The seed stamps curated constants with one curation date; a card an admin
+    # has since touched keeps whatever date it was given. Empty means the card
+    # predates the field and has not been re-checked.
+    last_verified: str | None = None
     url: str = ""
     desc: str = Field(default="", sa_column=Column(Text))
     # Deleting a built-in card retires it instead of removing the row: the seed

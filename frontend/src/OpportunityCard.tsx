@@ -505,6 +505,9 @@ export function OpportunityCard({
               : item.kind === "Apprenticeship" ? " opp-kind-apprentice"
               : item.kind === "Internship" ? " opp-kind-intern"
               : item.kind === "Volunteer" ? " opp-kind-volunteer"
+              : item.kind === "Speaker / CFP" ? " opp-kind-speaker"
+              : item.kind === "Open source" ? " opp-kind-opensource"
+              : item.kind === "Mentorship" ? " opp-kind-mentorship"
               : item.kind === "Hackathon" ? " opp-kind-hackathon" : "")
           }
         >
@@ -516,6 +519,14 @@ export function OpportunityCard({
           </span>
         )}
         <span className="opp-source">via {item.source}</span>
+        {item.last_verified && (
+          <span
+            className="opp-source"
+            title="Last checked against the organiser's own page"
+          >
+            checked {fmtDate(item.last_verified)}
+          </span>
+        )}
         {onToggleWatch && (
           <button
             type="button"
